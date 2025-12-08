@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Category, CategoryType } from '../types';
-import { Folder, FolderPlus, Trash2, Edit2, ChevronRight, ChevronDown } from 'lucide-react';
+import { Folder, FolderPlus, Trash2, ChevronRight, ChevronDown } from 'lucide-react';
 
 interface CategoryManagerProps {
   categories: Category[];
@@ -18,10 +18,14 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, onAddCate
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
+    // Fix TS2783: Exclude 'id' and 'parentId' from spread
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { id: _id, parentId: _pid, ...restCat } = newCat as Category;
+
     onAddCategory({
+      ...restCat,
       id: `cat_${Date.now()}`,
       parentId: newCat.parentId === '' ? null : newCat.parentId!,
-      ...newCat as Category
     });
     setNewCat({ ...newCat, name: '', code: '' });
   };

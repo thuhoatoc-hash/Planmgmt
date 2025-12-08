@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User } from '../types';
-import { X, Lock, Phone, Image, User as UserIcon } from 'lucide-react';
+import { X, Lock, Phone, Image } from 'lucide-react';
 
 interface UserProfileProps {
   user: User;

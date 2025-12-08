@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ProjectStatusItem } from '../types';
-import { Settings, Plus, Edit, Trash2, List } from 'lucide-react';
+import { Edit, Trash2, List } from 'lucide-react';
 
 interface ConfigurationManagerProps {
   statuses: ProjectStatusItem[];

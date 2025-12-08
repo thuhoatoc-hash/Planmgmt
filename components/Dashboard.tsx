@@ -113,7 +113,7 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories }
         />
         <StatCard 
           title="Dự án Đang chạy" 
-          value={projects.filter(p => p.status === 'ACTIVE').length} 
+          value={projects.filter(p => p.statusId !== 'st7').length} 
           subValue={`Tổng: ${projects.length} dự án`}
           icon={Activity}
           colorClass={{ bg: 'bg-indigo-50', icon: 'text-indigo-600', text: 'text-indigo-600' }}
@@ -157,7 +157,7 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories }
                       paddingAngle={5}
                       dataKey="value"
                     >
-                      {categoryData.map((entry, index) => (
+                      {categoryData.map((_, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>

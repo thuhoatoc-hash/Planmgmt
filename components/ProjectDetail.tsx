@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Project, Contract, Category, ContractType, CategoryType } from '../types';
-import { ArrowLeft, Plus, FileText, DollarSign, Calendar, Briefcase, Filter, User, Building2 } from 'lucide-react';
+import { ArrowLeft, Plus, DollarSign, Calendar, Briefcase, Filter, User, Building2 } from 'lucide-react';
 import { MOCK_USERS, MOCK_PARTNERS, MOCK_STATUSES } from '../services/mockData'; // In real app, pass via props
 
 interface ProjectDetailProps {
@@ -50,13 +50,13 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
     const category = categories.find(c => c.id === newContract.categoryId);
     const type = category?.type === CategoryType.REVENUE ? ContractType.OUTPUT : ContractType.INPUT;
 
-    const contract: Contract = {
+    // Fix TS2783 by spreading first, then adding generated properties
+    onAddContract({
+      ...newContract as Contract,
       id: `ctr_${Date.now()}`,
       projectId: project.id,
       type,
-      ...newContract as Contract
-    };
-    onAddContract(contract);
+    });
     setIsModalOpen(false);
     setNewContract({ code: '', name: '', value: 0, partnerName: '', signedDate: new Date().toISOString().split('T')[0], status: 'PENDING' });
   };

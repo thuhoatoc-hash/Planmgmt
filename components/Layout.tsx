@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, FolderKanban, Tags, Users, LogOut, Menu, X, Settings, Briefcase, UserCircle, Signal } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, Tags, Users, LogOut, Menu, X, Settings, Briefcase, Signal } from 'lucide-react';
 import { User } from '../types';
 
 interface LayoutProps {
