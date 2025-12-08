@@ -1,3 +1,4 @@
+
 export enum UserRole {
   ADMIN = 'ADMIN',
   USER = 'USER',
@@ -8,7 +9,7 @@ export interface User {
   username: string;
   fullName: string;
   role: UserRole;
-  password?: string; // For mock login/update
+  password?: string;
   phoneNumber?: string;
   avatarUrl?: string;
 }
@@ -40,18 +41,32 @@ export interface Partner {
   contactInfo: string;
 }
 
+export enum ProjectType {
+  OUTRIGHT_SALE = 'OUTRIGHT_SALE', // Bán đứt
+  SERVICE_LEASE = 'SERVICE_LEASE', // Thuê dịch vụ
+}
+
+export enum ProductType {
+  HARDWARE = 'HARDWARE', // Phần cứng
+  INTERNAL_SOFTWARE = 'INTERNAL_SOFTWARE', // Phần mềm nội bộ
+  HYBRID = 'HYBRID', // Hỗn hợp
+}
+
 export interface Project {
   id: string;
   name: string;
   code: string;
   description: string;
-  statusId: string; // Link to ProjectStatusItem
+  statusId: string;
   startDate: string;
   endDate: string;
-  budget: number;
-  amId?: string; // Account Manager (User ID)
-  pmId?: string; // Project Manager (User ID)
-  partnerId?: string; // Partner ID
+  plannedRevenue: number;
+  plannedCost: number;
+  projectType: ProjectType;
+  productType: ProductType;
+  amId?: string;
+  pmId?: string;
+  partnerId?: string;
 }
 
 export enum ContractType {
@@ -65,17 +80,32 @@ export interface Contract {
   code: string;
   name: string;
   type: ContractType;
-  categoryId: string; // Link to specific Revenue/Cost category
-  value: number;
+  categoryId: string; // Tham chiếu đến Category
+  value: number;      // Giá trị HĐ (đã gồm VAT hoặc chưa tùy quy định, ở đây giả sử là Gross)
   signedDate: string;
   status: 'PENDING' | 'SIGNED' | 'COMPLETED' | 'CANCELLED';
-  partnerName: string;
+  partnerName: string; // Tên đối tác ký HĐ (có thể khác đối tác dự án)
+  
+  // Fields for contract detail
+  partyA: string;
+  partyB: string;
+  effectiveDate: string;
+  guaranteeValue: number;
 }
 
-// Helper interface for Dashboard
-export interface FinancialSummary {
-  totalRevenue: number;
-  totalCost: number;
-  profit: number;
-  roi: number;
+export enum TaskStatus {
+  NEW = 'NEW',
+  IN_PROGRESS = 'IN_PROGRESS',
+  COMPLETED = 'COMPLETED',
+  LATE = 'LATE'
+}
+
+export interface Task {
+  id: string;
+  projectId: string;
+  name: string;
+  assigneeId: string; // User ID
+  status: TaskStatus;
+  deadline: string;
+  description?: string;
 }

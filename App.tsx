@@ -9,8 +9,9 @@ import UserManager from './components/UserManager';
 import PartnerManager from './components/PartnerManager';
 import ConfigurationManager from './components/ConfigurationManager';
 import UserProfile from './components/UserProfile';
-import { User, Project, Contract, Category, Partner, ProjectStatusItem } from './types';
-import { MOCK_USERS, MOCK_PROJECTS, MOCK_CONTRACTS, MOCK_CATEGORIES, MOCK_PARTNERS, MOCK_STATUSES } from './services/mockData';
+import Reports from './components/Reports';
+import { User, Project, Contract, Category, Partner, ProjectStatusItem, Task } from './types';
+import { MOCK_USERS, MOCK_PROJECTS, MOCK_CONTRACTS, MOCK_CATEGORIES, MOCK_PARTNERS, MOCK_STATUSES, MOCK_TASKS } from './services/mockData';
 
 const App: React.FC = () => {
   // Global State
@@ -25,6 +26,7 @@ const App: React.FC = () => {
   const [users, setUsers] = useState<User[]>(MOCK_USERS);
   const [partners, setPartners] = useState<Partner[]>(MOCK_PARTNERS);
   const [statuses, setStatuses] = useState<ProjectStatusItem[]>(MOCK_STATUSES);
+  const [tasks, setTasks] = useState<Task[]>(MOCK_TASKS);
 
   // View State
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -34,12 +36,27 @@ const App: React.FC = () => {
     return <Login onLogin={setUser} />;
   }
 
-  // Data Handlers
+  // Project Handlers
   const handleAddProject = (p: Project) => setProjects([p, ...projects]);
+  const handleUpdateProject = (p: Project) => {
+    setProjects(projects.map(existing => existing.id === p.id ? p : existing));
+    if (selectedProject?.id === p.id) setSelectedProject(p);
+  };
+  const handleDeleteProject = (id: string) => {
+    setProjects(projects.filter(p => p.id !== id));
+    if (selectedProject?.id === id) setSelectedProject(null);
+  };
+
+  // Contract Handlers
   const handleAddContract = (c: Contract) => setContracts([c, ...contracts]);
+  const handleUpdateContract = (c: Contract) => setContracts(contracts.map(existing => existing.id === c.id ? c : existing));
+  const handleDeleteContract = (id: string) => setContracts(contracts.filter(c => c.id !== id));
+  
+  // Keep this for backward compatibility or simple status updates if needed
   const handleUpdateContractStatus = (id: string, status: Contract['status']) => {
     setContracts(contracts.map(c => c.id === id ? { ...c, status } : c));
   };
+
   const handleAddCategory = (c: Category) => setCategories([...categories, c]);
   const handleDeleteCategory = (id: string) => setCategories(categories.filter(c => c.id !== id));
 
@@ -61,6 +78,10 @@ const App: React.FC = () => {
   const handleUpdateStatus = (s: ProjectStatusItem) => setStatuses(statuses.map(existing => existing.id === s.id ? s : existing));
   const handleDeleteStatus = (id: string) => setStatuses(statuses.filter(s => s.id !== id));
 
+  // Task Handlers
+  const handleAddTask = (t: Task) => setTasks([...tasks, t]);
+  const handleUpdateTask = (t: Task) => setTasks(tasks.map(existing => existing.id === t.id ? t : existing));
+  const handleDeleteTask = (id: string) => setTasks(tasks.filter(t => t.id !== id));
 
   // Navigation Logic
   const handleNavigate = (path: string) => {
@@ -78,9 +99,21 @@ const App: React.FC = () => {
           project={selectedProject}
           contracts={contracts}
           categories={categories}
+          user={user}
+          partners={partners}
+          users={users}
+          statuses={statuses}
+          tasks={tasks}
           onBack={() => setSelectedProject(null)}
           onAddContract={handleAddContract}
+          onUpdateContract={handleUpdateContract}
+          onDeleteContract={handleDeleteContract}
           onUpdateContractStatus={handleUpdateContractStatus}
+          onUpdateProject={handleUpdateProject}
+          onDeleteProject={handleDeleteProject}
+          onAddTask={handleAddTask}
+          onUpdateTask={handleUpdateTask}
+          onDeleteTask={handleDeleteTask}
         />
       );
     }
@@ -88,13 +121,18 @@ const App: React.FC = () => {
     switch (currentPath) {
       case 'dashboard':
         return <Dashboard projects={projects} contracts={contracts} categories={categories} />;
+      case 'reports':
+        return <Reports projects={projects} contracts={contracts} categories={categories} users={users} />;
       case 'projects':
         return <ProjectList 
                   projects={projects} 
+                  contracts={contracts} // Passed for calculation
                   users={users} 
                   partners={partners}
                   statuses={statuses}
                   onAddProject={handleAddProject} 
+                  onUpdateProject={handleUpdateProject}
+                  onDeleteProject={handleDeleteProject}
                   onSelectProject={setSelectedProject} 
                />;
       case 'categories':

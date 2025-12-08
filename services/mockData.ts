@@ -1,4 +1,4 @@
-import { Category, CategoryType, Contract, ContractType, Project, Partner, ProjectStatusItem, User, UserRole } from '../types';
+import { Category, CategoryType, Contract, ContractType, Project, Partner, ProjectStatusItem, User, UserRole, ProjectType, ProductType, Task, TaskStatus } from '../types';
 
 export const MOCK_USERS: User[] = [
   { id: '1', username: 'admin', password: '123', fullName: 'Quản trị viên', role: UserRole.ADMIN, phoneNumber: '0901234567', avatarUrl: '' },
@@ -23,13 +23,10 @@ export const MOCK_STATUSES: ProjectStatusItem[] = [
 ];
 
 export const MOCK_CATEGORIES: Category[] = [
-  // Doanh thu
   { id: 'cat_r1', name: 'Doanh thu Bán hàng', type: CategoryType.REVENUE, parentId: null, code: 'DT-BH' },
   { id: 'cat_r1_1', name: 'Bán lẻ', type: CategoryType.REVENUE, parentId: 'cat_r1', code: 'DT-BH-BL' },
   { id: 'cat_r1_2', name: 'Bán buôn', type: CategoryType.REVENUE, parentId: 'cat_r1', code: 'DT-BH-BB' },
   { id: 'cat_r2', name: 'Doanh thu Dịch vụ', type: CategoryType.REVENUE, parentId: null, code: 'DT-DV' },
-  
-  // Chi phí
   { id: 'cat_c1', name: 'Chi phí Trực tiếp', type: CategoryType.COST, parentId: null, code: 'CP-TT' },
   { id: 'cat_c1_1', name: 'Nguyên vật liệu', type: CategoryType.COST, parentId: 'cat_c1', code: 'CP-NVL' },
   { id: 'cat_c1_2', name: 'Nhân công', type: CategoryType.COST, parentId: 'cat_c1', code: 'CP-NC' },
@@ -40,23 +37,50 @@ export const MOCK_PROJECTS: Project[] = [
   { 
     id: 'prj_1', name: 'Chung cư Blue Sky', code: 'BS-2024', 
     description: 'Dự án xây dựng khu chung cư cao cấp tại Quận 7', 
-    statusId: 'st5', startDate: '2024-01-01', endDate: '2025-12-31', budget: 50000000000,
+    statusId: 'st5', startDate: '2024-01-01', endDate: '2025-12-31', 
+    plannedRevenue: 50000000000, plannedCost: 40000000000,
+    projectType: ProjectType.OUTRIGHT_SALE, productType: ProductType.HYBRID,
     amId: '3', pmId: '4', partnerId: 'p1'
   },
   { 
     id: 'prj_2', name: 'Khu dân cư Green Valley', code: 'GV-2024', 
     description: 'Dự án đất nền phân lô', 
-    statusId: 'st1', startDate: '2024-06-01', endDate: '2025-06-01', budget: 20000000000,
+    statusId: 'st1', startDate: '2024-06-01', endDate: '2025-06-01', 
+    plannedRevenue: 20000000000, plannedCost: 15000000000,
+    projectType: ProjectType.SERVICE_LEASE, productType: ProductType.INTERNAL_SOFTWARE,
     amId: '3', pmId: '4', partnerId: 'p2'
   },
 ];
 
 export const MOCK_CONTRACTS: Contract[] = [
-  // Project 1
-  { id: 'ctr_1', projectId: 'prj_1', code: 'HD-BAN-001', name: 'Hợp đồng bán căn hộ A1', type: ContractType.OUTPUT, categoryId: 'cat_r1_1', value: 3000000000, signedDate: '2024-02-15', status: 'SIGNED', partnerName: 'Nguyễn Văn A' },
-  { id: 'ctr_2', projectId: 'prj_1', code: 'HD-MUA-001', name: 'Mua thép Hòa Phát', type: ContractType.INPUT, categoryId: 'cat_c1_1', value: 500000000, signedDate: '2024-01-10', status: 'COMPLETED', partnerName: 'Cty Thép HP' },
-  { id: 'ctr_3', projectId: 'prj_1', code: 'HD-NC-001', name: 'Nhân công xây dựng T1', type: ContractType.INPUT, categoryId: 'cat_c1_2', value: 200000000, signedDate: '2024-01-20', status: 'SIGNED', partnerName: 'Nhà thầu XYZ' },
-  
-  // Project 2
-  { id: 'ctr_4', projectId: 'prj_2', code: 'HD-TK-001', name: 'Thiết kế quy hoạch', type: ContractType.INPUT, categoryId: 'cat_c2', value: 150000000, signedDate: '2024-05-01', status: 'PENDING', partnerName: 'Cty Kiến Trúc Á Đông' },
+  { 
+    id: 'ctr_1', projectId: 'prj_1', code: 'HD-BAN-001', name: 'Hợp đồng bán căn hộ A1', 
+    type: ContractType.OUTPUT, categoryId: 'cat_r1_1', value: 3000000000, signedDate: '2024-02-15', 
+    status: 'SIGNED', partnerName: 'Nguyễn Văn A',
+    partyA: 'Viettel Hà Nội', partyB: 'Nguyễn Văn A', effectiveDate: '2024-02-15', guaranteeValue: 0 
+  },
+  { 
+    id: 'ctr_2', projectId: 'prj_1', code: 'HD-MUA-001', name: 'Mua thép Hòa Phát', 
+    type: ContractType.INPUT, categoryId: 'cat_c1_1', value: 500000000, signedDate: '2024-01-10', 
+    status: 'COMPLETED', partnerName: 'Cty Thép HP',
+    partyA: 'Cty Thép HP', partyB: 'Viettel Hà Nội', effectiveDate: '2024-01-10', guaranteeValue: 50000000
+  },
+  { 
+    id: 'ctr_3', projectId: 'prj_1', code: 'HD-NC-001', name: 'Nhân công xây dựng T1', 
+    type: ContractType.INPUT, categoryId: 'cat_c1_2', value: 200000000, signedDate: '2024-01-20', 
+    status: 'SIGNED', partnerName: 'Nhà thầu XYZ',
+    partyA: 'Nhà thầu XYZ', partyB: 'Viettel Hà Nội', effectiveDate: '2024-01-20', guaranteeValue: 20000000 
+  },
+  { 
+    id: 'ctr_4', projectId: 'prj_2', code: 'HD-TK-001', name: 'Thiết kế quy hoạch', 
+    type: ContractType.INPUT, categoryId: 'cat_c2', value: 150000000, signedDate: '2024-05-01', 
+    status: 'PENDING', partnerName: 'Cty Kiến Trúc Á Đông',
+    partyA: 'Cty Kiến Trúc Á Đông', partyB: 'Viettel Hà Nội', effectiveDate: '2024-05-01', guaranteeValue: 0
+  },
+];
+
+export const MOCK_TASKS: Task[] = [
+    { id: 't1', projectId: 'prj_1', name: 'Khảo sát hiện trường đợt 1', assigneeId: '4', status: TaskStatus.COMPLETED, deadline: '2024-01-15' },
+    { id: 't2', projectId: 'prj_1', name: 'Lên phương án thiết kế sơ bộ', assigneeId: '4', status: TaskStatus.IN_PROGRESS, deadline: '2024-02-28' },
+    { id: 't3', projectId: 'prj_2', name: 'Gặp gỡ chủ đầu tư', assigneeId: '3', status: TaskStatus.LATE, deadline: '2024-05-10' },
 ];

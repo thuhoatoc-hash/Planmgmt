@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, FolderKanban, Tags, Users, LogOut, Menu, X, Settings, Briefcase, Signal } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, Tags, Users, LogOut, Menu, X, Settings, Briefcase, Signal, BarChart3 } from 'lucide-react';
 import { User } from '../types';
 
 interface LayoutProps {
@@ -16,6 +16,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, currentPath, 
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'reports', label: 'Báo cáo', icon: BarChart3 },
     { id: 'projects', label: 'Dự án', icon: FolderKanban },
     { id: 'partners', label: 'Đối tác', icon: Briefcase },
     { id: 'categories', label: 'Danh mục', icon: Tags },
