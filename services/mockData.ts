@@ -1,0 +1,62 @@
+import { Category, CategoryType, Contract, ContractType, Project, Partner, ProjectStatusItem, User, UserRole } from '../types';
+
+export const MOCK_USERS: User[] = [
+  { id: '1', username: 'admin', password: '123', fullName: 'Quản trị viên', role: UserRole.ADMIN, phoneNumber: '0901234567', avatarUrl: '' },
+  { id: '2', username: 'user', password: '123', fullName: 'Nhân viên Kinh doanh', role: UserRole.USER, phoneNumber: '0909876543', avatarUrl: '' },
+  { id: '3', username: 'am_hieu', password: '123', fullName: 'Nguyễn Văn Hiếu (AM)', role: UserRole.USER, phoneNumber: '0912345678', avatarUrl: '' },
+  { id: '4', username: 'pm_tuan', password: '123', fullName: 'Trần Minh Tuấn (PM)', role: UserRole.USER, phoneNumber: '0987654321', avatarUrl: '' },
+];
+
+export const MOCK_PARTNERS: Partner[] = [
+  { id: 'p1', name: 'Công ty Bất Động Sản Á Châu', code: 'ACHAU', contactInfo: '0243.555.888' },
+  { id: 'p2', name: 'Tập đoàn Xây dựng Delta', code: 'DELTA', contactInfo: 'contact@delta.com' },
+];
+
+export const MOCK_STATUSES: ProjectStatusItem[] = [
+  { id: 'st1', name: 'Đang xây dựng hồ sơ', color: 'bg-slate-100 text-slate-700', order: 1 },
+  { id: 'st2', name: 'Đang đấu thầu', color: 'bg-blue-100 text-blue-700', order: 2 },
+  { id: 'st3', name: 'Đang phê duyệt PAKD', color: 'bg-indigo-100 text-indigo-700', order: 3 },
+  { id: 'st4', name: 'Đang ký Hợp đồng', color: 'bg-purple-100 text-purple-700', order: 4 },
+  { id: 'st5', name: 'Đang triển khai', color: 'bg-amber-100 text-amber-700', order: 5 },
+  { id: 'st6', name: 'Đang nghiệm thu xuất HĐ', color: 'bg-orange-100 text-orange-700', order: 6 },
+  { id: 'st7', name: 'Hoàn thành', color: 'bg-emerald-100 text-emerald-700', order: 7 },
+];
+
+export const MOCK_CATEGORIES: Category[] = [
+  // Doanh thu
+  { id: 'cat_r1', name: 'Doanh thu Bán hàng', type: CategoryType.REVENUE, parentId: null, code: 'DT-BH' },
+  { id: 'cat_r1_1', name: 'Bán lẻ', type: CategoryType.REVENUE, parentId: 'cat_r1', code: 'DT-BH-BL' },
+  { id: 'cat_r1_2', name: 'Bán buôn', type: CategoryType.REVENUE, parentId: 'cat_r1', code: 'DT-BH-BB' },
+  { id: 'cat_r2', name: 'Doanh thu Dịch vụ', type: CategoryType.REVENUE, parentId: null, code: 'DT-DV' },
+  
+  // Chi phí
+  { id: 'cat_c1', name: 'Chi phí Trực tiếp', type: CategoryType.COST, parentId: null, code: 'CP-TT' },
+  { id: 'cat_c1_1', name: 'Nguyên vật liệu', type: CategoryType.COST, parentId: 'cat_c1', code: 'CP-NVL' },
+  { id: 'cat_c1_2', name: 'Nhân công', type: CategoryType.COST, parentId: 'cat_c1', code: 'CP-NC' },
+  { id: 'cat_c2', name: 'Chi phí Quản lý', type: CategoryType.COST, parentId: null, code: 'CP-QL' },
+];
+
+export const MOCK_PROJECTS: Project[] = [
+  { 
+    id: 'prj_1', name: 'Chung cư Blue Sky', code: 'BS-2024', 
+    description: 'Dự án xây dựng khu chung cư cao cấp tại Quận 7', 
+    statusId: 'st5', startDate: '2024-01-01', endDate: '2025-12-31', budget: 50000000000,
+    amId: '3', pmId: '4', partnerId: 'p1'
+  },
+  { 
+    id: 'prj_2', name: 'Khu dân cư Green Valley', code: 'GV-2024', 
+    description: 'Dự án đất nền phân lô', 
+    statusId: 'st1', startDate: '2024-06-01', endDate: '2025-06-01', budget: 20000000000,
+    amId: '3', pmId: '4', partnerId: 'p2'
+  },
+];
+
+export const MOCK_CONTRACTS: Contract[] = [
+  // Project 1
+  { id: 'ctr_1', projectId: 'prj_1', code: 'HD-BAN-001', name: 'Hợp đồng bán căn hộ A1', type: ContractType.OUTPUT, categoryId: 'cat_r1_1', value: 3000000000, signedDate: '2024-02-15', status: 'SIGNED', partnerName: 'Nguyễn Văn A' },
+  { id: 'ctr_2', projectId: 'prj_1', code: 'HD-MUA-001', name: 'Mua thép Hòa Phát', type: ContractType.INPUT, categoryId: 'cat_c1_1', value: 500000000, signedDate: '2024-01-10', status: 'COMPLETED', partnerName: 'Cty Thép HP' },
+  { id: 'ctr_3', projectId: 'prj_1', code: 'HD-NC-001', name: 'Nhân công xây dựng T1', type: ContractType.INPUT, categoryId: 'cat_c1_2', value: 200000000, signedDate: '2024-01-20', status: 'SIGNED', partnerName: 'Nhà thầu XYZ' },
+  
+  // Project 2
+  { id: 'ctr_4', projectId: 'prj_2', code: 'HD-TK-001', name: 'Thiết kế quy hoạch', type: ContractType.INPUT, categoryId: 'cat_c2', value: 150000000, signedDate: '2024-05-01', status: 'PENDING', partnerName: 'Cty Kiến Trúc Á Đông' },
+];
