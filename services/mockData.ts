@@ -38,7 +38,7 @@ export const MOCK_PROJECTS: Project[] = [
     id: 'prj_1', name: 'Chung cư Blue Sky', code: 'BS-2024', 
     description: 'Dự án xây dựng khu chung cư cao cấp tại Quận 7', 
     statusId: 'st5', startDate: '2024-01-01', endDate: '2025-12-31', 
-    plannedRevenue: 50000000000, plannedCost: 40000000000,
+    plannedSales: 60000000000, plannedRevenue: 50000000000, plannedCost: 40000000000,
     projectType: ProjectType.OUTRIGHT_SALE, productType: ProductType.HYBRID,
     amId: '3', pmId: '4', partnerId: 'p1'
   },
@@ -46,7 +46,7 @@ export const MOCK_PROJECTS: Project[] = [
     id: 'prj_2', name: 'Khu dân cư Green Valley', code: 'GV-2024', 
     description: 'Dự án đất nền phân lô', 
     statusId: 'st1', startDate: '2024-06-01', endDate: '2025-06-01', 
-    plannedRevenue: 20000000000, plannedCost: 15000000000,
+    plannedSales: 25000000000, plannedRevenue: 20000000000, plannedCost: 15000000000,
     projectType: ProjectType.SERVICE_LEASE, productType: ProductType.INTERNAL_SOFTWARE,
     amId: '3', pmId: '4', partnerId: 'p2'
   },

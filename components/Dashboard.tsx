@@ -15,32 +15,49 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories }
 
   const stats = useMemo(() => {
     let totalRevenue = 0;
+    let totalSales = 0;
     let totalCost = 0;
     const projectStats = projects.map(p => {
       const pContracts = contracts.filter(c => c.projectId === p.id);
-      const rev = pContracts
-        .filter(c => c.type === ContractType.OUTPUT)
+      
+      // Doanh số: Tổng giá trị hợp đồng đầu ra (trừ hủy)
+      const sales = pContracts
+        .filter(c => c.type === ContractType.OUTPUT && c.status !== 'CANCELLED')
         .reduce((acc, curr) => acc + curr.value, 0);
+
+      // Doanh thu: Chỉ tính các hợp đồng đã hoàn thành/nghiệm thu
+      const rev = pContracts
+        .filter(c => c.type === ContractType.OUTPUT && c.status === 'COMPLETED')
+        .reduce((acc, curr) => acc + curr.value, 0);
+
+      // Chi phí: Tổng giá trị hợp đồng đầu vào (trừ hủy)
       const cost = pContracts
-        .filter(c => c.type === ContractType.INPUT)
+        .filter(c => c.type === ContractType.INPUT && c.status !== 'CANCELLED')
         .reduce((acc, curr) => acc + curr.value, 0);
       
       totalRevenue += rev;
+      totalSales += sales;
       totalCost += cost;
 
+      // Profit calculated as Sales - Cost (Efficiency of Signed Contracts)
       return {
         name: p.name,
+        sales: sales,
         revenue: rev,
         cost: cost,
-        profit: rev - cost
+        profit: sales - cost
       };
     });
 
+    // Global Profit = Total Sales - Total Cost
+    const globalProfit = totalSales - totalCost;
+
     return {
       totalRevenue,
+      totalSales,
       totalCost,
-      profit: totalRevenue - totalCost,
-      roi: totalCost > 0 ? ((totalRevenue - totalCost) / totalCost) * 100 : 0,
+      profit: globalProfit,
+      roi: totalCost > 0 ? (globalProfit / totalCost) * 100 : 0,
       projectStats
     };
   }, [projects, contracts]);
@@ -91,11 +108,11 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories }
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
-          title="Tổng Doanh Thu" 
-          value={formatCurrency(stats.totalRevenue)} 
-          subValue="Từ tất cả dự án"
+          title="Tổng Doanh Số (Ký)" 
+          value={formatCurrency(stats.totalSales)} 
+          subValue="Giá trị hợp đồng đầu ra"
           icon={TrendingUp}
-          colorClass={{ bg: 'bg-emerald-50', icon: 'text-emerald-600', text: 'text-emerald-600' }}
+          colorClass={{ bg: 'bg-indigo-50', icon: 'text-indigo-600', text: 'text-indigo-600' }}
         />
         <StatCard 
           title="Tổng Chi Phí" 
@@ -105,25 +122,25 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories }
           colorClass={{ bg: 'bg-red-50', icon: 'text-red-600', text: 'text-red-600' }}
         />
         <StatCard 
-          title="Lợi Nhuận Ròng" 
+          title="Lợi Nhuận (Dự kiến)" 
           value={formatCurrency(stats.profit)} 
           subValue={`ROI: ${stats.roi.toFixed(1)}%`}
           icon={Wallet}
           colorClass={{ bg: 'bg-blue-50', icon: 'text-blue-600', text: 'text-blue-600' }}
         />
         <StatCard 
-          title="Dự án Đang chạy" 
-          value={projects.filter(p => p.statusId !== 'st7').length} 
-          subValue={`Tổng: ${projects.length} dự án`}
+          title="Doanh Thu (NT)" 
+          value={formatCurrency(stats.totalRevenue)} 
+          subValue="Đã nghiệm thu"
           icon={Activity}
-          colorClass={{ bg: 'bg-indigo-50', icon: 'text-indigo-600', text: 'text-indigo-600' }}
+          colorClass={{ bg: 'bg-emerald-50', icon: 'text-emerald-600', text: 'text-emerald-600' }}
         />
       </div>
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-          <h3 className="text-lg font-bold text-slate-800 mb-6">Hiệu quả theo Dự án</h3>
+          <h3 className="text-lg font-bold text-slate-800 mb-6">Hiệu quả theo Dự án (Doanh số vs Chi phí)</h3>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={stats.projectStats} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
@@ -135,7 +152,7 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories }
                   contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                 />
                 <Legend />
-                <Bar dataKey="revenue" name="Doanh thu" fill="#10b981" radius={[4, 4, 0, 0]} barSize={20} />
+                <Bar dataKey="sales" name="Doanh số" fill="#6366f1" radius={[4, 4, 0, 0]} barSize={20} />
                 <Bar dataKey="cost" name="Chi phí" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={20} />
               </BarChart>
             </ResponsiveContainer>
@@ -143,7 +160,7 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories }
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-          <h3 className="text-lg font-bold text-slate-800 mb-6">Cơ cấu Doanh thu</h3>
+          <h3 className="text-lg font-bold text-slate-800 mb-6">Cơ cấu Doanh số theo Danh mục</h3>
           <div className="h-80 flex items-center justify-center">
              {categoryData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">

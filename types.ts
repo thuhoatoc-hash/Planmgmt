@@ -60,8 +60,9 @@ export interface Project {
   statusId: string;
   startDate: string;
   endDate: string;
-  plannedRevenue: number;
-  plannedCost: number;
+  plannedSales?: number;   // Doanh số ký dự kiến
+  plannedRevenue: number;  // Doanh thu nghiệm thu dự kiến
+  plannedCost: number;     // Chi phí dự kiến
   projectType: ProjectType;
   productType: ProductType;
   amId?: string;

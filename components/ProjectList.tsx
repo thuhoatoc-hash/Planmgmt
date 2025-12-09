@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Project, ProjectStatusItem, User, Partner, ProjectType, ProductType, Contract, ContractType } from '../types';
-import { Plus, Search, Calendar, ChevronRight, User as UserIcon, Building2, Edit, Trash2, Tag, Box } from 'lucide-react';
+import { Plus, Search, Calendar, ChevronRight, User as UserIcon, Building2, Edit, Trash2, Tag, Box, Filter } from 'lucide-react';
 import CurrencyInput from './CurrencyInput';
 
 interface ProjectListProps {
@@ -18,11 +18,13 @@ interface ProjectListProps {
 const ProjectList: React.FC<ProjectListProps> = ({ projects, contracts, users, partners, statuses, onAddProject, onUpdateProject, onDeleteProject, onSelectProject }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatusId, setFilterStatusId] = useState('');
   
   // Project Form State
   const initialProjectState: Partial<Project> = {
     name: '',
     code: '',
+    plannedSales: 0,
     plannedRevenue: 0,
     plannedCost: 0,
     description: '',
@@ -35,8 +37,9 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, contracts, users, p
   const [formData, setFormData] = useState<Partial<Project>>(initialProjectState);
 
   const filteredProjects = projects.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    p.code.toLowerCase().includes(searchTerm.toLowerCase())
+    (p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    p.code.toLowerCase().includes(searchTerm.toLowerCase())) &&
+    (filterStatusId === '' || p.statusId === filterStatusId)
   );
 
   const handleOpenModal = (project?: Project, e?: React.MouseEvent) => {
@@ -110,8 +113,8 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, contracts, users, p
       </div>
 
       {/* Search and Filter Bar */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
-        <div className="relative flex-1 max-w-md">
+      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center gap-4">
+        <div className="relative flex-1 max-w-md w-full">
            <Search className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
            <input 
              type="text" 
@@ -120,6 +123,19 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, contracts, users, p
              value={searchTerm}
              onChange={e => setSearchTerm(e.target.value)}
            />
+        </div>
+        <div className="w-full md:w-auto min-w-[220px] relative">
+            <Filter className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <select
+                className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#EE0033] outline-none text-slate-600 appearance-none bg-white"
+                value={filterStatusId}
+                onChange={(e) => setFilterStatusId(e.target.value)}
+            >
+                <option value="">-- Tất cả trạng thái --</option>
+                {statuses.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+            </select>
         </div>
       </div>
 
@@ -289,9 +305,18 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, contracts, users, p
                  </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
+              <div className="grid grid-cols-3 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Doanh thu dự kiến (PAKD)</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Doanh số Dự kiến (PAKD)</label>
+                    <CurrencyInput 
+                        className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-[#EE0033] outline-none font-bold text-indigo-600"
+                        value={formData.plannedSales || 0}
+                        onChange={(val) => setFormData({...formData, plannedSales: val})}
+                        placeholder="0"
+                    />
+                 </div>
+                 <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Doanh thu Dự kiến (PAKD)</label>
                     <CurrencyInput 
                         className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-[#EE0033] outline-none font-bold text-emerald-600"
                         value={formData.plannedRevenue || 0}
@@ -300,7 +325,7 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, contracts, users, p
                     />
                  </div>
                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Chi phí dự kiến (PAKD)</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Chi phí Dự kiến (PAKD)</label>
                     <CurrencyInput 
                         className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-[#EE0033] outline-none font-bold text-rose-600"
                         value={formData.plannedCost || 0}

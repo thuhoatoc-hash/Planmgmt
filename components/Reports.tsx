@@ -63,7 +63,7 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
             sales,
             revenue,
             cost,
-            profit: revenue - cost
+            profit: sales - cost // Profit = Sales - Cost
         };
     }).filter(d => d.sales > 0 || d.cost > 0 || d.revenue > 0).sort((a,b) => b.sales - a.sales);
   }, [projects, filteredContracts]);
@@ -114,7 +114,7 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
            <h1 className="text-2xl font-bold text-slate-800">Báo cáo & Thống kê</h1>
-           <p className="text-slate-500">Phân tích hiệu quả hoạt động kinh doanh</p>
+           <p className="text-slate-500">Phân tích hiệu quả hoạt động kinh doanh (LN = Doanh số - Chi phí)</p>
         </div>
         <div className="flex gap-2">
              <button 
@@ -225,7 +225,7 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
                                 <th className="px-6 py-3 text-right">Doanh số (Ký)</th>
                                 <th className="px-6 py-3 text-right">Doanh thu (NT)</th>
                                 <th className="px-6 py-3 text-right">Chi phí</th>
-                                <th className="px-6 py-3 text-right">Lợi nhuận</th>
+                                <th className="px-6 py-3 text-right">Lợi nhuận (DS - CP)</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">

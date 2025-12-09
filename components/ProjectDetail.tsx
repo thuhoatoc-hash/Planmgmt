@@ -96,7 +96,8 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
       .filter(c => c.type === ContractType.INPUT && c.status !== 'CANCELLED')
       .reduce((acc, c) => acc + c.value, 0);
     
-    return { sales, actualRevenue, actualCost, profit: actualRevenue - actualCost };
+    // Profit now calculated as SALES - COST (not Revenue - Cost)
+    return { sales, actualRevenue, actualCost, profit: sales - actualCost };
   }, [projectContracts]);
 
   // --- HANDLERS ---
@@ -195,77 +196,87 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
     const title = type === ContractType.OUTPUT ? 'Danh sách Doanh thu' : 'Danh sách Chi phí';
 
     return (
-      <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+      <div className="bg-white rounded-lg border border-slate-200 shadow-sm">
         <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 font-medium text-slate-700 flex justify-between items-center">
             <span>{title}</span>
             <span className="text-xs bg-white border border-slate-200 px-2 py-1 rounded shadow-sm">
                 Tổng: <span className="font-bold text-slate-900">{formatCurrency(data.reduce((a,b) => a + b.value, 0))}</span>
             </span>
         </div>
-        <table className="w-full text-sm text-left">
-          <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
-            <tr>
-              <th className="px-4 py-3">Mã HĐ/Mục</th>
-              <th className="px-4 py-3">Tên nội dung</th>
-              <th className="px-4 py-3">Đối tác (Bên B)</th>
-              <th className="px-4 py-3">Danh mục</th>
-              <th className="px-4 py-3 text-right">Giá trị</th>
-              <th className="px-4 py-3">Ngày ký</th>
-              <th className="px-4 py-3">Trạng thái</th>
-              <th className="px-4 py-3 text-right">Thao tác</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {data.length === 0 ? (
-              <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-400">Chưa có dữ liệu</td></tr>
-            ) : (
-              data.map(contract => {
-                const category = categories.find(c => c.id === contract.categoryId);
-                return (
-                  <tr key={contract.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3 font-medium text-slate-700">{contract.code}</td>
-                    <td className="px-4 py-3 max-w-xs truncate" title={contract.name}>{contract.name}</td>
-                    <td className="px-4 py-3">{contract.partyB || contract.partnerName}</td>
-                    <td className="px-4 py-3">
-                      <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-xs border border-slate-200">
-                        {category?.name || 'Unknown'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right font-medium">{formatCurrency(contract.value)}</td>
-                    <td className="px-4 py-3 text-slate-500">{new Date(contract.signedDate).toLocaleDateString('vi-VN')}</td>
-                    <td className="px-4 py-3">
-                      <select 
-                        value={contract.status}
-                        onChange={(e) => onUpdateContractStatus(contract.id, e.target.value as any)}
-                        className={`text-xs font-semibold px-2 py-1 rounded-full border-0 cursor-pointer outline-none ${
-                          contract.status === 'SIGNED' ? 'bg-green-100 text-green-700' :
-                          contract.status === 'COMPLETED' ? 'bg-blue-100 text-blue-700' :
-                          contract.status === 'CANCELLED' ? 'bg-red-100 text-red-700' :
-                          'bg-yellow-100 text-yellow-700'
-                        }`}
-                      >
-                         <option value="PENDING">Mới</option>
-                         <option value="SIGNED">Đã ký</option>
-                         <option value="COMPLETED">Hoàn thành</option>
-                         <option value="CANCELLED">Hủy</option>
-                      </select>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                        <div className="flex justify-end gap-2">
-                            <button onClick={() => handleOpenContractModal(contract)} className="text-slate-400 hover:text-indigo-600 transition-colors" title="Sửa">
-                                <Edit className="w-4 h-4" />
-                            </button>
-                            <button onClick={() => handleDeleteContractItem(contract.id)} className="text-slate-400 hover:text-red-600 transition-colors" title="Xóa">
-                                <Trash2 className="w-4 h-4" />
-                            </button>
-                        </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+        <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left min-w-[1000px]">
+            <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                <tr>
+                <th className="px-4 py-3 whitespace-nowrap">Mã HĐ/Mục</th>
+                <th className="px-4 py-3 whitespace-nowrap">Tên nội dung</th>
+                <th className="px-4 py-3 whitespace-nowrap">Đối tác (Bên B)</th>
+                <th className="px-4 py-3 whitespace-nowrap">Danh mục</th>
+                <th className="px-4 py-3 text-right whitespace-nowrap">Giá trị</th>
+                <th className="px-4 py-3 whitespace-nowrap">Ngày ký</th>
+                <th className="px-4 py-3 whitespace-nowrap">Trạng thái</th>
+                <th className="px-4 py-3 text-right whitespace-nowrap">Thao tác</th>
+                </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+                {data.length === 0 ? (
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-400">Chưa có dữ liệu</td></tr>
+                ) : (
+                data.map(contract => {
+                    const category = categories.find(c => c.id === contract.categoryId);
+                    return (
+                    <tr key={contract.id} className="hover:bg-slate-50">
+                        <td className="px-4 py-3 font-medium text-slate-700 whitespace-nowrap">{contract.code}</td>
+                        <td className="px-4 py-3 font-medium text-slate-800 min-w-[200px]">
+                            {contract.name}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600 min-w-[150px]">
+                            {contract.partyB || contract.partnerName}
+                        </td>
+                        <td className="px-4 py-3">
+                        <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-xs border border-slate-200 whitespace-nowrap">
+                            {category?.name || 'Unknown'}
+                        </span>
+                        </td>
+                        <td className="px-4 py-3 text-right font-bold text-slate-700 whitespace-nowrap">
+                            {formatCurrency(contract.value)}
+                        </td>
+                        <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
+                            {new Date(contract.signedDate).toLocaleDateString('vi-VN')}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                        <select 
+                            value={contract.status}
+                            onChange={(e) => onUpdateContractStatus(contract.id, e.target.value as any)}
+                            className={`text-xs font-semibold px-2 py-1 rounded-full border-0 cursor-pointer outline-none ${
+                            contract.status === 'SIGNED' ? 'bg-green-100 text-green-700' :
+                            contract.status === 'COMPLETED' ? 'bg-blue-100 text-blue-700' :
+                            contract.status === 'CANCELLED' ? 'bg-red-100 text-red-700' :
+                            'bg-yellow-100 text-yellow-700'
+                            }`}
+                        >
+                            <option value="PENDING">Mới</option>
+                            <option value="SIGNED">Đã ký</option>
+                            <option value="COMPLETED">Hoàn thành</option>
+                            <option value="CANCELLED">Hủy</option>
+                        </select>
+                        </td>
+                        <td className="px-4 py-3 text-right whitespace-nowrap">
+                            <div className="flex justify-end gap-2">
+                                <button onClick={() => handleOpenContractModal(contract)} className="text-slate-400 hover:text-indigo-600 transition-colors" title="Sửa">
+                                    <Edit className="w-4 h-4" />
+                                </button>
+                                <button onClick={() => handleDeleteContractItem(contract.id)} className="text-slate-400 hover:text-red-600 transition-colors" title="Xóa">
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    );
+                })
+                )}
+            </tbody>
+            </table>
+        </div>
       </div>
     );
   };
@@ -395,12 +406,12 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                     <p className="text-2xl font-bold text-indigo-600 mt-2">{formatCurrency(stats.sales)}</p>
                     <div className="mt-2 text-xs flex justify-between text-slate-400">
                         <span>Kế hoạch:</span>
-                        <span>{formatCurrency(project.plannedRevenue)}</span>
+                        <span>{formatCurrency(project.plannedSales || project.plannedRevenue)}</span>
                     </div>
                      <div className="w-full bg-slate-100 rounded-full h-1.5 mt-2">
                         <div 
                             className="bg-indigo-500 h-1.5 rounded-full" 
-                            style={{ width: `${Math.min((stats.sales / (project.plannedRevenue || 1)) * 100, 100)}%` }}
+                            style={{ width: `${Math.min((stats.sales / (project.plannedSales || project.plannedRevenue || 1)) * 100, 100)}%` }}
                         ></div>
                     </div>
                  </div>
@@ -447,7 +458,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                       {formatCurrency(stats.profit)}
                     </p>
                     <div className="mt-2 text-xs text-slate-400">
-                        LN = Doanh thu (NT) - Chi phí
+                        LN = Doanh số (Ký) - Chi phí
                     </div>
                  </div>
              </div>
@@ -679,28 +690,34 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                     <input type="date" className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-[#EE0033] outline-none" value={projectForm.startDate} onChange={e => setProjectForm({...projectForm, startDate: e.target.value})} />
                  </div>
                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Ngày kết thúc</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Ngày kết thúc (Dự kiến)</label>
                     <input type="date" className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-[#EE0033] outline-none" value={projectForm.endDate} onChange={e => setProjectForm({...projectForm, endDate: e.target.value})} />
                  </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
+              <div className="grid grid-cols-3 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Doanh thu dự kiến (PAKD)</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Doanh số (PAKD)</label>
+                    <CurrencyInput 
+                        className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-[#EE0033] outline-none font-bold text-indigo-600"
+                        value={projectForm.plannedSales || 0}
+                        onChange={(val) => setProjectForm({...projectForm, plannedSales: val})}
+                    />
+                 </div>
+                 <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Doanh thu (PAKD)</label>
                     <CurrencyInput 
                         className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-[#EE0033] outline-none font-bold text-emerald-600"
                         value={projectForm.plannedRevenue || 0}
                         onChange={(val) => setProjectForm({...projectForm, plannedRevenue: val})}
-                        placeholder="0"
                     />
                  </div>
                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Chi phí dự kiến (PAKD)</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Chi phí (PAKD)</label>
                     <CurrencyInput 
                         className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-[#EE0033] outline-none font-bold text-rose-600"
                         value={projectForm.plannedCost || 0}
                         onChange={(val) => setProjectForm({...projectForm, plannedCost: val})}
-                        placeholder="0"
                     />
                  </div>
               </div>
@@ -732,63 +749,52 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
               <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-100">
                 <button type="button" onClick={() => setIsProjectModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium">Hủy</button>
                 <button type="submit" className="px-4 py-2 bg-[#EE0033] text-white rounded-lg hover:bg-red-700 font-medium shadow-sm">
-                   <Save className="w-4 h-4 inline-block mr-2" />
-                   Lưu thay đổi
+                    Cập nhật
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-      
-      {/* Modal Add/Edit Task */}
+
+      {/* Modal Task */}
       {isTaskModalOpen && (
-          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-xl max-w-lg w-full p-6">
-                  <h2 className="text-xl font-bold mb-4 text-slate-800">{taskForm.id ? 'Sửa Công việc' : 'Thêm Công việc mới'}</h2>
-                  <form onSubmit={handleSaveTask} className="space-y-4">
-                      <div>
-                          <label className="block text-sm font-medium text-slate-700 mb-1">Tên công việc</label>
-                          <input required type="text" className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-[#EE0033] outline-none" value={taskForm.name} onChange={e => setTaskForm({...taskForm, name: e.target.value})} />
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-4">
-                          <div>
-                              <label className="block text-sm font-medium text-slate-700 mb-1">Người thực hiện</label>
-                              <select required className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-[#EE0033] outline-none" value={taskForm.assigneeId} onChange={e => setTaskForm({...taskForm, assigneeId: e.target.value})}>
-                                  {users.map(u => <option key={u.id} value={u.id}>{u.fullName}</option>)}
-                              </select>
-                          </div>
-                          <div>
-                              <label className="block text-sm font-medium text-slate-700 mb-1">Trạng thái</label>
-                              <select className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-[#EE0033] outline-none" value={taskForm.status} onChange={e => setTaskForm({...taskForm, status: e.target.value as TaskStatus})}>
-                                  <option value={TaskStatus.NEW}>Mới tạo</option>
-                                  <option value={TaskStatus.IN_PROGRESS}>Đang thực hiện</option>
-                                  <option value={TaskStatus.COMPLETED}>Hoàn thành</option>
-                                  <option value={TaskStatus.LATE}>Trễ hạn</option>
-                              </select>
-                          </div>
-                      </div>
-
-                      <div>
-                          <label className="block text-sm font-medium text-slate-700 mb-1">Deadline</label>
-                          <input required type="date" className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-[#EE0033] outline-none" value={taskForm.deadline} onChange={e => setTaskForm({...taskForm, deadline: e.target.value})} />
-                      </div>
-
-                      <div>
-                          <label className="block text-sm font-medium text-slate-700 mb-1">Mô tả (Tùy chọn)</label>
-                          <textarea className="w-full p-2 border rounded-lg h-20 focus:ring-2 focus:ring-[#EE0033] outline-none" value={taskForm.description || ''} onChange={e => setTaskForm({...taskForm, description: e.target.value})} />
-                      </div>
-
-                      <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-100">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl max-w-lg w-full p-6 animate-in fade-in zoom-in duration-200">
+                <h2 className="text-xl font-bold mb-4 text-slate-800">{taskForm.id ? 'Sửa Công việc' : 'Thêm Công việc mới'}</h2>
+                <form onSubmit={handleSaveTask} className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Tên công việc</label>
+                        <input required type="text" className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-[#EE0033] outline-none" value={taskForm.name} onChange={e => setTaskForm({...taskForm, name: e.target.value})} />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Người thực hiện</label>
+                        <select className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-[#EE0033] outline-none" value={taskForm.assigneeId || ''} onChange={e => setTaskForm({...taskForm, assigneeId: e.target.value})}>
+                            {users.map(u => <option key={u.id} value={u.id}>{u.fullName}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Deadline</label>
+                        <input type="date" className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-[#EE0033] outline-none" value={taskForm.deadline} onChange={e => setTaskForm({...taskForm, deadline: e.target.value})} />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Trạng thái</label>
+                        <select className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-[#EE0033] outline-none" value={taskForm.status} onChange={e => setTaskForm({...taskForm, status: e.target.value as TaskStatus})}>
+                            <option value={TaskStatus.NEW}>Mới tạo</option>
+                            <option value={TaskStatus.IN_PROGRESS}>Đang thực hiện</option>
+                            <option value={TaskStatus.COMPLETED}>Hoàn thành</option>
+                            <option value={TaskStatus.LATE}>Đã trễ</option>
+                        </select>
+                    </div>
+                    <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-100">
                         <button type="button" onClick={() => setIsTaskModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium">Hủy</button>
                         <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium shadow-sm">
-                            Lưu công việc
+                            {taskForm.id ? 'Cập nhật' : 'Thêm mới'}
                         </button>
-                      </div>
-                  </form>
-              </div>
-          </div>
+                    </div>
+                </form>
+            </div>
+        </div>
       )}
     </div>
   );
