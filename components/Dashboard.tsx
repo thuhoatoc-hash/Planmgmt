@@ -1,14 +1,16 @@
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Project, Contract, ContractType, Category, CategoryType, KPIMonthlyData } from '../types';
-import { Wallet, TrendingUp, TrendingDown, Activity, Settings, Check, X, SlidersHorizontal, Target } from 'lucide-react';
+import { Project, Contract, ContractType, Category, CategoryType, KPIMonthlyData, Task, User, TaskStatus } from '../types';
+import { Wallet, TrendingUp, TrendingDown, Activity, Settings, Check, X, SlidersHorizontal, Target, CheckSquare } from 'lucide-react';
 
 interface DashboardProps {
   projects: Project[];
   contracts: Contract[];
   categories: Category[];
   kpiData?: KPIMonthlyData[];
+  tasks?: Task[];
+  users?: User[];
 }
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
@@ -23,9 +25,10 @@ const DEFAULT_CONFIG = {
   showProjectChart: true,
   showCategoryChart: true,
   showKPIChart: true,
+  showTaskChart: true,
 };
 
-const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, kpiData = [] }) => {
+const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, kpiData = [], tasks = [], users = [] }) => {
   // State for customization
   const [config, setConfig] = useState(DEFAULT_CONFIG);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
@@ -60,6 +63,7 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, 
     localStorage.setItem('pm_dashboard_config', JSON.stringify(newConfig));
   };
 
+  // --- Financial Stats Calculation ---
   const stats = useMemo(() => {
     let totalRevenue = 0;
     let totalSales = 0;
@@ -109,6 +113,7 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, 
     };
   }, [projects, contracts]);
 
+  // --- Category Stats Calculation ---
   const categoryData = useMemo(() => {
     // Group contracts by root category (for simplicity in charts)
     const revCats = categories.filter(c => c.type === CategoryType.REVENUE && c.parentId === null);
@@ -130,7 +135,7 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, 
     return data;
   }, [categories, contracts]);
 
-  // KPI Data Summary for Current Month (or latest available)
+  // --- KPI Data Summary for Current Month ---
   const kpiSummary = useMemo(() => {
       if (!kpiData || kpiData.length === 0) return null;
       // Use latest data
@@ -158,6 +163,31 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, 
           ]
       };
   }, [kpiData]);
+
+  // --- Task Stats Calculation ---
+  const taskStats = useMemo(() => {
+      const today = new Date().toISOString().split('T')[0];
+
+      // 1. By AM (User)
+      const tasksByAM = users.map(user => {
+          const userTasks = tasks.filter(t => t.assigneeId === user.id);
+          const total = userTasks.length;
+          const late = userTasks.filter(t => t.status !== TaskStatus.COMPLETED && t.deadline < today).length;
+          // Only return AMs who have tasks
+          return { name: user.fullName.split(' ').pop(), fullName: user.fullName, total, late }; 
+      }).filter(stat => stat.total > 0).sort((a,b) => b.total - a.total);
+
+      // 2. By Project
+      const tasksByProject = projects.map(proj => {
+          const projTasks = tasks.filter(t => t.projectId === proj.id);
+          const total = projTasks.length;
+          const late = projTasks.filter(t => t.status !== TaskStatus.COMPLETED && t.deadline < today).length;
+           // Only return Projects that have tasks
+          return { name: proj.code, fullName: proj.name, total, late };
+      }).filter(stat => stat.total > 0).sort((a,b) => b.total - a.total);
+
+      return { tasksByAM, tasksByProject };
+  }, [tasks, users, projects]);
 
   const StatCard = ({ title, value, subValue, icon: Icon, colorClass }: any) => (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex items-start justify-between animate-in zoom-in duration-300">
@@ -201,13 +231,14 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, 
                      <X className="w-4 h-4" />
                    </button>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2 max-h-80 overflow-y-auto">
                   {[
                     { key: 'showSales', label: 'Thẻ Doanh số' },
                     { key: 'showCost', label: 'Thẻ Chi phí' },
                     { key: 'showProfit', label: 'Thẻ Lợi nhuận' },
                     { key: 'showRevenue', label: 'Thẻ Doanh thu' },
                     { key: 'showKPIChart', label: 'Biểu đồ KPI' },
+                    { key: 'showTaskChart', label: 'Biểu đồ Công việc' },
                     { key: 'showProjectChart', label: 'Biểu đồ Dự án' },
                     { key: 'showCategoryChart', label: 'Biểu đồ Danh mục' },
                   ].map(item => (
@@ -229,7 +260,7 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, 
         </div>
       </div>
 
-      {/* KPI Section (New) */}
+      {/* KPI Section */}
       {config.showKPIChart && kpiSummary && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in duration-300">
               <div className="bg-gradient-to-r from-slate-800 to-slate-900 text-white rounded-xl p-6 shadow-md flex flex-col justify-center relative overflow-hidden">
@@ -275,7 +306,7 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, 
           </div>
       )}
 
-      {/* KPI Cards */}
+      {/* Main KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {config.showSales && (
           <StatCard 
@@ -315,7 +346,94 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, 
         )}
       </div>
 
-      {/* Charts Row */}
+      {/* TASK CHARTS (New) */}
+      {config.showTaskChart && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in duration-300">
+            {/* Chart By AM */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                        <CheckSquare className="w-5 h-5 text-indigo-600" />
+                        Nhiệm vụ theo AM
+                    </h3>
+                </div>
+                <div className="h-64">
+                    {taskStats.tasksByAM.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={taskStats.tasksByAM} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                <XAxis dataKey="name" tick={{fontSize: 12, fill: '#64748b'}} />
+                                <YAxis tick={{fontSize: 12, fill: '#64748b'}} />
+                                <Tooltip 
+                                    cursor={{fill: '#f1f5f9'}}
+                                    content={({ active, payload, label }) => {
+                                        if (active && payload && payload.length) {
+                                            return (
+                                                <div className="bg-white p-3 border border-slate-200 shadow-lg rounded-lg text-xs">
+                                                    <p className="font-bold text-slate-800 mb-1">{payload[0].payload.fullName}</p>
+                                                    <p className="text-indigo-600">Tổng số việc: {payload[0].value}</p>
+                                                    <p className="text-rose-500">Trễ hạn: {payload[1].value}</p>
+                                                </div>
+                                            );
+                                        }
+                                        return null;
+                                    }}
+                                />
+                                <Legend />
+                                <Bar dataKey="total" name="Tổng số việc" fill="#6366f1" radius={[4, 4, 0, 0]} barSize={24} />
+                                <Bar dataKey="late" name="Trễ hạn" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={24} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    ) : (
+                        <div className="h-full flex items-center justify-center text-slate-400">Chưa có dữ liệu công việc</div>
+                    )}
+                </div>
+            </div>
+
+            {/* Chart By Project */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                        <Activity className="w-5 h-5 text-indigo-600" />
+                        Nhiệm vụ theo Dự án
+                    </h3>
+                </div>
+                <div className="h-64">
+                    {taskStats.tasksByProject.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={taskStats.tasksByProject} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                <XAxis dataKey="name" tick={{fontSize: 12, fill: '#64748b'}} />
+                                <YAxis tick={{fontSize: 12, fill: '#64748b'}} />
+                                <Tooltip 
+                                    cursor={{fill: '#f1f5f9'}}
+                                    content={({ active, payload, label }) => {
+                                        if (active && payload && payload.length) {
+                                            return (
+                                                <div className="bg-white p-3 border border-slate-200 shadow-lg rounded-lg text-xs">
+                                                    <p className="font-bold text-slate-800 mb-1">{payload[0].payload.fullName}</p>
+                                                    <p className="text-indigo-600">Tổng số việc: {payload[0].value}</p>
+                                                    <p className="text-rose-500">Trễ hạn: {payload[1].value}</p>
+                                                </div>
+                                            );
+                                        }
+                                        return null;
+                                    }}
+                                />
+                                <Legend />
+                                <Bar dataKey="total" name="Tổng số việc" fill="#6366f1" radius={[4, 4, 0, 0]} barSize={24} />
+                                <Bar dataKey="late" name="Trễ hạn" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={24} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    ) : (
+                         <div className="h-full flex items-center justify-center text-slate-400">Chưa có dữ liệu công việc</div>
+                    )}
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* Financial Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {config.showProjectChart && (
           <div className={`bg-white rounded-xl shadow-sm border border-slate-200 p-6 ${!config.showCategoryChart ? 'lg:col-span-2' : ''}`}>

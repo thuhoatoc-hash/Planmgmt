@@ -133,7 +133,14 @@ const App: React.FC = () => {
 
     switch (currentPath) {
       case 'dashboard':
-        return <Dashboard projects={projects} contracts={contracts} categories={categories} kpiData={kpiData} />;
+        return <Dashboard 
+                  projects={projects} 
+                  contracts={contracts} 
+                  categories={categories} 
+                  kpiData={kpiData} 
+                  tasks={tasks}
+                  users={users}
+               />;
       case 'kpi':
         return <KPIManagement kpiData={kpiData} onUpdateKPI={handleUpdateKPI} user={user} />;
       case 'reports':
