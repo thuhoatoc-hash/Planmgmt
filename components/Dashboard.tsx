@@ -76,19 +76,18 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, 
         .filter(c => c.type === ContractType.OUTPUT && c.status !== 'CANCELLED')
         .reduce((acc, curr) => acc + curr.value, 0);
 
-      // Doanh thu: Tính dựa trên các Installments đã xuất hóa đơn hoặc thanh toán
-      // Nếu không có installment nào thì mới tính dựa trên status COMPLETED
+      // Doanh thu: Tính từ các hạng mục (installments) đã xuất hóa đơn (INVOICED) hoặc đã thanh toán (PAID)
       const rev = pContracts
         .filter(c => c.type === ContractType.OUTPUT && c.status !== 'CANCELLED')
         .reduce((acc, c) => {
             if (c.installments && c.installments.length > 0) {
-                // Sum only INVOICED or PAID installments
-                const installmentsSum = c.installments
-                    .filter(i => i.status === InstallmentStatus.INVOICED || i.status === InstallmentStatus.PAID)
-                    .reduce((sum, i) => sum + i.value, 0);
-                return acc + installmentsSum;
+                // Sum only valid installments
+                const validInstallments = c.installments.filter(i => 
+                    i.status === InstallmentStatus.INVOICED || i.status === InstallmentStatus.PAID
+                );
+                return acc + validInstallments.reduce((sum, i) => sum + i.value, 0);
             } else {
-                // Fallback for legacy data or contracts without installments
+                // Fallback: If no installments defined, assume revenue = value if contract is COMPLETED
                 return acc + (c.status === 'COMPLETED' ? c.value : 0);
             }
         }, 0);

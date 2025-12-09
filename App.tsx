@@ -17,25 +17,35 @@ import { MOCK_USERS, MOCK_PROJECTS, MOCK_CONTRACTS, MOCK_CATEGORIES, MOCK_PARTNE
 
 // Helper to load data from localStorage or fallback to mock
 const loadData = <T,>(key: string, fallback: T): T => {
-  const saved = localStorage.getItem(key);
-  return saved ? JSON.parse(saved) : fallback;
+  try {
+    const saved = localStorage.getItem(key);
+    return saved ? JSON.parse(saved) : fallback;
+  } catch (e) {
+    console.error(`Error loading ${key}`, e);
+    return fallback;
+  }
 };
 
 const SESSION_DURATION = 60 * 60 * 1000; // 60 minutes in ms
 
 const App: React.FC = () => {
-  // Global State with Persistence
+  // Global State with Persistence for Session
   const [user, setUser] = useState<User | null>(() => {
-    const savedUser = localStorage.getItem('currentUser');
-    const loginTime = localStorage.getItem('loginTime');
-    if (savedUser && loginTime) {
-      const now = Date.now();
-      if (now - parseInt(loginTime) < SESSION_DURATION) {
-        return JSON.parse(savedUser);
-      } else {
-        localStorage.removeItem('currentUser');
-        localStorage.removeItem('loginTime');
+    try {
+      const savedUser = localStorage.getItem('currentUser');
+      const loginTime = localStorage.getItem('loginTime');
+      if (savedUser && loginTime) {
+        const now = Date.now();
+        if (now - parseInt(loginTime) < SESSION_DURATION) {
+          return JSON.parse(savedUser);
+        } else {
+          // Session expired
+          localStorage.removeItem('currentUser');
+          localStorage.removeItem('loginTime');
+        }
       }
+    } catch (e) {
+      console.error('Error loading session', e);
     }
     return null;
   });
@@ -53,7 +63,7 @@ const App: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>(() => loadData('tasks', MOCK_TASKS));
   const [kpiData, setKpiData] = useState<KPIMonthlyData[]>(() => loadData('kpiData', MOCK_KPI));
 
-  // View State (Not persisted usually, but kept for navigation flow)
+  // View State
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
   // --- PERSISTENCE EFFECTS ---
@@ -66,7 +76,7 @@ const App: React.FC = () => {
   useEffect(() => localStorage.setItem('tasks', JSON.stringify(tasks)), [tasks]);
   useEffect(() => localStorage.setItem('kpiData', JSON.stringify(kpiData)), [kpiData]);
 
-  // Handle Login with Session Storage
+  // Handle Login
   const handleLogin = (u: User) => {
     setUser(u);
     localStorage.setItem('currentUser', JSON.stringify(u));
@@ -79,7 +89,6 @@ const App: React.FC = () => {
     localStorage.removeItem('loginTime');
   };
 
-  // Handle Login Check
   if (!user) {
     return <Login onLogin={handleLogin} />;
   }
@@ -112,8 +121,8 @@ const App: React.FC = () => {
   const handleUpdateUser = (u: User) => {
     setUsers(users.map(existing => existing.id === u.id ? u : existing));
     if (user.id === u.id) {
-        setUser(u); // Update current session if self-update
-        localStorage.setItem('currentUser', JSON.stringify(u));
+        setUser(u);
+        localStorage.setItem('currentUser', JSON.stringify(u)); // Update session user data
     }
   };
   const handleDeleteUser = (id: string) => setUsers(users.filter(u => u.id !== id));
