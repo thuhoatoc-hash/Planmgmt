@@ -366,7 +366,7 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, 
                                 <YAxis tick={{fontSize: 12, fill: '#64748b'}} />
                                 <Tooltip 
                                     cursor={{fill: '#f1f5f9'}}
-                                    content={({ active, payload, label }) => {
+                                    content={({ active, payload }) => {
                                         if (active && payload && payload.length) {
                                             return (
                                                 <div className="bg-white p-3 border border-slate-200 shadow-lg rounded-lg text-xs">
@@ -407,7 +407,7 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, 
                                 <YAxis tick={{fontSize: 12, fill: '#64748b'}} />
                                 <Tooltip 
                                     cursor={{fill: '#f1f5f9'}}
-                                    content={({ active, payload, label }) => {
+                                    content={({ active, payload }) => {
                                         if (active && payload && payload.length) {
                                             return (
                                                 <div className="bg-white p-3 border border-slate-200 shadow-lg rounded-lg text-xs">
