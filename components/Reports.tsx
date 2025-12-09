@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Project, Contract, Category, User, ContractType } from '../types';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Download, Filter, Calendar, BarChart3, PieChart as PieChartIcon, User as UserIcon } from 'lucide-react';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { Download, Filter, Calendar, BarChart3, PieChart as PieChartIcon, User as UserIcon, TrendingUp } from 'lucide-react';
 
 interface ReportsProps {
   projects: Project[];
@@ -13,7 +13,7 @@ interface ReportsProps {
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#FF6B6B'];
 
 const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, users }) => {
-  const [activeTab, setActiveTab] = useState<'GENERAL' | 'COST' | 'AM'>('GENERAL');
+  const [activeTab, setActiveTab] = useState<'GENERAL' | 'COST' | 'AM' | 'TREND'>('GENERAL');
   
   // Date Filter State
   const [startDate, setStartDate] = useState(new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0]); // First day of year
@@ -108,6 +108,31 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
       return Object.values(amMap).filter(d => d.sales > 0 || d.revenue > 0).sort((a,b) => b.sales - a.sales);
   }, [filteredContracts, projects, users]);
 
+  // --- REPORT 4: TREND ANALYSIS ---
+  const trendData = useMemo(() => {
+      const trendMap: Record<string, { date: string, sales: number, revenue: number, cost: number }> = {};
+      
+      filteredContracts.forEach(c => {
+          const d = new Date(c.signedDate);
+          // Format YYYY-MM
+          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+          
+          if (!trendMap[key]) {
+              trendMap[key] = { date: key, sales: 0, revenue: 0, cost: 0 };
+          }
+
+          if (c.type === ContractType.OUTPUT && c.status !== 'CANCELLED') {
+              trendMap[key].sales += c.value;
+              if (c.status === 'COMPLETED') {
+                 trendMap[key].revenue += c.value;
+              }
+          } else if (c.type === ContractType.INPUT && c.status !== 'CANCELLED') {
+              trendMap[key].cost += c.value;
+          }
+      });
+
+      return Object.values(trendMap).sort((a,b) => a.date.localeCompare(b.date));
+  }, [filteredContracts]);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -122,6 +147,7 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
                     if(activeTab === 'GENERAL') exportToCSV(generalData, `Bao_Cao_Tong_Hop_${startDate}_${endDate}`);
                     if(activeTab === 'COST') exportToCSV(costData, `Bao_Cao_Chi_Phi_${startDate}_${endDate}`);
                     if(activeTab === 'AM') exportToCSV(amData, `Bao_Cao_AM_${startDate}_${endDate}`);
+                    if(activeTab === 'TREND') exportToCSV(trendData, `Bao_Cao_Xu_Huong_${startDate}_${endDate}`);
                 }}
                 className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 flex items-center gap-2 shadow-sm font-medium"
              >
@@ -164,10 +190,11 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-slate-200">
-        <nav className="flex gap-4">
+      <div className="border-b border-slate-200 overflow-x-auto">
+        <nav className="flex gap-4 min-w-max">
           {[
             { id: 'GENERAL', label: 'Tổng hợp Dự án', icon: BarChart3 },
+            { id: 'TREND', label: 'Xu hướng (Trend)', icon: TrendingUp },
             { id: 'COST', label: 'Phân tích Chi phí', icon: PieChartIcon },
             { id: 'AM', label: 'Hiệu quả AM', icon: UserIcon },
           ].map(tab => (
@@ -254,6 +281,60 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
                                 <td className="px-6 py-3 text-right text-blue-700">{formatCurrency(generalData.reduce((a,b) => a + b.profit, 0))}</td>
                             </tr>
                         </tfoot>
+                    </table>
+                 </div>
+             </div>
+         )}
+         
+         {/* --- TREND REPORT --- */}
+         {activeTab === 'TREND' && (
+             <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-300">
+                 <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-96">
+                    <h3 className="font-bold text-slate-700 mb-4">Xu hướng Doanh số & Chi phí theo tháng</h3>
+                    <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={trendData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                            <XAxis dataKey="date" tick={{fontSize: 12, fill: '#64748b'}} />
+                            <YAxis tickFormatter={(val) => `${(val/1e9).toFixed(0)} tỷ`} width={60} tick={{fontSize: 12, fill: '#64748b'}} />
+                            <Tooltip formatter={(value: number) => formatCurrency(value)} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                            <Legend />
+                            <Line type="monotone" dataKey="sales" name="Doanh số (Ký)" stroke="#6366f1" strokeWidth={2} dot={{r: 4}} activeDot={{r: 6}} />
+                            <Line type="monotone" dataKey="revenue" name="Doanh thu (NT)" stroke="#10b981" strokeWidth={2} dot={{r: 4}} activeDot={{r: 6}} />
+                            <Line type="monotone" dataKey="cost" name="Chi phí" stroke="#f43f5e" strokeWidth={2} dot={{r: 4}} activeDot={{r: 6}} />
+                        </LineChart>
+                    </ResponsiveContainer>
+                 </div>
+                 
+                 <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                    <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
+                        <h3 className="font-bold text-slate-800">Chi tiết số liệu theo Tháng</h3>
+                    </div>
+                    <table className="w-full text-sm text-left">
+                        <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                            <tr>
+                                <th className="px-6 py-3">Tháng</th>
+                                <th className="px-6 py-3 text-right">Doanh số (Ký)</th>
+                                <th className="px-6 py-3 text-right">Doanh thu (NT)</th>
+                                <th className="px-6 py-3 text-right">Chi phí</th>
+                                <th className="px-6 py-3 text-right">Chênh lệch (DS - CP)</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {trendData.map((row, idx) => (
+                                <tr key={idx} className="hover:bg-slate-50">
+                                    <td className="px-6 py-3 font-medium text-slate-800">{row.date}</td>
+                                    <td className="px-6 py-3 text-right text-indigo-600">{formatCurrency(row.sales)}</td>
+                                    <td className="px-6 py-3 text-right text-emerald-600">{formatCurrency(row.revenue)}</td>
+                                    <td className="px-6 py-3 text-right text-rose-600">{formatCurrency(row.cost)}</td>
+                                    <td className={`px-6 py-3 text-right font-medium ${row.sales - row.cost >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>
+                                        {formatCurrency(row.sales - row.cost)}
+                                    </td>
+                                </tr>
+                            ))}
+                            {trendData.length === 0 && (
+                                <tr><td colSpan={5} className="px-6 py-8 text-center text-slate-400">Không có dữ liệu</td></tr>
+                            )}
+                        </tbody>
                     </table>
                  </div>
              </div>

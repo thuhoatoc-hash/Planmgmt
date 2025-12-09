@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import Layout from './components/Layout';
 import Login from './components/Login';
@@ -10,8 +11,9 @@ import PartnerManager from './components/PartnerManager';
 import ConfigurationManager from './components/ConfigurationManager';
 import UserProfile from './components/UserProfile';
 import Reports from './components/Reports';
-import { User, Project, Contract, Category, Partner, ProjectStatusItem, Task } from './types';
-import { MOCK_USERS, MOCK_PROJECTS, MOCK_CONTRACTS, MOCK_CATEGORIES, MOCK_PARTNERS, MOCK_STATUSES, MOCK_TASKS } from './services/mockData';
+import KPIManagement from './components/KPIManagement';
+import { User, Project, Contract, Category, Partner, ProjectStatusItem, Task, KPIMonthlyData } from './types';
+import { MOCK_USERS, MOCK_PROJECTS, MOCK_CONTRACTS, MOCK_CATEGORIES, MOCK_PARTNERS, MOCK_STATUSES, MOCK_TASKS, MOCK_KPI } from './services/mockData';
 
 const App: React.FC = () => {
   // Global State
@@ -27,6 +29,7 @@ const App: React.FC = () => {
   const [partners, setPartners] = useState<Partner[]>(MOCK_PARTNERS);
   const [statuses, setStatuses] = useState<ProjectStatusItem[]>(MOCK_STATUSES);
   const [tasks, setTasks] = useState<Task[]>(MOCK_TASKS);
+  const [kpiData, setKpiData] = useState<KPIMonthlyData[]>(MOCK_KPI);
 
   // View State
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -83,6 +86,16 @@ const App: React.FC = () => {
   const handleUpdateTask = (t: Task) => setTasks(tasks.map(existing => existing.id === t.id ? t : existing));
   const handleDeleteTask = (id: string) => setTasks(tasks.filter(t => t.id !== id));
 
+  // KPI Handlers
+  const handleUpdateKPI = (data: KPIMonthlyData) => {
+    const exists = kpiData.some(d => d.id === data.id);
+    if (exists) {
+        setKpiData(kpiData.map(d => d.id === data.id ? data : d));
+    } else {
+        setKpiData([...kpiData, data]);
+    }
+  };
+
   // Navigation Logic
   const handleNavigate = (path: string) => {
     setCurrentPath(path);
@@ -120,7 +133,9 @@ const App: React.FC = () => {
 
     switch (currentPath) {
       case 'dashboard':
-        return <Dashboard projects={projects} contracts={contracts} categories={categories} />;
+        return <Dashboard projects={projects} contracts={contracts} categories={categories} kpiData={kpiData} />;
+      case 'kpi':
+        return <KPIManagement kpiData={kpiData} onUpdateKPI={handleUpdateKPI} user={user} />;
       case 'reports':
         return <Reports projects={projects} contracts={contracts} categories={categories} users={users} />;
       case 'projects':

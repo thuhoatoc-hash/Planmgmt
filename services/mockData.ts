@@ -1,5 +1,5 @@
 
-import { Category, CategoryType, Contract, ContractType, Project, Partner, ProjectStatusItem, User, UserRole, ProjectType, ProductType, Task, TaskStatus, InstallmentStatus } from '../types';
+import { Category, CategoryType, Contract, ContractType, Project, Partner, ProjectStatusItem, User, UserRole, ProjectType, ProductType, Task, TaskStatus, InstallmentStatus, KPIMonthlyData } from '../types';
 
 export const MOCK_USERS: User[] = [
   { id: '1', username: 'admin', password: '123', fullName: 'Quản trị viên', role: UserRole.ADMIN, phoneNumber: '0901234567', avatarUrl: '' },
@@ -92,4 +92,56 @@ export const MOCK_TASKS: Task[] = [
     { id: 't1', projectId: 'prj_1', name: 'Khảo sát hiện trường đợt 1', assigneeId: '4', status: TaskStatus.COMPLETED, deadline: '2024-01-15' },
     { id: 't2', projectId: 'prj_1', name: 'Lên phương án thiết kế sơ bộ', assigneeId: '4', status: TaskStatus.IN_PROGRESS, deadline: '2024-02-28' },
     { id: 't3', projectId: 'prj_2', name: 'Gặp gỡ chủ đầu tư', assigneeId: '3', status: TaskStatus.LATE, deadline: '2024-05-10' },
+];
+
+export const MOCK_KPI: KPIMonthlyData[] = [
+  {
+    id: 'kpi_2025_12',
+    month: '2025-12',
+    groups: [
+      {
+        id: 'g1',
+        name: 'DOANH THU DỊCH VỤ',
+        autoCalculate: true, // Auto sum children
+        weight: 10,
+        unit: 'Tr.đồng',
+        items: [
+          { id: 'k1_1', name: 'DT GPCNTT đại trà (Giáo dục+ y tế+ Bulk SMS)', unit: 'Tr.đồng', target: 6228, weight: 0, actual: 200 },
+          { id: 'k1_2', name: 'DTDV Dự án GPCNTT', unit: 'Tr.đồng', target: 1133, weight: 0, actual: 233 },
+          { id: 'k1_3', name: 'DT Kênh truyền', unit: 'Tr.đồng', target: 1708, weight: 0, actual: 480 },
+        ]
+      },
+      {
+        id: 'g2',
+        name: 'TỔNG DOANH THU (= DTDV + DT THIẾT BỊ)',
+        autoCalculate: true, // Auto sum children
+        weight: 15,
+        unit: 'Tr.đồng',
+        items: [
+          { id: 'k2_1', name: 'Doanh thu bán hàng Chính quyền', unit: 'Tr.đồng', target: 15302, weight: 10, actual: 233 },
+          { id: 'k2_2', name: 'Doanh thu BulkSMS', unit: 'Tr.đồng', target: 1728, weight: 0, actual: 180 },
+          { id: 'k2_3', name: 'Doanh thu bán hàng kênh truyền', unit: 'Tr.đồng', target: 1722, weight: 5, actual: 480 },
+          { id: 'k2_4', name: 'Doanh thu bán hàng Y tế- Giáo dục', unit: 'Tr.đồng', target: 5663, weight: 10, actual: 20 },
+        ]
+      },
+      {
+        id: 'g3',
+        name: 'CHƯƠNG TRÌNH HÀNH ĐỘNG',
+        autoCalculate: false,
+        weight: 0, // Header doesn't have weight, children do
+        unit: '',
+        items: [
+          { id: 'k3_1', name: 'Hiệu quả dự án', unit: 'DA', target: 3, weight: 5, actual: 3 },
+          { id: 'k3_2', name: 'Thu cước (kênh truyền)', unit: 'Tr.đồng', target: 98, weight: 5, actual: 65 },
+          { id: 'k3_3', name: 'Phát triển doanh số bán mới (kênh truyền)', unit: 'Tr.đồng', target: 300, weight: 3, actual: 400 },
+          { id: 'k3_4', name: 'Thâm nhập DN mới (Kênh truyền)', unit: 'DN', target: 10, weight: 2, actual: 1 },
+          { id: 'k3_5', name: 'CTHĐ Lĩnh vực Giáo Dục', unit: 'DT', target: 2300, weight: 5, actual: 1300 },
+          { id: 'k3_6', name: 'CTHĐ Lĩnh vực Y tế', unit: 'Tr.đồng', target: 1000, weight: 5, actual: 4200 },
+          { id: 'k3_7', name: 'Thu hồi công nợ', unit: 'Tr.đồng', target: 98, weight: 5, actual: 8 },
+          { id: 'k3_8', name: 'CTHĐ lĩnh vực chính quyền', unit: 'DS', target: 18000, weight: 20, actual: 27900 },
+          { id: 'k3_9', name: 'CTHĐ lĩnh vực KHDN', unit: 'Tr.đồng', target: 0, weight: 0, actual: 0 },
+        ]
+      }
+    ]
+  }
 ];

@@ -121,11 +121,38 @@ export enum TaskStatus {
 }
 
 export interface Task {
+    id: string;
+    projectId: string;
+    name: string;
+    assigneeId: string;
+    status: TaskStatus;
+    deadline: string;
+}
+
+// --- KPI Types ---
+
+export interface KPIItem {
   id: string;
-  projectId: string;
   name: string;
-  assigneeId: string; // User ID
-  status: TaskStatus;
-  deadline: string;
-  description?: string;
+  unit: string; // Đơn vị tính (Tr.đồng, %, DA...)
+  target: number; // Mục tiêu
+  weight: number; // Tỷ trọng (%)
+  actual: number; // Kết quả thực hiện
+}
+
+export interface KPIGroup {
+  id: string;
+  name: string;
+  unit?: string;
+  target?: number; // Optional: for groups that act as summary rows
+  weight?: number; // Optional: for groups that have a weight
+  actual?: number; // Optional: calculated actual for group
+  autoCalculate?: boolean; // If true, target/actual is sum of children
+  items: KPIItem[];
+}
+
+export interface KPIMonthlyData {
+  id: string;
+  month: string; // YYYY-MM
+  groups: KPIGroup[];
 }
