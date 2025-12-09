@@ -149,19 +149,44 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, 
   // --- KPI Data Summary for Current Month ---
   const kpiSummary = useMemo(() => {
       if (!kpiData || kpiData.length === 0) return null;
-      // Use latest data
-      const current = kpiData[0]; // Assuming MOCK_KPI is sorted or just taking first
+      // Use latest data (sort by month descending)
+      const sortedData = [...kpiData].sort((a,b) => b.month.localeCompare(a.month));
+      const current = sortedData[0]; 
+
       let totalScore = 0;
       let completedCount = 0;
       let incompleteCount = 0;
 
-      current.groups.forEach(g => {
-          g.items.forEach(i => {
-              if (i.actual >= i.target) completedCount++;
-              else incompleteCount++;
+      current.groups.forEach(group => {
+          let groupTarget = group.target || 0;
+          let groupActual = group.actual || 0;
+          
+          if (group.autoCalculate) {
+              groupTarget = group.items.reduce((sum, item) => sum + (item.target || 0), 0);
+              groupActual = group.items.reduce((sum, item) => sum + (item.actual || 0), 0);
+          }
+
+          // Group Level Score
+          if (group.weight && group.weight > 0) {
+              const groupPercent = groupTarget > 0 ? (groupActual / groupTarget) * 100 : 0;
+              const cappedPercent = Math.min(groupPercent, 120); // Cap at 120%
+              totalScore += (cappedPercent * group.weight) / 100;
+          }
+
+          // Item Level Score & Stats
+          group.items.forEach(item => {
+              const percent = item.target > 0 ? (item.actual / item.target) * 100 : 0;
               
-              const ratio = i.target > 0 ? (i.actual / i.target) : 0;
-              totalScore += ratio * i.weight;
+              if (item.weight && item.weight > 0) {
+                  const cappedPercent = Math.min(percent, 120); // Cap at 120%
+                  totalScore += (cappedPercent * item.weight) / 100;
+              }
+
+              // Stats for chart
+              if (item.target > 0 || item.weight > 0) {
+                  if (percent >= 100) completedCount++;
+                  else incompleteCount++;
+              }
           });
       });
 

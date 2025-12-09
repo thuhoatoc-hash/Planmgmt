@@ -158,13 +158,17 @@ const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, use
         
         if (group.weight && group.weight > 0) {
             groupPercent = groupTarget > 0 ? (groupActual / groupTarget) * 100 : 0;
-            groupScore = (groupPercent * group.weight) / 100;
+            // Cap logic: If > 120%, max score is based on 120%
+            const cappedPercent = Math.min(groupPercent, 120);
+            groupScore = (cappedPercent * group.weight) / 100;
             grandTotalScore += groupScore;
         }
 
         const processedItems = group.items.map(item => {
             const percent = item.target > 0 ? (item.actual / item.target) * 100 : 0;
-            const score = item.weight > 0 ? (percent * item.weight) / 100 : 0;
+            // Cap logic: If > 120%, max score is based on 120%
+            const cappedPercent = Math.min(percent, 120);
+            const score = item.weight > 0 ? (cappedPercent * item.weight) / 100 : 0;
             
             if (item.weight > 0) {
                 grandTotalScore += score;
