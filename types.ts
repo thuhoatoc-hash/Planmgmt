@@ -75,6 +75,22 @@ export enum ContractType {
   OUTPUT = 'OUTPUT', // Đầu ra (Doanh thu)
 }
 
+// Trạng thái của từng lần nghiệm thu/thanh toán
+export enum InstallmentStatus {
+  PLANNING = 'PLANNING',     // Kế hoạch
+  INVOICED = 'INVOICED',     // Đã xuất hóa đơn (hoặc Đã nhận hóa đơn đầu vào)
+  PAID = 'PAID',             // Đã thanh toán (Tiền về hoặc Tiền đi)
+}
+
+export interface ContractInstallment {
+  id: string;
+  name: string;       // Tên đợt (VD: Nghiệm thu đợt 1, Tạm ứng 30%)
+  value: number;      // Giá trị
+  status: InstallmentStatus;
+  date: string;       // Ngày dự kiến hoặc thực tế
+  note?: string;
+}
+
 export interface Contract {
   id: string;
   projectId: string;
@@ -82,7 +98,7 @@ export interface Contract {
   name: string;
   type: ContractType;
   categoryId: string; // Tham chiếu đến Category
-  value: number;      // Giá trị HĐ (đã gồm VAT hoặc chưa tùy quy định, ở đây giả sử là Gross)
+  value: number;      // Giá trị HĐ (Tổng của installments nếu có)
   signedDate: string;
   status: 'PENDING' | 'SIGNED' | 'COMPLETED' | 'CANCELLED';
   partnerName: string; // Tên đối tác ký HĐ (có thể khác đối tác dự án)
@@ -92,6 +108,9 @@ export interface Contract {
   partyB: string;
   effectiveDate: string;
   guaranteeValue: number;
+
+  // Danh sách các lần nghiệm thu (doanh thu) hoặc các hạng mục chi phí (đầu vào)
+  installments: ContractInstallment[];
 }
 
 export enum TaskStatus {

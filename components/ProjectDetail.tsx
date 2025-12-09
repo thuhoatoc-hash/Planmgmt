@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
-import { Project, Contract, Category, ContractType, CategoryType, ProjectType, ProductType, User, Partner, ProjectStatusItem, UserRole, Task, TaskStatus } from '../types';
-import { ArrowLeft, Plus, DollarSign, Calendar, Briefcase, Filter, User as UserIcon, Building2, Edit, Trash2, Tag, Box, TrendingUp, CheckCircle2, ListTodo } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Project, Contract, Category, ContractType, CategoryType, ProjectType, ProductType, User, Partner, ProjectStatusItem, UserRole, Task, TaskStatus, ContractInstallment, InstallmentStatus } from '../types';
+import { ArrowLeft, Plus, DollarSign, Calendar, Briefcase, Filter, User as UserIcon, Building2, Edit, Trash2, Tag, Box, TrendingUp, CheckCircle2, ListTodo, PlusCircle, MinusCircle } from 'lucide-react';
 import CurrencyInput from './CurrencyInput';
 
 interface ProjectDetailProps {
@@ -11,7 +11,7 @@ interface ProjectDetailProps {
   partners: Partner[];
   users: User[];
   statuses: ProjectStatusItem[];
-  tasks: Task[]; // New Prop
+  tasks: Task[];
   onBack: () => void;
   onAddContract: (c: Contract) => void;
   onUpdateContract: (c: Contract) => void;
@@ -19,9 +19,9 @@ interface ProjectDetailProps {
   onUpdateContractStatus: (id: string, status: Contract['status']) => void;
   onUpdateProject: (p: Project) => void;
   onDeleteProject: (id: string) => void;
-  onAddTask: (t: Task) => void; // New Prop
-  onUpdateTask: (t: Task) => void; // New Prop
-  onDeleteTask: (id: string) => void; // New Prop
+  onAddTask: (t: Task) => void;
+  onUpdateTask: (t: Task) => void;
+  onDeleteTask: (id: string) => void;
 }
 
 const ProjectDetail: React.FC<ProjectDetailProps> = ({ 
@@ -61,9 +61,18 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
     signedDate: new Date().toISOString().split('T')[0],
     effectiveDate: new Date().toISOString().split('T')[0],
     guaranteeValue: 0,
-    status: 'PENDING'
+    status: 'PENDING',
+    installments: []
   };
   const [contractForm, setContractForm] = useState<Partial<Contract>>(initialContractState);
+  
+  // Local state for adding a new installment inside the modal
+  const [newInstallment, setNewInstallment] = useState<Partial<ContractInstallment>>({
+      name: '',
+      value: 0,
+      status: InstallmentStatus.PLANNING,
+      date: new Date().toISOString().split('T')[0]
+  });
 
   // --- PROJECT EDIT FORM STATE ---
   const [projectForm, setProjectForm] = useState<Partial<Project>>({});
@@ -86,10 +95,21 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
       .filter(c => c.type === ContractType.OUTPUT && c.status !== 'CANCELLED')
       .reduce((acc, c) => acc + c.value, 0);
 
-    // 2. Doanh thu (Revenue): Tổng HĐ đầu ra (Chỉ trạng thái Hoàn thành/Nghiệm thu)
+    // 2. Doanh thu (Revenue): Tổng HĐ đầu ra (Chỉ tính những item đã xuất HĐ hoặc đã Thanh toán trong installments)
+    // Nếu hợp đồng không có installment nào, tính theo status của contract
     const actualRevenue = projectContracts
-      .filter(c => c.type === ContractType.OUTPUT && c.status === 'COMPLETED')
-      .reduce((acc, c) => acc + c.value, 0);
+      .filter(c => c.type === ContractType.OUTPUT && c.status !== 'CANCELLED')
+      .reduce((acc, c) => {
+          if (c.installments && c.installments.length > 0) {
+              // Sum only items that are INVOICED or PAID
+              return acc + c.installments
+                .filter(i => i.status === InstallmentStatus.INVOICED || i.status === InstallmentStatus.PAID)
+                .reduce((sum, i) => sum + i.value, 0);
+          } else {
+              // Fallback logic
+              return acc + (c.status === 'COMPLETED' ? c.value : 0);
+          }
+      }, 0);
 
     // 3. Chi phí (Cost): Tổng HĐ đầu vào (trừ Hủy)
     const actualCost = projectContracts
@@ -102,16 +122,62 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
 
   // --- HANDLERS ---
 
+  // Auto-calculate Contract Value when installments change
+  useEffect(() => {
+      if (contractForm.installments && contractForm.installments.length > 0) {
+          const total = contractForm.installments.reduce((sum, item) => sum + item.value, 0);
+          if (total !== contractForm.value) {
+              setContractForm(prev => ({ ...prev, value: total }));
+          }
+      }
+  }, [contractForm.installments]);
+
   const handleOpenContractModal = (contract?: Contract) => {
+    setNewInstallment({
+        name: '',
+        value: 0,
+        status: InstallmentStatus.PLANNING,
+        date: new Date().toISOString().split('T')[0]
+    });
+
     if (contract) {
-        setContractForm({ ...contract });
+        setContractForm({ 
+            ...contract,
+            installments: contract.installments || []
+        });
     } else {
         setContractForm({ 
             ...initialContractState, 
             projectId: project.id,
+            installments: []
         });
     }
     setIsContractModalOpen(true);
+  };
+
+  const handleAddInstallment = () => {
+      if (!newInstallment.name || !newInstallment.value) return;
+      const item: ContractInstallment = {
+          ...newInstallment as ContractInstallment,
+          id: `ins_${Date.now()}`
+      };
+      setContractForm(prev => ({
+          ...prev,
+          installments: [...(prev.installments || []), item]
+      }));
+      setNewInstallment({
+        name: '',
+        value: 0,
+        status: InstallmentStatus.PLANNING,
+        date: new Date().toISOString().split('T')[0]
+      });
+  };
+
+  const handleRemoveInstallment = (id: string) => {
+      setContractForm(prev => ({
+          ...prev,
+          installments: prev.installments?.filter(i => i.id !== id) || []
+      }));
   };
 
   const handleSaveContract = (e: React.FormEvent) => {
@@ -126,6 +192,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
         type,
         projectId: project.id,
         partnerName: contractForm.partyB || contractForm.partnerName || 'Unknown',
+        installments: contractForm.installments || []
     } as Contract;
 
     if (finalContract.id) {
@@ -210,8 +277,8 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                 <th className="px-4 py-3 whitespace-nowrap">Mã HĐ/Mục</th>
                 <th className="px-4 py-3 whitespace-nowrap">Tên nội dung</th>
                 <th className="px-4 py-3 whitespace-nowrap">Đối tác (Bên B)</th>
-                <th className="px-4 py-3 whitespace-nowrap">Danh mục</th>
-                <th className="px-4 py-3 text-right whitespace-nowrap">Giá trị</th>
+                <th className="px-4 py-3 whitespace-nowrap">Tiến độ (nghiệm thu/thanh toán)</th>
+                <th className="px-4 py-3 text-right whitespace-nowrap">Giá trị HĐ</th>
                 <th className="px-4 py-3 whitespace-nowrap">Ngày ký</th>
                 <th className="px-4 py-3 whitespace-nowrap">Trạng thái</th>
                 <th className="px-4 py-3 text-right whitespace-nowrap">Thao tác</th>
@@ -223,19 +290,33 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                 ) : (
                 data.map(contract => {
                     const category = categories.find(c => c.id === contract.categoryId);
+                    const paidAmount = (contract.installments || [])
+                        .filter(i => i.status === InstallmentStatus.PAID || i.status === InstallmentStatus.INVOICED)
+                        .reduce((acc, i) => acc + i.value, 0);
+                    const percent = contract.value > 0 ? (paidAmount / contract.value) * 100 : 0;
+
                     return (
                     <tr key={contract.id} className="hover:bg-slate-50">
                         <td className="px-4 py-3 font-medium text-slate-700 whitespace-nowrap">{contract.code}</td>
-                        <td className="px-4 py-3 font-medium text-slate-800 min-w-[200px]">
-                            {contract.name}
+                        <td className="px-4 py-3 min-w-[200px]">
+                            <div className="font-medium text-slate-800">{contract.name}</div>
+                            <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200">
+                                {category?.name || 'Unknown'}
+                            </span>
                         </td>
                         <td className="px-4 py-3 text-slate-600 min-w-[150px]">
                             {contract.partyB || contract.partnerName}
                         </td>
-                        <td className="px-4 py-3">
-                        <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-xs border border-slate-200 whitespace-nowrap">
-                            {category?.name || 'Unknown'}
-                        </span>
+                        <td className="px-4 py-3 min-w-[200px]">
+                            <div className="flex items-center gap-2 mb-1">
+                                <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                    <div className={`h-full rounded-full ${type === ContractType.OUTPUT ? 'bg-emerald-500' : 'bg-rose-500'}`} style={{width: `${percent}%`}}></div>
+                                </div>
+                                <span className="text-xs font-medium text-slate-600">{percent.toFixed(0)}%</span>
+                            </div>
+                            <div className="text-[10px] text-slate-400">
+                                Đã {type === ContractType.OUTPUT ? 'nghiệm thu' : 'thanh toán'}: {formatCurrency(paidAmount)}
+                            </div>
                         </td>
                         <td className="px-4 py-3 text-right font-bold text-slate-700 whitespace-nowrap">
                             {formatCurrency(contract.value)}
@@ -339,7 +420,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                       className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2 text-sm font-medium shadow-sm"
                   >
                       <Plus className="w-4 h-4" />
-                      Thêm Doanh thu / Chi phí
+                      Thêm Hợp đồng
                   </button>
                 )}
             </div>
@@ -549,22 +630,24 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
       {/* Modal Add/Edit Contract */}
       {isContractModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl max-w-3xl w-full p-6 max-h-[90vh] overflow-y-auto">
-            <h2 className="text-xl font-bold mb-4 text-slate-800">{contractForm.id ? 'Sửa Hạng mục' : 'Thêm Hạng mục Doanh thu / Chi phí'}</h2>
-            <form onSubmit={handleSaveContract} className="space-y-4">
+          <div className="bg-white rounded-xl max-w-4xl w-full p-6 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl font-bold mb-4 text-slate-800">{contractForm.id ? 'Sửa Hợp đồng / Hạng mục' : 'Thêm Hợp đồng / Hạng mục'}</h2>
+            <form onSubmit={handleSaveContract} className="space-y-6">
+              
+              {/* Top Section: General Info */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Số hiệu Hợp đồng / Mã</label>
                   <input required type="text" className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-[#EE0033] outline-none" value={contractForm.code} onChange={e => setContractForm({...contractForm, code: e.target.value.toUpperCase()})} />
                 </div>
                  <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Tên nội dung</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Tên Hợp đồng / Nội dung</label>
                   <input required type="text" className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-[#EE0033] outline-none" value={contractForm.name} onChange={e => setContractForm({...contractForm, name: e.target.value})} />
                 </div>
               </div>
 
               <div>
-                 <label className="block text-sm font-medium text-slate-700 mb-1">Loại danh mục (Xác định là Doanh thu hay Chi phí)</label>
+                 <label className="block text-sm font-medium text-slate-700 mb-1">Loại danh mục</label>
                  <select 
                     required 
                     className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-[#EE0033] outline-none" 
@@ -585,14 +668,20 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                  </select>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  <div>
-                   <label className="block text-sm font-medium text-slate-700 mb-1">Giá trị (VND)</label>
-                   <CurrencyInput 
-                        className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-[#EE0033] outline-none font-bold text-indigo-700" 
-                        value={contractForm.value || 0} 
-                        onChange={val => setContractForm({...contractForm, value: val})} 
-                    />
+                   <label className="block text-sm font-medium text-slate-700 mb-1">Tổng Giá trị Hợp đồng (VND)</label>
+                   <div className="relative">
+                        <CurrencyInput 
+                            className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-[#EE0033] outline-none font-bold text-indigo-700 bg-slate-50" 
+                            value={contractForm.value || 0} 
+                            onChange={val => setContractForm({...contractForm, value: val})} 
+                            disabled={contractForm.installments && contractForm.installments.length > 0}
+                        />
+                        {contractForm.installments && contractForm.installments.length > 0 && (
+                            <span className="absolute right-3 top-2.5 text-xs text-slate-400 italic">Tự động tính từ chi tiết</span>
+                        )}
+                   </div>
                  </div>
                  <div>
                    <label className="block text-sm font-medium text-slate-700 mb-1">Giá trị Bảo lãnh (Nếu có)</label>
@@ -606,17 +695,6 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Bên A (Chủ đầu tư/Viettel)</label>
-                  <input required type="text" className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-[#EE0033] outline-none" value={contractForm.partyA} onChange={e => setContractForm({...contractForm, partyA: e.target.value})} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Bên B (Đối tác/Khách hàng)</label>
-                  <input required type="text" className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-[#EE0033] outline-none" value={contractForm.partyB} onChange={e => setContractForm({...contractForm, partyB: e.target.value})} />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Ngày ký</label>
                   <input required type="date" className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-[#EE0033] outline-none" value={contractForm.signedDate} onChange={e => setContractForm({...contractForm, signedDate: e.target.value})} />
                 </div>
@@ -625,11 +703,141 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                   <input required type="date" className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-[#EE0033] outline-none" value={contractForm.effectiveDate} onChange={e => setContractForm({...contractForm, effectiveDate: e.target.value})} />
                 </div>
               </div>
+              
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Bên A</label>
+                  <input required type="text" className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-[#EE0033] outline-none" value={contractForm.partyA} onChange={e => setContractForm({...contractForm, partyA: e.target.value})} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Bên B</label>
+                  <input required type="text" className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-[#EE0033] outline-none" value={contractForm.partyB} onChange={e => setContractForm({...contractForm, partyB: e.target.value})} />
+                </div>
+              </div>
+              
+              {/* Middle Section: Installments / Cost Items */}
+              <div className="border-t border-slate-100 pt-4 mt-6">
+                <div className="flex justify-between items-center mb-2">
+                    <h3 className="font-bold text-slate-700 text-sm">
+                        {contractForm.categoryId && categories.find(c => c.id === contractForm.categoryId)?.type === CategoryType.COST 
+                         ? 'Chi tiết Hạng mục Chi phí / Thanh toán' 
+                         : 'Chi tiết Tiến độ Nghiệm thu / Thanh toán'}
+                    </h3>
+                </div>
+                
+                {/* List of items */}
+                <div className="bg-slate-50 rounded-lg border border-slate-200 overflow-hidden mb-3">
+                    <table className="w-full text-sm">
+                        <thead className="bg-slate-100 text-slate-600 font-medium">
+                            <tr>
+                                <th className="px-3 py-2 text-left">Nội dung</th>
+                                <th className="px-3 py-2 text-left">Ngày dự kiến</th>
+                                <th className="px-3 py-2 text-right">Giá trị</th>
+                                <th className="px-3 py-2 text-center">Trạng thái</th>
+                                <th className="px-3 py-2 w-10"></th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200">
+                            {(!contractForm.installments || contractForm.installments.length === 0) && (
+                                <tr>
+                                    <td colSpan={5} className="px-3 py-4 text-center text-slate-400 italic">Chưa có thông tin chi tiết</td>
+                                </tr>
+                            )}
+                            {contractForm.installments?.map(item => (
+                                <tr key={item.id}>
+                                    <td className="px-3 py-2">{item.name}</td>
+                                    <td className="px-3 py-2 text-slate-500">{new Date(item.date).toLocaleDateString('vi-VN')}</td>
+                                    <td className="px-3 py-2 text-right font-medium">{formatCurrency(item.value)}</td>
+                                    <td className="px-3 py-2 text-center">
+                                        <span className={`px-2 py-0.5 rounded text-[10px] border ${
+                                            item.status === InstallmentStatus.PAID ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
+                                            item.status === InstallmentStatus.INVOICED ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                                            'bg-slate-100 text-slate-600 border-slate-200'
+                                        }`}>
+                                            {item.status === InstallmentStatus.PLANNING && 'Kế hoạch'}
+                                            {item.status === InstallmentStatus.INVOICED && (contractForm.type === ContractType.OUTPUT ? 'Đã xuất HĐ' : 'Đã nhận HĐ')}
+                                            {item.status === InstallmentStatus.PAID && 'Đã thanh toán'}
+                                        </span>
+                                    </td>
+                                    <td className="px-3 py-2 text-right">
+                                        <button type="button" onClick={() => handleRemoveInstallment(item.id)} className="text-slate-400 hover:text-red-500">
+                                            <MinusCircle className="w-4 h-4" />
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                        <tfoot className="bg-white font-medium border-t border-slate-200">
+                             <tr>
+                                <td colSpan={2} className="px-3 py-2 text-right">Tổng cộng:</td>
+                                <td className="px-3 py-2 text-right text-indigo-700">
+                                    {formatCurrency((contractForm.installments || []).reduce((sum, i) => sum + i.value, 0))}
+                                </td>
+                                <td colSpan={2}></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
 
-              <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-100">
+                {/* Add new item form */}
+                <div className="flex gap-2 items-end bg-blue-50/50 p-3 rounded-lg border border-blue-100">
+                    <div className="flex-1">
+                        <label className="block text-xs font-medium text-slate-500 mb-1">Nội dung đợt</label>
+                        <input 
+                            type="text" 
+                            className="w-full p-1.5 text-sm border rounded"
+                            placeholder="VD: Tạm ứng 30%"
+                            value={newInstallment.name}
+                            onChange={e => setNewInstallment({...newInstallment, name: e.target.value})}
+                        />
+                    </div>
+                    <div className="w-32">
+                        <label className="block text-xs font-medium text-slate-500 mb-1">Ngày</label>
+                        <input 
+                            type="date" 
+                            className="w-full p-1.5 text-sm border rounded"
+                            value={newInstallment.date}
+                            onChange={e => setNewInstallment({...newInstallment, date: e.target.value})}
+                        />
+                    </div>
+                    <div className="w-40">
+                        <label className="block text-xs font-medium text-slate-500 mb-1">Giá trị</label>
+                        <CurrencyInput 
+                            className="w-full p-1.5 text-sm border rounded font-medium"
+                            placeholder="0"
+                            value={newInstallment.value || 0}
+                            onChange={val => setNewInstallment({...newInstallment, value: val})}
+                        />
+                    </div>
+                    <div className="w-36">
+                        <label className="block text-xs font-medium text-slate-500 mb-1">Trạng thái</label>
+                        <select 
+                            className="w-full p-1.5 text-sm border rounded"
+                            value={newInstallment.status}
+                            onChange={e => setNewInstallment({...newInstallment, status: e.target.value as InstallmentStatus})}
+                        >
+                            <option value={InstallmentStatus.PLANNING}>Kế hoạch</option>
+                            <option value={InstallmentStatus.INVOICED}>
+                                {contractForm.type === ContractType.OUTPUT ? 'Đã xuất HĐ' : 'Đã nhận HĐ'}
+                            </option>
+                            <option value={InstallmentStatus.PAID}>Đã thanh toán</option>
+                        </select>
+                    </div>
+                    <button 
+                        type="button" 
+                        onClick={handleAddInstallment}
+                        disabled={!newInstallment.name || !newInstallment.value}
+                        className="p-1.5 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed"
+                    >
+                        <PlusCircle className="w-5 h-5" />
+                    </button>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
                 <button type="button" onClick={() => setIsContractModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Hủy</button>
-                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
-                    {contractForm.id ? 'Cập nhật' : 'Lưu bản ghi'}
+                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium">
+                    {contractForm.id ? 'Cập nhật' : 'Lưu Hợp đồng'}
                 </button>
               </div>
             </form>
