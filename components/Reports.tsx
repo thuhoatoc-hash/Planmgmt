@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Project, Contract, Category, User, ContractType, CategoryType } from '../types';
+import { Project, Contract, Category, User, ContractType } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Download, Filter, Calendar, BarChart3, PieChart as PieChartIcon, User as UserIcon } from 'lucide-react';
 

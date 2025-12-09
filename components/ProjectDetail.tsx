@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Project, Contract, Category, ContractType, CategoryType, ProjectType, ProductType, User, Partner, ProjectStatusItem, UserRole, Task, TaskStatus } from '../types';
-import { ArrowLeft, Plus, DollarSign, Calendar, Briefcase, Filter, User as UserIcon, Building2, Edit, Trash2, Tag, Box, Save, TrendingUp, CheckCircle2, ListTodo, Clock, CheckSquare } from 'lucide-react';
+import { ArrowLeft, Plus, DollarSign, Calendar, Briefcase, Filter, User as UserIcon, Building2, Edit, Trash2, Tag, Box, Save, TrendingUp, CheckCircle2, ListTodo } from 'lucide-react';
 import CurrencyInput from './CurrencyInput';
 
 interface ProjectDetailProps {
