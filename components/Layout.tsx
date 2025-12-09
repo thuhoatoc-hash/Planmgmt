@@ -1,5 +1,5 @@
-import React from 'react';
-import { LayoutDashboard, FolderKanban, Tags, Users, LogOut, Menu, X, Settings, Briefcase, Signal, BarChart3 } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { LayoutDashboard, FolderKanban, Tags, Users, LogOut, Menu, X, Settings, Briefcase, Signal, BarChart3, Download } from 'lucide-react';
 import { User } from '../types';
 
 interface LayoutProps {
@@ -12,7 +12,8 @@ interface LayoutProps {
 }
 
 const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, currentPath, onNavigate, onOpenProfile }) => {
-  const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -27,6 +28,32 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, currentPath, 
   ];
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      // Prevent the mini-infobar from appearing on mobile
+      e.preventDefault();
+      // Stash the event so it can be triggered later.
+      setDeferredPrompt(e);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    // Show the install prompt
+    deferredPrompt.prompt();
+    // Wait for the user to respond to the prompt
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log(`User response to the install prompt: ${outcome}`);
+    // We've used the prompt, and can't use it again, throw it away
+    setDeferredPrompt(null);
+  };
 
   return (
     <div className="flex h-screen bg-slate-50 text-slate-800 font-sans overflow-hidden">
@@ -78,6 +105,17 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, currentPath, 
         </nav>
 
         <div className="p-4 border-t border-slate-200 bg-white">
+          {/* Install Button */}
+          {deferredPrompt && (
+            <button
+              onClick={handleInstallClick}
+              className="flex items-center w-full px-4 py-2 mb-3 text-sm font-medium text-white bg-slate-800 rounded-lg hover:bg-slate-700 transition-colors shadow-sm"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Cài đặt App
+            </button>
+          )}
+
           <button 
             onClick={onOpenProfile}
             className="flex items-center gap-3 mb-3 px-2 w-full hover:bg-slate-50 p-2 rounded-lg transition-colors text-left"
@@ -111,7 +149,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, currentPath, 
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top Header (Mobile only mainly) */}
-        <header className="lg:hidden bg-white border-b border-slate-200 h-16 flex items-center px-4 justify-between">
+        <header className="lg:hidden bg-white border-b border-slate-200 h-16 flex items-center px-4 justify-between sticky top-0 z-20">
           <div className="flex items-center gap-2 font-semibold text-slate-800">
             <Signal className="h-6 w-6 text-[#EE0033]" />
             <span className="text-[#EE0033] font-bold">Viettel Hà Nội</span>
