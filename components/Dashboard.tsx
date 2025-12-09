@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Project, Contract, ContractType, Category, CategoryType, KPIMonthlyData, Task, User, TaskStatus } from '../types';
+import { Project, Contract, ContractType, Category, CategoryType, KPIMonthlyData, Task, User, TaskStatus, InstallmentStatus } from '../types';
 import { Wallet, TrendingUp, TrendingDown, Activity, Settings, Check, X, SlidersHorizontal, Target, CheckSquare } from 'lucide-react';
 
 interface DashboardProps {
@@ -76,10 +76,22 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, 
         .filter(c => c.type === ContractType.OUTPUT && c.status !== 'CANCELLED')
         .reduce((acc, curr) => acc + curr.value, 0);
 
-      // Doanh thu: Chỉ tính các hợp đồng đã hoàn thành/nghiệm thu
+      // Doanh thu: Tính dựa trên các Installments đã xuất hóa đơn hoặc thanh toán
+      // Nếu không có installment nào thì mới tính dựa trên status COMPLETED
       const rev = pContracts
-        .filter(c => c.type === ContractType.OUTPUT && c.status === 'COMPLETED')
-        .reduce((acc, curr) => acc + curr.value, 0);
+        .filter(c => c.type === ContractType.OUTPUT && c.status !== 'CANCELLED')
+        .reduce((acc, c) => {
+            if (c.installments && c.installments.length > 0) {
+                // Sum only INVOICED or PAID installments
+                const installmentsSum = c.installments
+                    .filter(i => i.status === InstallmentStatus.INVOICED || i.status === InstallmentStatus.PAID)
+                    .reduce((sum, i) => sum + i.value, 0);
+                return acc + installmentsSum;
+            } else {
+                // Fallback for legacy data or contracts without installments
+                return acc + (c.status === 'COMPLETED' ? c.value : 0);
+            }
+        }, 0);
 
       // Chi phí: Tổng giá trị hợp đồng đầu vào (trừ hủy)
       const cost = pContracts

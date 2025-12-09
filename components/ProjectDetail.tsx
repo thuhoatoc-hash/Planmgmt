@@ -719,7 +719,19 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                    </div>
                    <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Đối tác (Bên B)</label>
-                        <input type="text" className="w-full p-2 border rounded-lg" value={contractForm.partyB || contractForm.partnerName} onChange={e => setContractForm({...contractForm, partyB: e.target.value, partnerName: e.target.value})} placeholder="Tên đối tác ký kết..." />
+                        <input 
+                            list="partners-list"
+                            type="text" 
+                            className="w-full p-2 border rounded-lg" 
+                            value={contractForm.partyB || contractForm.partnerName} 
+                            onChange={e => setContractForm({...contractForm, partyB: e.target.value, partnerName: e.target.value})} 
+                            placeholder="Chọn hoặc nhập tên đối tác..." 
+                        />
+                        <datalist id="partners-list">
+                            {partners.map(p => (
+                                <option key={p.id} value={p.name} />
+                            ))}
+                        </datalist>
                    </div>
                </div>
 

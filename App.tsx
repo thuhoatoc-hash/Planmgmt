@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Layout from './components/Layout';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
@@ -15,28 +15,73 @@ import KPIManagement from './components/KPIManagement';
 import { User, Project, Contract, Category, Partner, ProjectStatusItem, Task, KPIMonthlyData } from './types';
 import { MOCK_USERS, MOCK_PROJECTS, MOCK_CONTRACTS, MOCK_CATEGORIES, MOCK_PARTNERS, MOCK_STATUSES, MOCK_TASKS, MOCK_KPI } from './services/mockData';
 
+// Helper to load data from localStorage or fallback to mock
+const loadData = <T,>(key: string, fallback: T): T => {
+  const saved = localStorage.getItem(key);
+  return saved ? JSON.parse(saved) : fallback;
+};
+
+const SESSION_DURATION = 60 * 60 * 1000; // 60 minutes in ms
+
 const App: React.FC = () => {
-  // Global State
-  const [user, setUser] = useState<User | null>(null);
+  // Global State with Persistence
+  const [user, setUser] = useState<User | null>(() => {
+    const savedUser = localStorage.getItem('currentUser');
+    const loginTime = localStorage.getItem('loginTime');
+    if (savedUser && loginTime) {
+      const now = Date.now();
+      if (now - parseInt(loginTime) < SESSION_DURATION) {
+        return JSON.parse(savedUser);
+      } else {
+        localStorage.removeItem('currentUser');
+        localStorage.removeItem('loginTime');
+      }
+    }
+    return null;
+  });
+
   const [currentPath, setCurrentPath] = useState('dashboard');
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   
-  // Data State
-  const [projects, setProjects] = useState<Project[]>(MOCK_PROJECTS);
-  const [contracts, setContracts] = useState<Contract[]>(MOCK_CONTRACTS);
-  const [categories, setCategories] = useState<Category[]>(MOCK_CATEGORIES);
-  const [users, setUsers] = useState<User[]>(MOCK_USERS);
-  const [partners, setPartners] = useState<Partner[]>(MOCK_PARTNERS);
-  const [statuses, setStatuses] = useState<ProjectStatusItem[]>(MOCK_STATUSES);
-  const [tasks, setTasks] = useState<Task[]>(MOCK_TASKS);
-  const [kpiData, setKpiData] = useState<KPIMonthlyData[]>(MOCK_KPI);
+  // Data State with Persistence
+  const [projects, setProjects] = useState<Project[]>(() => loadData('projects', MOCK_PROJECTS));
+  const [contracts, setContracts] = useState<Contract[]>(() => loadData('contracts', MOCK_CONTRACTS));
+  const [categories, setCategories] = useState<Category[]>(() => loadData('categories', MOCK_CATEGORIES));
+  const [users, setUsers] = useState<User[]>(() => loadData('users', MOCK_USERS));
+  const [partners, setPartners] = useState<Partner[]>(() => loadData('partners', MOCK_PARTNERS));
+  const [statuses, setStatuses] = useState<ProjectStatusItem[]>(() => loadData('statuses', MOCK_STATUSES));
+  const [tasks, setTasks] = useState<Task[]>(() => loadData('tasks', MOCK_TASKS));
+  const [kpiData, setKpiData] = useState<KPIMonthlyData[]>(() => loadData('kpiData', MOCK_KPI));
 
-  // View State
+  // View State (Not persisted usually, but kept for navigation flow)
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
-  // Handle Login
+  // --- PERSISTENCE EFFECTS ---
+  useEffect(() => localStorage.setItem('projects', JSON.stringify(projects)), [projects]);
+  useEffect(() => localStorage.setItem('contracts', JSON.stringify(contracts)), [contracts]);
+  useEffect(() => localStorage.setItem('categories', JSON.stringify(categories)), [categories]);
+  useEffect(() => localStorage.setItem('users', JSON.stringify(users)), [users]);
+  useEffect(() => localStorage.setItem('partners', JSON.stringify(partners)), [partners]);
+  useEffect(() => localStorage.setItem('statuses', JSON.stringify(statuses)), [statuses]);
+  useEffect(() => localStorage.setItem('tasks', JSON.stringify(tasks)), [tasks]);
+  useEffect(() => localStorage.setItem('kpiData', JSON.stringify(kpiData)), [kpiData]);
+
+  // Handle Login with Session Storage
+  const handleLogin = (u: User) => {
+    setUser(u);
+    localStorage.setItem('currentUser', JSON.stringify(u));
+    localStorage.setItem('loginTime', Date.now().toString());
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    localStorage.removeItem('currentUser');
+    localStorage.removeItem('loginTime');
+  };
+
+  // Handle Login Check
   if (!user) {
-    return <Login onLogin={setUser} />;
+    return <Login onLogin={handleLogin} />;
   }
 
   // Project Handlers
@@ -55,7 +100,6 @@ const App: React.FC = () => {
   const handleUpdateContract = (c: Contract) => setContracts(contracts.map(existing => existing.id === c.id ? c : existing));
   const handleDeleteContract = (id: string) => setContracts(contracts.filter(c => c.id !== id));
   
-  // Keep this for backward compatibility or simple status updates if needed
   const handleUpdateContractStatus = (id: string, status: Contract['status']) => {
     setContracts(contracts.map(c => c.id === id ? { ...c, status } : c));
   };
@@ -67,7 +111,10 @@ const App: React.FC = () => {
   const handleAddUser = (u: User) => setUsers([...users, u]);
   const handleUpdateUser = (u: User) => {
     setUsers(users.map(existing => existing.id === u.id ? u : existing));
-    if (user.id === u.id) setUser(u); // Update current session if self-update
+    if (user.id === u.id) {
+        setUser(u); // Update current session if self-update
+        localStorage.setItem('currentUser', JSON.stringify(u));
+    }
   };
   const handleDeleteUser = (id: string) => setUsers(users.filter(u => u.id !== id));
 
@@ -173,7 +220,7 @@ const App: React.FC = () => {
   return (
     <Layout 
       user={user} 
-      onLogout={() => setUser(null)} 
+      onLogout={handleLogout} 
       currentPath={currentPath} 
       onNavigate={handleNavigate}
       onOpenProfile={() => setIsProfileOpen(true)}
