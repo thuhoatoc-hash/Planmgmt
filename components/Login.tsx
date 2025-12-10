@@ -1,7 +1,8 @@
+
 import React, { useState } from 'react';
 import { User } from '../types';
-import { MOCK_USERS } from '../services/mockData';
-import { Signal, ArrowRight } from 'lucide-react';
+import { api } from '../services/api';
+import { Signal, ArrowRight, Loader2 } from 'lucide-react';
 
 interface LoginProps {
   onLogin: (user: User) => void;
@@ -11,14 +12,26 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const user = MOCK_USERS.find(u => u.username === username);
-    if (user && password === '123456') { // Simple mock password
-      onLogin(user);
-    } else {
-      setError('Tên đăng nhập hoặc mật khẩu không đúng (Mặc định: 123456)');
+    setError('');
+    setLoading(true);
+
+    try {
+        // Fetch user from Supabase "users" table
+        const user = await api.users.login(username);
+
+        if (user && user.password === password) {
+             onLogin(user);
+        } else {
+             setError('Tên đăng nhập hoặc mật khẩu không đúng.');
+        }
+    } catch (err) {
+        setError('Có lỗi xảy ra khi kết nối máy chủ.');
+    } finally {
+        setLoading(false);
     }
   };
 
@@ -46,7 +59,8 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#EE0033] focus:border-[#EE0033] outline-none transition-all"
-              placeholder="admin hoặc user"
+              placeholder="admin"
+              disabled={loading}
             />
           </div>
 
@@ -60,6 +74,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#EE0033] focus:border-[#EE0033] outline-none transition-all"
               placeholder="••••••"
+              disabled={loading}
             />
           </div>
 
@@ -71,17 +86,17 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
           <button
             type="submit"
-            className="w-full bg-[#EE0033] text-white font-semibold py-2.5 rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
+            disabled={loading}
+            className="w-full bg-[#EE0033] text-white font-semibold py-2.5 rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            Đăng nhập
-            <ArrowRight className="w-4 h-4" />
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Đăng nhập <ArrowRight className="w-4 h-4" /></>}
           </button>
         </form>
 
         <div className="mt-8 pt-6 border-t border-slate-100 text-center">
           <p className="text-xs text-slate-400">Copyright @ Dzung Nguyen</p>
           <div className="mt-2 text-xs text-slate-400">
-            <p>Demo accounts: admin / 123456</p>
+            <p>Cloud Database Connected</p>
           </div>
         </div>
       </div>

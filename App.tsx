@@ -13,18 +13,8 @@ import UserProfile from './components/UserProfile';
 import Reports from './components/Reports';
 import KPIManagement from './components/KPIManagement';
 import { User, Project, Contract, Category, Partner, ProjectStatusItem, Task, KPIMonthlyData } from './types';
-import { MOCK_USERS, MOCK_PROJECTS, MOCK_CONTRACTS, MOCK_CATEGORIES, MOCK_PARTNERS, MOCK_STATUSES, MOCK_TASKS, MOCK_KPI } from './services/mockData';
-
-// Helper to load data from localStorage or fallback to mock
-const loadData = <T,>(key: string, fallback: T): T => {
-  try {
-    const saved = localStorage.getItem(key);
-    return saved ? JSON.parse(saved) : fallback;
-  } catch (e) {
-    console.error(`Error loading ${key}`, e);
-    return fallback;
-  }
-};
+import { api } from './services/api';
+import { Loader2 } from 'lucide-react';
 
 const SESSION_DURATION = 60 * 60 * 1000; // 60 minutes in ms
 
@@ -39,7 +29,6 @@ const App: React.FC = () => {
         if (now - parseInt(loginTime) < SESSION_DURATION) {
           return JSON.parse(savedUser);
         } else {
-          // Session expired
           localStorage.removeItem('currentUser');
           localStorage.removeItem('loginTime');
         }
@@ -52,29 +41,58 @@ const App: React.FC = () => {
 
   const [currentPath, setCurrentPath] = useState('dashboard');
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isAppLoading, setIsAppLoading] = useState(false);
   
-  // Data State with Persistence
-  const [projects, setProjects] = useState<Project[]>(() => loadData('projects', MOCK_PROJECTS));
-  const [contracts, setContracts] = useState<Contract[]>(() => loadData('contracts', MOCK_CONTRACTS));
-  const [categories, setCategories] = useState<Category[]>(() => loadData('categories', MOCK_CATEGORIES));
-  const [users, setUsers] = useState<User[]>(() => loadData('users', MOCK_USERS));
-  const [partners, setPartners] = useState<Partner[]>(() => loadData('partners', MOCK_PARTNERS));
-  const [statuses, setStatuses] = useState<ProjectStatusItem[]>(() => loadData('statuses', MOCK_STATUSES));
-  const [tasks, setTasks] = useState<Task[]>(() => loadData('tasks', MOCK_TASKS));
-  const [kpiData, setKpiData] = useState<KPIMonthlyData[]>(() => loadData('kpiData', MOCK_KPI));
+  // Data State
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [partners, setPartners] = useState<Partner[]>([]);
+  const [statuses, setStatuses] = useState<ProjectStatusItem[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [kpiData, setKpiData] = useState<KPIMonthlyData[]>([]);
 
   // View State
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
-  // --- PERSISTENCE EFFECTS ---
-  useEffect(() => localStorage.setItem('projects', JSON.stringify(projects)), [projects]);
-  useEffect(() => localStorage.setItem('contracts', JSON.stringify(contracts)), [contracts]);
-  useEffect(() => localStorage.setItem('categories', JSON.stringify(categories)), [categories]);
-  useEffect(() => localStorage.setItem('users', JSON.stringify(users)), [users]);
-  useEffect(() => localStorage.setItem('partners', JSON.stringify(partners)), [partners]);
-  useEffect(() => localStorage.setItem('statuses', JSON.stringify(statuses)), [statuses]);
-  useEffect(() => localStorage.setItem('tasks', JSON.stringify(tasks)), [tasks]);
-  useEffect(() => localStorage.setItem('kpiData', JSON.stringify(kpiData)), [kpiData]);
+  // --- FETCH DATA FROM SUPABASE ---
+  const fetchAllData = async () => {
+    setIsAppLoading(true);
+    try {
+        const [
+            pData, cData, catData, uData, partData, sData, tData, kData
+        ] = await Promise.all([
+            api.projects.getAll(),
+            api.contracts.getAll(),
+            api.categories.getAll(),
+            api.users.getAll(),
+            api.partners.getAll(),
+            api.statuses.getAll(),
+            api.tasks.getAll(),
+            api.kpi.getAll()
+        ]);
+
+        setProjects(pData);
+        setContracts(cData);
+        setCategories(catData);
+        setUsers(uData);
+        setPartners(partData);
+        setStatuses(sData.sort((a,b) => a.order - b.order));
+        setTasks(tData);
+        setKpiData(kData);
+    } catch (error) {
+        console.error("Failed to fetch initial data", error);
+    } finally {
+        setIsAppLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+        fetchAllData();
+    }
+  }, [user]);
 
   // Handle Login
   const handleLogin = (u: User) => {
@@ -87,69 +105,149 @@ const App: React.FC = () => {
     setUser(null);
     localStorage.removeItem('currentUser');
     localStorage.removeItem('loginTime');
+    // Clear data
+    setProjects([]);
+    setContracts([]);
   };
 
   if (!user) {
     return <Login onLogin={handleLogin} />;
   }
 
+  if (isAppLoading && projects.length === 0 && statuses.length === 0) {
+      return (
+          <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-50 gap-4">
+              <Loader2 className="w-10 h-10 text-[#EE0033] animate-spin" />
+              <p className="text-slate-500 font-medium">Đang tải dữ liệu từ Cloud...</p>
+          </div>
+      )
+  }
+
   // Project Handlers
-  const handleAddProject = (p: Project) => setProjects([p, ...projects]);
-  const handleUpdateProject = (p: Project) => {
-    setProjects(projects.map(existing => existing.id === p.id ? p : existing));
-    if (selectedProject?.id === p.id) setSelectedProject(p);
+  const handleAddProject = async (p: Project) => {
+      const saved = await api.projects.save(p);
+      if (saved) setProjects([saved, ...projects]);
   };
-  const handleDeleteProject = (id: string) => {
-    setProjects(projects.filter(p => p.id !== id));
-    if (selectedProject?.id === id) setSelectedProject(null);
+  const handleUpdateProject = async (p: Project) => {
+      const saved = await api.projects.save(p);
+      if (saved) {
+          setProjects(projects.map(existing => existing.id === saved.id ? saved : existing));
+          if (selectedProject?.id === saved.id) setSelectedProject(saved);
+      }
+  };
+  const handleDeleteProject = async (id: string) => {
+      const success = await api.projects.delete(id);
+      if (success) {
+          setProjects(projects.filter(p => p.id !== id));
+          if (selectedProject?.id === id) setSelectedProject(null);
+      }
   };
 
   // Contract Handlers
-  const handleAddContract = (c: Contract) => setContracts([c, ...contracts]);
-  const handleUpdateContract = (c: Contract) => setContracts(contracts.map(existing => existing.id === c.id ? c : existing));
-  const handleDeleteContract = (id: string) => setContracts(contracts.filter(c => c.id !== id));
-  
-  const handleUpdateContractStatus = (id: string, status: Contract['status']) => {
-    setContracts(contracts.map(c => c.id === id ? { ...c, status } : c));
+  const handleAddContract = async (c: Contract) => {
+      const saved = await api.contracts.save(c);
+      if (saved) setContracts([saved, ...contracts]);
+  };
+  const handleUpdateContract = async (c: Contract) => {
+      const saved = await api.contracts.save(c);
+      if (saved) setContracts(contracts.map(existing => existing.id === saved.id ? saved : existing));
+  };
+  const handleDeleteContract = async (id: string) => {
+      const success = await api.contracts.delete(id);
+      if (success) setContracts(contracts.filter(c => c.id !== id));
+  };
+  const handleUpdateContractStatus = async (id: string, status: Contract['status']) => {
+      const contract = contracts.find(c => c.id === id);
+      if (contract) {
+          const updated = { ...contract, status };
+          const saved = await api.contracts.save(updated);
+          if (saved) setContracts(contracts.map(c => c.id === id ? saved : c));
+      }
   };
 
-  const handleAddCategory = (c: Category) => setCategories([...categories, c]);
-  const handleDeleteCategory = (id: string) => setCategories(categories.filter(c => c.id !== id));
+  // Category Handlers
+  const handleAddCategory = async (c: Category) => {
+      const saved = await api.categories.save(c);
+      if (saved) setCategories([...categories, saved]);
+  };
+  const handleDeleteCategory = async (id: string) => {
+      const success = await api.categories.delete(id);
+      if (success) setCategories(categories.filter(c => c.id !== id));
+  };
 
   // User Handlers
-  const handleAddUser = (u: User) => setUsers([...users, u]);
-  const handleUpdateUser = (u: User) => {
-    setUsers(users.map(existing => existing.id === u.id ? u : existing));
-    if (user.id === u.id) {
-        setUser(u);
-        localStorage.setItem('currentUser', JSON.stringify(u)); // Update session user data
-    }
+  const handleAddUser = async (u: User) => {
+      const saved = await api.users.save(u);
+      if (saved) setUsers([...users, saved]);
   };
-  const handleDeleteUser = (id: string) => setUsers(users.filter(u => u.id !== id));
+  const handleUpdateUser = async (u: User) => {
+      const saved = await api.users.save(u);
+      if (saved) {
+          setUsers(users.map(existing => existing.id === saved.id ? saved : existing));
+          if (user.id === saved.id) {
+              setUser(saved);
+              localStorage.setItem('currentUser', JSON.stringify(saved));
+          }
+      }
+  };
+  const handleDeleteUser = async (id: string) => {
+      const success = await api.users.delete(id);
+      if (success) setUsers(users.filter(u => u.id !== id));
+  };
 
   // Partner Handlers
-  const handleAddPartner = (p: Partner) => setPartners([...partners, p]);
-  const handleUpdatePartner = (p: Partner) => setPartners(partners.map(existing => existing.id === p.id ? p : existing));
-  const handleDeletePartner = (id: string) => setPartners(partners.filter(p => p.id !== id));
+  const handleAddPartner = async (p: Partner) => {
+      const saved = await api.partners.save(p);
+      if (saved) setPartners([...partners, saved]);
+  };
+  const handleUpdatePartner = async (p: Partner) => {
+      const saved = await api.partners.save(p);
+      if (saved) setPartners(partners.map(existing => existing.id === saved.id ? saved : existing));
+  };
+  const handleDeletePartner = async (id: string) => {
+      const success = await api.partners.delete(id);
+      if (success) setPartners(partners.filter(p => p.id !== id));
+  };
 
   // Status Handlers
-  const handleAddStatus = (s: ProjectStatusItem) => setStatuses([...statuses, s]);
-  const handleUpdateStatus = (s: ProjectStatusItem) => setStatuses(statuses.map(existing => existing.id === s.id ? s : existing));
-  const handleDeleteStatus = (id: string) => setStatuses(statuses.filter(s => s.id !== id));
+  const handleAddStatus = async (s: ProjectStatusItem) => {
+      const saved = await api.statuses.save(s);
+      if (saved) setStatuses([...statuses, saved]);
+  };
+  const handleUpdateStatus = async (s: ProjectStatusItem) => {
+      const saved = await api.statuses.save(s);
+      if (saved) setStatuses(statuses.map(existing => existing.id === saved.id ? saved : existing));
+  };
+  const handleDeleteStatus = async (id: string) => {
+      const success = await api.statuses.delete(id);
+      if (success) setStatuses(statuses.filter(s => s.id !== id));
+  };
 
   // Task Handlers
-  const handleAddTask = (t: Task) => setTasks([...tasks, t]);
-  const handleUpdateTask = (t: Task) => setTasks(tasks.map(existing => existing.id === t.id ? t : existing));
-  const handleDeleteTask = (id: string) => setTasks(tasks.filter(t => t.id !== id));
+  const handleAddTask = async (t: Task) => {
+      const saved = await api.tasks.save(t);
+      if (saved) setTasks([...tasks, saved]);
+  };
+  const handleUpdateTask = async (t: Task) => {
+      const saved = await api.tasks.save(t);
+      if (saved) setTasks(tasks.map(existing => existing.id === saved.id ? saved : existing));
+  };
+  const handleDeleteTask = async (id: string) => {
+      const success = await api.tasks.delete(id);
+      if (success) setTasks(tasks.filter(t => t.id !== id));
+  };
 
   // KPI Handlers
-  const handleUpdateKPI = (data: KPIMonthlyData) => {
-    const exists = kpiData.some(d => d.id === data.id);
-    if (exists) {
-        setKpiData(kpiData.map(d => d.id === data.id ? data : d));
-    } else {
-        setKpiData([...kpiData, data]);
-    }
+  const handleUpdateKPI = async (data: KPIMonthlyData) => {
+      const saved = await api.kpi.save(data);
+      if (saved) {
+          const exists = kpiData.some(d => d.id === saved.id);
+          if (exists) {
+              setKpiData(kpiData.map(d => d.id === saved.id ? saved : d));
+          } else {
+              setKpiData([...kpiData, saved]);
+          }
+      }
   };
 
   // Navigation Logic
@@ -204,7 +302,7 @@ const App: React.FC = () => {
       case 'projects':
         return <ProjectList 
                   projects={projects} 
-                  contracts={contracts} // Passed for calculation
+                  contracts={contracts} 
                   users={users} 
                   partners={partners}
                   statuses={statuses}

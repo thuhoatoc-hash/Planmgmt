@@ -1,41 +1,66 @@
 # PM Quản lý dự án kinh doanh - Viettel Hà Nội
 
-## Hướng dẫn Deploy lên Internet (Vercel)
+Hệ thống quản lý phương án kinh doanh, theo dõi hợp đồng, doanh thu, chi phí và báo cáo KPI.
 
-Bạn đã có mã nguồn trên GitHub. Để đưa website này lên mạng (Public), cách đơn giản và nhanh nhất là sử dụng **Vercel**.
+## 1. Cài đặt và Kết nối Database (Supabase)
 
-### Bước 1: Chuẩn bị
-1. Đảm bảo bạn đã **Commit** và **Push** tất cả các file mới (package.json, vite.config.ts,...) lên GitHub repository của bạn.
+### Bước 1: Setup Supabase
+1. Tạo project mới trên [Supabase](https://supabase.com).
+2. Vào **SQL Editor**, copy và chạy nội dung file `db_schema.sql` (nếu bạn chưa có, hãy yêu cầu AI tạo lại SQL script) để tạo bảng.
+3. Vào **Project Settings -> API**, copy `Project URL` và `anon public key`.
 
-### Bước 2: Kết nối Vercel
-1. Truy cập [https://vercel.com/](https://vercel.com/).
-2. Đăng ký/Đăng nhập bằng tài khoản **GitHub**.
-3. Tại giao diện Dashboard, bấm nút **"Add New..."** -> **"Project"**.
-4. Danh sách repository của bạn sẽ hiện ra. Tìm repo dự án này và bấm nút **"Import"**.
+### Bước 2: Cấu hình biến môi trường
+Tạo file `.env` ở thư mục gốc (không commit file này lên GitHub):
+```env
+VITE_SUPABASE_URL=https://your-project-id.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key-here
+```
 
-### Bước 3: Cấu hình & Deploy
-1. Ở màn hình "Configure Project":
-   - **Framework Preset**: Vercel thường tự nhận diện là `Vite`. Nếu không, hãy chọn `Vite`.
-   - **Root Directory**: Để mặc định (`./`).
-   - **Build Command**: Để mặc định (`npm run build` hoặc `vite build`).
-   - **Output Directory**: Để mặc định (`dist`).
-2. Bấm nút **"Deploy"**.
+## 2. Chạy ứng dụng (Local)
 
-### Bước 4: Hoàn tất
-- Vercel sẽ chạy quá trình build trong khoảng 1-2 phút.
-- Khi hoàn tất, bạn sẽ nhận được một đường link (ví dụ: `pm-viettel.vercel.app`) để truy cập website của mình từ bất kỳ đâu.
+1. Cài đặt thư viện: `npm install`
+2. Chạy server phát triển: `npm run dev`
+3. Truy cập: `http://localhost:5173`
+   - **User:** `admin` / **Pass:** `123`
 
----
+## 3. Deploy lên Internet (Hosting)
 
-## Cài đặt và chạy thử trên máy cá nhân (Local)
+### Cách 1: Deploy lên Vercel (Khuyên dùng - Nhanh & Ổn định nhất)
+Vercel hỗ trợ cực tốt cho Vite và React.
 
-Nếu bạn muốn chạy thử trên máy tính của mình:
+1. **Đẩy code lên GitHub:**
+   - Tạo một repository mới trên GitHub.
+   - Chạy lệnh tại thư mục dự án:
+     ```bash
+     git init
+     git add .
+     git commit -m "First commit"
+     git branch -M main
+     git remote add origin https://github.com/<username>/<repo-name>.git
+     git push -u origin main
+     ```
 
-1. Cài đặt [Node.js](https://nodejs.org/).
-2. Mở terminal tại thư mục dự án.
-3. Chạy lệnh:
+2. **Kết nối Vercel:**
+   - Truy cập [Vercel.com](https://vercel.com) và đăng nhập bằng GitHub.
+   - Bấm **"Add New..."** -> **"Project"**.
+   - Chọn repository bạn vừa đẩy lên.
+
+3. **Cấu hình Environment Variables (Quan trọng):**
+   - Tại màn hình "Configure Project" trên Vercel, phần **Environment Variables**, thêm 2 biến từ Supabase của bạn:
+     - `VITE_SUPABASE_URL`: (URL của Supabase)
+     - `VITE_SUPABASE_ANON_KEY`: (Key anon public)
+   - Bấm **Deploy**.
+
+4. **Hoàn tất:**
+   - Sau khi deploy xong, Vercel sẽ cấp cho bạn một tên miền (ví dụ: `pm-viettel.vercel.app`). Bạn có thể dùng link này để truy cập từ mọi nơi.
+
+### Cách 2: Deploy lên GitHub Pages
+Nếu bạn muốn dùng GitHub Pages (miễn phí hoàn toàn nhưng cấu hình phức tạp hơn chút).
+
+1. Trong file `vite.config.ts`, đảm bảo `base` được cấu hình đúng.
+2. Thêm biến `VITE_BASE_PATH=/ten-repo/` vào file `.env` (thay `ten-repo` bằng tên repository của bạn).
+3. Chạy lệnh build:
    ```bash
-   npm install
-   npm run dev
+   npm run build
    ```
-4. Truy cập đường link hiện ra trong terminal (thường là `http://localhost:5173`).
+4. Đẩy thư mục `dist` lên nhánh `gh-pages` của GitHub.

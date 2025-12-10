@@ -1,7 +1,8 @@
 
 import React, { useState, useMemo } from 'react';
 import { KPIMonthlyData, KPIGroup, KPIItem, UserRole, User } from '../types';
-import { Calendar, TrendingUp, AlertCircle, CheckCircle, Lock, Unlock, Plus, Trash2, PlusCircle, Copy, CheckSquare, Square } from 'lucide-react';
+import { Calendar, TrendingUp, AlertCircle, CheckCircle, Lock, Unlock, Plus, Trash2, PlusCircle, Copy, CheckSquare, Square, BarChart3 } from 'lucide-react';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 interface KPIManagementProps {
   kpiData: KPIMonthlyData[];
@@ -33,12 +34,109 @@ interface CalculatedData {
 const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, user }) => {
   const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().slice(0, 7));
   const [isEditMode, setIsEditMode] = useState(false);
+  const [showTrend, setShowTrend] = useState(true);
 
   const isAdmin = user?.role === UserRole.ADMIN;
 
   const currentData = useMemo(() => {
     return kpiData.find(d => d.month === selectedMonth) || null;
   }, [kpiData, selectedMonth]);
+
+  // --- CALCULATION HELPER (Used for both Trend and Detail view) ---
+  const calculateScoreForMonth = (data: KPIMonthlyData) => {
+      let totalScore = 0;
+      data.groups.forEach(group => {
+          let groupTarget = group.target || 0;
+          let groupActual = group.actual || 0;
+          
+          if (group.autoCalculate) {
+              groupTarget = group.items.reduce((sum, item) => sum + (item.target || 0), 0);
+              groupActual = group.items.reduce((sum, item) => sum + (item.actual || 0), 0);
+          }
+
+          // Group Level Score
+          if (group.weight && group.weight > 0) {
+              const groupPercent = groupTarget > 0 ? (groupActual / groupTarget) * 100 : 0;
+              const cappedPercent = Math.min(groupPercent, 120); // Cap at 120%
+              totalScore += (cappedPercent * group.weight) / 100;
+          }
+
+          // Item Level Score
+          group.items.forEach(item => {
+              const percent = item.target > 0 ? (item.actual / item.target) * 100 : 0;
+              if (item.weight && item.weight > 0) {
+                  const cappedPercent = Math.min(percent, 120); // Cap at 120%
+                  totalScore += (cappedPercent * item.weight) / 100;
+              }
+          });
+      });
+      return totalScore;
+  };
+
+  // --- TREND DATA ---
+  const trendData = useMemo(() => {
+      return kpiData.map(d => ({
+          month: d.month,
+          score: calculateScoreForMonth(d)
+      })).sort((a, b) => a.month.localeCompare(b.month)); // Sort chronological
+  }, [kpiData]);
+
+  // --- DETAIL DATA FOR SELECTED MONTH ---
+  const calculatedData: CalculatedData | null = useMemo(() => {
+    if (!currentData) return null;
+
+    let grandTotalScore = 0;
+    let completedCount = 0;
+    let totalItemsCount = 0;
+
+    const processedGroups = currentData.groups.map(group => {
+        let groupTarget = group.target || 0;
+        let groupActual = group.actual || 0;
+        
+        if (group.autoCalculate) {
+            groupTarget = group.items.reduce((sum, item) => sum + (item.target || 0), 0);
+            groupActual = group.items.reduce((sum, item) => sum + (item.actual || 0), 0);
+        }
+
+        let groupPercent = 0;
+        let groupScore = 0;
+        
+        if (group.weight && group.weight > 0) {
+            groupPercent = groupTarget > 0 ? (groupActual / groupTarget) * 100 : 0;
+            const cappedPercent = Math.min(groupPercent, 120);
+            groupScore = (cappedPercent * group.weight) / 100;
+            grandTotalScore += groupScore;
+        }
+
+        const processedItems = group.items.map(item => {
+            const percent = item.target > 0 ? (item.actual / item.target) * 100 : 0;
+            const cappedPercent = Math.min(percent, 120);
+            const score = item.weight > 0 ? (cappedPercent * item.weight) / 100 : 0;
+            
+            if (item.weight > 0) {
+                grandTotalScore += score;
+            }
+
+            if (item.target > 0 || item.weight > 0) {
+                 totalItemsCount++;
+                 if (percent >= 100) completedCount++;
+            }
+
+            return { ...item, percent, score };
+        });
+
+        return { 
+            ...group, 
+            target: groupTarget, 
+            actual: groupActual, 
+            percent: groupPercent, 
+            score: groupScore,
+            items: processedItems 
+        };
+    });
+
+    return { groups: processedGroups, totalScore: grandTotalScore, completed: completedCount, total: totalItemsCount };
+  }, [currentData]);
 
   const handleInitMonth = () => {
       const sortedMonths = [...kpiData].sort((a,b) => b.month.localeCompare(a.month));
@@ -47,6 +145,7 @@ const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, use
       let newGroups: KPIGroup[] = [];
       
       if (latest) {
+          // Deep copy groups to avoid reference issues, reset actuals
           newGroups = latest.groups.map(g => ({
               ...g,
               actual: 0,
@@ -71,7 +170,7 @@ const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, use
       onUpdateKPI(newData); 
   };
 
-  // --- CRUD HANDLERS ---
+  // --- CRUD HANDLERS (Same as before) ---
   const handleUpdateGroup = (groupId: string, field: keyof KPIGroup, value: any) => {
       if (!currentData) return;
       const newGroups = currentData.groups.map(g => 
@@ -137,64 +236,6 @@ const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, use
       onUpdateKPI({ ...currentData, groups: newGroups });
   };
 
-  const calculatedData: CalculatedData | null = useMemo(() => {
-    if (!currentData) return null;
-
-    let grandTotalScore = 0;
-    let completedCount = 0;
-    let totalItemsCount = 0;
-
-    const processedGroups = currentData.groups.map(group => {
-        let groupTarget = group.target || 0;
-        let groupActual = group.actual || 0;
-        
-        if (group.autoCalculate) {
-            groupTarget = group.items.reduce((sum, item) => sum + (item.target || 0), 0);
-            groupActual = group.items.reduce((sum, item) => sum + (item.actual || 0), 0);
-        }
-
-        let groupPercent = 0;
-        let groupScore = 0;
-        
-        if (group.weight && group.weight > 0) {
-            groupPercent = groupTarget > 0 ? (groupActual / groupTarget) * 100 : 0;
-            // Cap logic: If > 120%, max score is based on 120%
-            const cappedPercent = Math.min(groupPercent, 120);
-            groupScore = (cappedPercent * group.weight) / 100;
-            grandTotalScore += groupScore;
-        }
-
-        const processedItems = group.items.map(item => {
-            const percent = item.target > 0 ? (item.actual / item.target) * 100 : 0;
-            // Cap logic: If > 120%, max score is based on 120%
-            const cappedPercent = Math.min(percent, 120);
-            const score = item.weight > 0 ? (cappedPercent * item.weight) / 100 : 0;
-            
-            if (item.weight > 0) {
-                grandTotalScore += score;
-            }
-
-            if (item.target > 0 || item.weight > 0) {
-                 totalItemsCount++;
-                 if (percent >= 100) completedCount++;
-            }
-
-            return { ...item, percent, score };
-        });
-
-        return { 
-            ...group, 
-            target: groupTarget, 
-            actual: groupActual, 
-            percent: groupPercent, 
-            score: groupScore,
-            items: processedItems 
-        };
-    });
-
-    return { groups: processedGroups, totalScore: grandTotalScore, completed: completedCount, total: totalItemsCount };
-  }, [currentData]);
-
   const formatNumber = (num: number) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(num);
 
   if (!currentData) {
@@ -248,6 +289,16 @@ const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, use
                     {isEditMode ? 'Đang Chỉnh sửa Cấu trúc' : 'Chế độ Xem / Nhập KQ'}
                 </button>
              )}
+
+            <button 
+                onClick={() => setShowTrend(!showTrend)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-colors shadow-sm ${
+                    showTrend ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-white text-slate-600 border-slate-200'
+                }`}
+            >
+                <BarChart3 className="w-4 h-4" />
+                {showTrend ? 'Ẩn Biểu đồ' : 'Hiện Xu hướng'}
+            </button>
              
              <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-slate-200 shadow-sm">
                 <span className="text-sm font-semibold text-slate-600">Tháng:</span>
@@ -261,12 +312,52 @@ const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, use
         </div>
       </div>
 
+      {/* --- TREND CHART --- */}
+      {showTrend && trendData.length > 0 && (
+          <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm animate-in slide-in-from-top-4 duration-300">
+              <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-[#EE0033]" />
+                  Xu hướng Điểm KPI qua các tháng
+              </h3>
+              <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={trendData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                          <defs>
+                              <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="5%" stopColor="#EE0033" stopOpacity={0.1}/>
+                                  <stop offset="95%" stopColor="#EE0033" stopOpacity={0}/>
+                              </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                          <XAxis dataKey="month" tick={{fontSize: 12, fill: '#64748b'}} />
+                          <YAxis domain={[0, 'auto']} tick={{fontSize: 12, fill: '#64748b'}} />
+                          <Tooltip 
+                            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                            formatter={(value: number) => [value.toFixed(2), 'Điểm']}
+                          />
+                          <ReferenceLine y={100} stroke="#10b981" strokeDasharray="3 3" label={{ position: 'right', value: 'Mục tiêu (100)', fill: '#10b981', fontSize: 10 }} />
+                          <Area 
+                            type="monotone" 
+                            dataKey="score" 
+                            stroke="#EE0033" 
+                            fillOpacity={1} 
+                            fill="url(#colorScore)" 
+                            strokeWidth={2}
+                            activeDot={{ r: 6, strokeWidth: 0, fill: '#EE0033' }}
+                          />
+                      </AreaChart>
+                  </ResponsiveContainer>
+              </div>
+          </div>
+      )}
+
+      {/* --- SCORE SUMMARY CARDS --- */}
       {calculatedData && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl p-6 text-white shadow-lg relative overflow-hidden">
                 <div className="flex justify-between items-start mb-4 relative z-10">
                     <div>
-                        <p className="text-blue-100 text-sm font-medium uppercase">Tổng điểm đạt được</p>
+                        <p className="text-blue-100 text-sm font-medium uppercase">Tổng điểm {selectedMonth}</p>
                         <h3 className="text-4xl font-bold mt-1">{calculatedData.totalScore.toFixed(2)}</h3>
                     </div>
                     <div className="p-2 bg-white/20 rounded-lg">
@@ -310,6 +401,7 @@ const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, use
         </div>
       )}
 
+      {/* --- DETAIL TABLE --- */}
       {calculatedData && (
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
