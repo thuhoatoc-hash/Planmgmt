@@ -19,25 +19,37 @@ async function fetchAll<T>(table: string): Promise<T[]> {
 }
 
 // Generic helper to upsert data
-// Modified to handle ID generation logic
+// Modified to handle ID generation logic ROBUSTLY
 async function upsert<T extends { id?: string }>(table: string, item: T): Promise<T | null> {
   const payload = { ...item };
 
-  // CRITICAL FIX: If ID is present but looks like a temp ID (e.g. 'task_123') or empty, 
-  // remove it so Supabase/Postgres generates a real UUID.
-  if (payload.id && !isValidUUID(payload.id)) {
-      delete payload.id;
-  }
-  if (payload.id === '') {
-      delete payload.id;
+  // FIX FOR "null value in column id" ERROR:
+  // If the ID is missing, empty, or a temp ID (like 'user_123'), we must ensure
+  // a valid UUID is sent to the DB if the DB doesn't have a DEFAULT value set up.
+  // We generate a UUID v4 client-side to be safe.
+  if (!payload.id || !isValidUUID(payload.id)) {
+      if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+          payload.id = crypto.randomUUID();
+      } else {
+          // Fallback for older browsers (unlikely with Vite/modern React but safe to have)
+          // Simple UUID v4 generator
+          payload.id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+          });
+      }
   }
 
   const { data, error } = await supabase.from(table).upsert(payload).select().single();
   
   if (error) {
     console.error(`Error upserting into ${table}:`, JSON.stringify(error, null, 2));
-    // Optional: Throw error to let UI know
-    alert(`Lỗi lưu dữ liệu (${table}): ${error.message}`);
+    // Provide a more friendly error message based on common issues
+    let msg = error.message;
+    if (msg.includes('Could not find the') && msg.includes('column')) {
+        msg = `Lỗi cấu trúc dữ liệu: Bảng '${table}' trên Supabase thiếu cột. Vui lòng chạy lệnh SQL cập nhật. (${error.message})`;
+    }
+    alert(`Lỗi lưu dữ liệu (${table}): ${msg}`);
     return null;
   }
   return data as T;

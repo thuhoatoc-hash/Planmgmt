@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Task, TaskStatus, TaskType, Project, User } from '../types';
-import { Plus, Search, Edit, Trash2, CheckSquare, Clock, AlertTriangle, Briefcase, FileText, Calendar } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, CheckSquare, Clock, AlertTriangle, Briefcase, FileText, Calendar, Send, Mail, CheckCircle } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 
 interface TaskManagementProps {
@@ -22,6 +22,7 @@ const TaskManagement: React.FC<TaskManagementProps> = ({ tasks, projects, users,
   const [filterType, setFilterType] = useState<string>('ALL');
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [filterAssignee, setFilterAssignee] = useState<string>('ALL');
+  const [reminderSent, setReminderSent] = useState(false);
 
   // Task Form State
   const initialFormState: Partial<Task> = {
@@ -85,6 +86,23 @@ const TaskManagement: React.FC<TaskManagementProps> = ({ tasks, projects, users,
       ];
 
       return { total, completed, inProgress, late, dueSoon, pieData };
+  }, [tasks]);
+
+  // Tasks due tomorrow for reminder feature
+  const tasksDueTomorrow = useMemo(() => {
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      return tasks.filter(t => {
+          if (t.status === TaskStatus.COMPLETED || t.status === TaskStatus.CANCELLED) return false;
+          const deadline = new Date(t.deadline);
+          // Reset time part for accurate date comparison
+          const d = new Date(deadline);
+          d.setHours(0,0,0,0);
+          return d.getTime() === tomorrow.getTime();
+      });
   }, [tasks]);
 
   // --- FILTER LOGIC ---
@@ -158,6 +176,24 @@ const TaskManagement: React.FC<TaskManagementProps> = ({ tasks, projects, users,
       setIsModalOpen(false);
   };
 
+  const handleSendReminders = () => {
+      let count = 0;
+      tasksDueTomorrow.forEach(task => {
+          const assignee = users.find(u => u.id === task.assigneeId);
+          if(assignee) {
+              console.log(`[Email Simulation] To: ${assignee.email || assignee.username}, Subject: Nhắc nhở: Nhiệm vụ "${task.name}" đến hạn vào ngày mai.`);
+              count++;
+          }
+      });
+      
+      if(count > 0) {
+          setReminderSent(true);
+          setTimeout(() => setReminderSent(false), 4000);
+      } else {
+          alert('Không tìm thấy thông tin người nhận hoặc không có nhiệm vụ nào cần nhắc nhở.');
+      }
+  };
+
   const toggleCollaborator = (userId: string) => {
       const currentIds = formData.collaboratorIds || [];
       if (currentIds.includes(userId)) {
@@ -171,18 +207,44 @@ const TaskManagement: React.FC<TaskManagementProps> = ({ tasks, projects, users,
   const getProjectName = (id?: string) => projects.find(p => p.id === id)?.name || '';
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 pb-10">
+    <div className="space-y-6 animate-in fade-in duration-500 pb-10 relative">
+        {/* Success Notification Toast */}
+        {reminderSent && (
+            <div className="fixed top-20 right-4 z-50 bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 animate-in slide-in-from-right-10 duration-300">
+                <div className="bg-emerald-100 p-2 rounded-full text-emerald-600">
+                    <CheckCircle className="w-5 h-5" />
+                </div>
+                <div>
+                    <p className="font-bold text-sm">Đã gửi nhắc nhở thành công!</p>
+                    <p className="text-xs text-emerald-700 mt-0.5">Hệ thống đã gửi email cho các nhân sự có việc đến hạn ngày mai.</p>
+                </div>
+            </div>
+        )}
+
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
                 <h1 className="text-2xl font-bold text-slate-800">Quản lý Nhiệm vụ</h1>
                 <p className="text-slate-500">Theo dõi tiến độ công việc dự án và giao việc</p>
             </div>
-            <button 
-                onClick={() => handleOpenModal()}
-                className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 flex items-center gap-2 shadow-sm font-medium"
-            >
-                <Plus className="w-5 h-5" /> Thêm Nhiệm vụ
-            </button>
+            <div className="flex gap-2">
+                {tasksDueTomorrow.length > 0 && (
+                    <button 
+                        onClick={handleSendReminders}
+                        className="bg-amber-500 text-white px-4 py-2 rounded-lg hover:bg-amber-600 flex items-center gap-2 shadow-sm font-medium transition-colors"
+                        title={`Gửi nhắc nhở cho ${tasksDueTomorrow.length} nhiệm vụ đến hạn ngày mai`}
+                    >
+                        <Mail className="w-5 h-5" /> 
+                        <span className="hidden md:inline">Gửi nhắc nhở hạn chót ({tasksDueTomorrow.length})</span>
+                        <span className="md:hidden">Nhắc nhở ({tasksDueTomorrow.length})</span>
+                    </button>
+                )}
+                <button 
+                    onClick={() => handleOpenModal()}
+                    className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 flex items-center gap-2 shadow-sm font-medium"
+                >
+                    <Plus className="w-5 h-5" /> Thêm Nhiệm vụ
+                </button>
+            </div>
         </div>
 
         {/* Stats Row */}

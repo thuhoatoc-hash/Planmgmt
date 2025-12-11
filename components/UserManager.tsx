@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { User, UserRole } from '../types';
-import { Shield, User as UserIcon, Phone, Edit, Trash2, Plus, Lock, Briefcase, Zap, Mail } from 'lucide-react';
+import { Shield, User as UserIcon, Phone, Edit, Trash2, Plus, Lock, Briefcase, Zap, Mail, CheckCircle2 } from 'lucide-react';
 import { hashPassword } from '../lib/crypto';
 
 interface UserManagerProps {
@@ -37,6 +37,19 @@ const UserManager: React.FC<UserManagerProps> = ({ users, onAddUser, onUpdateUse
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validation: Email Required
+    if (!editingUser.email || !editingUser.email.trim()) {
+        alert("Vui lòng nhập Email! Đây là trường bắt buộc để khôi phục mật khẩu và nhận thông báo.");
+        return;
+    }
+
+    // Basic Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(editingUser.email)) {
+        alert("Định dạng Email không hợp lệ!");
+        return;
+    }
+    
     let finalPassword = editingUser.password;
     if (passwordInput) {
         finalPassword = await hashPassword(passwordInput);
@@ -65,6 +78,41 @@ const UserManager: React.FC<UserManagerProps> = ({ users, onAddUser, onUpdateUse
       }
   };
 
+  const roleOptions = [
+      { 
+          value: UserRole.AM, 
+          label: 'NV Kinh doanh (AM)', 
+          icon: Briefcase, 
+          desc: 'Phụ trách khách hàng, chỉ tiêu doanh số.',
+          activeClass: 'border-blue-500 bg-blue-50 ring-1 ring-blue-500', 
+          iconClass: 'bg-blue-100 text-blue-700' 
+      },
+      { 
+          value: UserRole.PM, 
+          label: 'TV Giải pháp (PM)', 
+          icon: Zap, 
+          desc: 'Phụ trách kỹ thuật, triển khai dự án.',
+          activeClass: 'border-indigo-500 bg-indigo-50 ring-1 ring-indigo-500', 
+          iconClass: 'bg-indigo-100 text-indigo-700' 
+      },
+      { 
+          value: UserRole.ADMIN, 
+          label: 'Quản trị viên', 
+          icon: Shield, 
+          desc: 'Toàn quyền cấu hình hệ thống.',
+          activeClass: 'border-purple-500 bg-purple-50 ring-1 ring-purple-500', 
+          iconClass: 'bg-purple-100 text-purple-700' 
+      },
+      { 
+          value: UserRole.USER, 
+          label: 'User (Khác)', 
+          icon: UserIcon, 
+          desc: 'Quyền xem cơ bản, không tác nghiệp.',
+          activeClass: 'border-slate-500 bg-slate-50 ring-1 ring-slate-500', 
+          iconClass: 'bg-slate-100 text-slate-700' 
+      },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -74,7 +122,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, onAddUser, onUpdateUse
         </div>
         <button 
           onClick={() => handleOpenModal()}
-          className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 flex items-center gap-2"
+          className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 flex items-center gap-2 shadow-sm font-medium"
         >
           <Plus className="w-4 h-4" /> Thêm User
         </button>
@@ -96,10 +144,10 @@ const UserManager: React.FC<UserManagerProps> = ({ users, onAddUser, onUpdateUse
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
                     {user.avatarUrl ? (
-                        <img src={user.avatarUrl} alt="avt" className="w-8 h-8 rounded-full object-cover" />
+                        <img src={user.avatarUrl} alt="avt" className="w-9 h-9 rounded-full object-cover border border-slate-200" />
                     ) : (
-                        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600">
-                        <UserIcon className="w-4 h-4" />
+                        <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 border border-slate-200">
+                        <UserIcon className="w-5 h-5" />
                         </div>
                     )}
                     <div>
@@ -109,17 +157,18 @@ const UserManager: React.FC<UserManagerProps> = ({ users, onAddUser, onUpdateUse
                   </div>
                 </td>
                 <td className="px-6 py-4">
-                    <div className="flex flex-col gap-1">
+                    <div className="flex flex-col gap-1.5">
                         {user.email && (
                             <div className="flex items-center gap-2 text-sm text-slate-600">
-                                <Mail className="w-3 h-3 text-slate-400" /> {user.email}
+                                <Mail className="w-3.5 h-3.5 text-slate-400" /> {user.email}
                             </div>
                         )}
                         {user.phoneNumber && (
                             <div className="flex items-center gap-2 text-sm text-slate-600">
-                                <Phone className="w-3 h-3 text-slate-400" /> {user.phoneNumber}
+                                <Phone className="w-3.5 h-3.5 text-slate-400" /> {user.phoneNumber}
                             </div>
                         )}
+                        {!user.email && !user.phoneNumber && <span className="text-xs text-slate-400 italic">Chưa cập nhật</span>}
                     </div>
                 </td>
                 <td className="px-6 py-4">
@@ -127,11 +176,11 @@ const UserManager: React.FC<UserManagerProps> = ({ users, onAddUser, onUpdateUse
                 </td>
                 <td className="px-6 py-4 text-right">
                   <div className="flex items-center justify-end gap-2">
-                    <button onClick={() => handleOpenModal(user)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded">
+                    <button onClick={() => handleOpenModal(user)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors" title="Sửa thông tin">
                         <Edit className="w-4 h-4" />
                     </button>
                     {user.username !== 'admin' && (
-                        <button onClick={() => onDeleteUser(user.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded">
+                        <button onClick={() => onDeleteUser(user.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" title="Xóa user">
                             <Trash2 className="w-4 h-4" />
                         </button>
                     )}
@@ -145,63 +194,106 @@ const UserManager: React.FC<UserManagerProps> = ({ users, onAddUser, onUpdateUse
 
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl max-w-lg w-full p-6">
-            <h2 className="text-xl font-bold mb-4">{editingUser.id ? 'Sửa User' : 'Thêm User'}</h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Username</label>
-                  <input required disabled={!!editingUser.id} type="text" className="w-full p-2 border rounded" value={editingUser.username} onChange={e => setEditingUser({...editingUser, username: e.target.value})} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Vai trò</label>
-                  <select className="w-full p-2 border rounded" value={editingUser.role} onChange={e => setEditingUser({...editingUser, role: e.target.value as UserRole})}>
-                    <option value={UserRole.AM}>NV Kinh doanh (AM)</option>
-                    <option value={UserRole.PM}>TV Giải pháp (PM)</option>
-                    <option value={UserRole.ADMIN}>Quản trị (Admin)</option>
-                    <option value={UserRole.USER}>Khác (User)</option>
-                  </select>
-                </div>
-              </div>
+          <div className="bg-white rounded-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl font-bold mb-6 text-slate-800">{editingUser.id ? 'Sửa Thông tin User' : 'Thêm User Mới'}</h2>
+            <form onSubmit={handleSubmit} className="space-y-6">
               
+              {/* Role Selection Grid */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Họ và Tên</label>
-                <input required type="text" className="w-full p-2 border rounded" value={editingUser.fullName} onChange={e => setEditingUser({...editingUser, fullName: e.target.value})} />
+                  <label className="block text-sm font-bold text-slate-700 mb-3">Phân quyền Vai trò <span className="text-red-500">*</span></label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {roleOptions.map((option) => {
+                          const isSelected = editingUser.role === option.value;
+                          return (
+                              <div 
+                                key={option.value}
+                                onClick={() => setEditingUser({ ...editingUser, role: option.value })}
+                                className={`cursor-pointer rounded-xl p-3 border-2 transition-all flex items-start gap-3 relative ${
+                                    isSelected 
+                                    ? `bg-white ${option.activeClass}` 
+                                    : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                                }`}
+                              >
+                                  <div className={`p-2 rounded-lg shrink-0 ${isSelected ? option.iconClass : 'bg-slate-100 text-slate-500'}`}>
+                                      <option.icon className="w-5 h-5" />
+                                  </div>
+                                  <div>
+                                      <div className={`font-bold text-sm ${isSelected ? 'text-slate-800' : 'text-slate-600'}`}>{option.label}</div>
+                                      <div className="text-xs text-slate-500 mt-0.5 leading-tight">{option.desc}</div>
+                                  </div>
+                                  {isSelected && (
+                                      <div className="absolute top-3 right-3 text-indigo-600">
+                                          <CheckCircle2 className="w-5 h-5 fill-indigo-100" />
+                                      </div>
+                                  )}
+                              </div>
+                          )
+                      })}
+                  </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-                    <input type="email" className="w-full p-2 border rounded" value={editingUser.email || ''} onChange={e => setEditingUser({...editingUser, email: e.target.value})} placeholder="abc@viettel.com.vn" />
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Tên đăng nhập (Username) <span className="text-red-500">*</span></label>
+                  <input required disabled={!!editingUser.id} type="text" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" value={editingUser.username} onChange={e => setEditingUser({...editingUser, username: e.target.value})} placeholder="VD: am_hieu" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Họ và Tên <span className="text-red-500">*</span></label>
+                  <input required type="text" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" value={editingUser.fullName} onChange={e => setEditingUser({...editingUser, fullName: e.target.value})} placeholder="VD: Nguyễn Văn A" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Email <span className="text-red-500">*</span></label>
+                    <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <input 
+                            required
+                            type="email" 
+                            className="w-full pl-9 p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" 
+                            value={editingUser.email || ''} 
+                            onChange={e => setEditingUser({...editingUser, email: e.target.value})} 
+                            placeholder="email@viettel.com.vn" 
+                        />
+                    </div>
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Số điện thoại</label>
-                    <input type="text" className="w-full p-2 border rounded" value={editingUser.phoneNumber || ''} onChange={e => setEditingUser({...editingUser, phoneNumber: e.target.value})} />
+                    <div className="relative">
+                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <input type="text" className="w-full pl-9 p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" value={editingUser.phoneNumber || ''} onChange={e => setEditingUser({...editingUser, phoneNumber: e.target.value})} placeholder="09xxxxxxxx" />
+                    </div>
                 </div>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Avatar URL</label>
-                <input type="text" className="w-full p-2 border rounded" value={editingUser.avatarUrl || ''} onChange={e => setEditingUser({...editingUser, avatarUrl: e.target.value})} placeholder="https://..." />
+                <input type="text" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" value={editingUser.avatarUrl || ''} onChange={e => setEditingUser({...editingUser, avatarUrl: e.target.value})} placeholder="https://example.com/avatar.jpg" />
               </div>
 
-              <div>
-                 <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-2">
-                    <Lock className="w-3 h-3" /> Mật khẩu {editingUser.id && '(Bỏ trống nếu không đổi)'}
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                 <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                    <Lock className="w-4 h-4 text-slate-500" /> 
+                    {editingUser.id ? 'Đổi mật khẩu (Tùy chọn)' : 'Thiết lập mật khẩu'}
                  </label>
                  <input 
                     type="password" 
-                    className="w-full p-2 border rounded" 
+                    className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white" 
                     value={passwordInput} 
                     onChange={e => setPasswordInput(e.target.value)} 
                     required={!editingUser.id}
-                    placeholder={editingUser.id ? "********" : ""}
+                    placeholder={editingUser.id ? "Nhập mật khẩu mới nếu muốn đổi..." : "Nhập mật khẩu khởi tạo..."}
                 />
+                {!editingUser.id && <p className="text-xs text-slate-500 mt-1">Mật khẩu mặc định gợi ý: 123</p>}
               </div>
               
-              <div className="flex justify-end gap-3 mt-6">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded">Hủy</button>
-                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">Lưu</button>
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-lg font-medium">Hủy</button>
+                <button type="submit" className="px-5 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium shadow-sm flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4" />
+                    {editingUser.id ? 'Cập nhật User' : 'Tạo User mới'}
+                </button>
               </div>
             </form>
           </div>
