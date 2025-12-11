@@ -356,6 +356,7 @@ const App: React.FC = () => {
     switch (currentPath) {
       case 'dashboard':
         return <Dashboard 
+                  currentUser={user}
                   projects={projects} 
                   contracts={contracts} 
                   categories={categories} 

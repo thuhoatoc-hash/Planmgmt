@@ -1,6 +1,6 @@
 
 
-import { Category, CategoryType, Contract, ContractType, Project, Partner, ProjectStatusItem, User, UserRole, ProjectType, ProductType, Task, TaskStatus, InstallmentStatus, KPIMonthlyData, TaskType } from '../types';
+import { Category, CategoryType, Contract, ContractType, Project, Partner, ProjectStatusItem, User, UserRole, ProjectType, ProductType, Task, TaskStatus, InstallmentStatus, KPIMonthlyData, TaskType, PartnerType } from '../types';
 
 export const MOCK_USERS: User[] = [
   { id: '1', username: 'admin', password: '123', fullName: 'Quản trị viên', role: UserRole.ADMIN, phoneNumber: '0901234567', avatarUrl: '' },
@@ -10,8 +10,8 @@ export const MOCK_USERS: User[] = [
 ];
 
 export const MOCK_PARTNERS: Partner[] = [
-  { id: 'p1', name: 'Công ty Bất Động Sản Á Châu', code: 'ACHAU', contactInfo: '0243.555.888' },
-  { id: 'p2', name: 'Tập đoàn Xây dựng Delta', code: 'DELTA', contactInfo: 'contact@delta.com' },
+  { id: 'p1', name: 'Công ty Bất Động Sản Á Châu', code: 'ACHAU', contactInfo: '0243.555.888', type: PartnerType.CUSTOMER },
+  { id: 'p2', name: 'Tập đoàn Xây dựng Delta', code: 'DELTA', contactInfo: 'contact@delta.com', type: PartnerType.CUSTOMER },
 ];
 
 export const MOCK_STATUSES: ProjectStatusItem[] = [

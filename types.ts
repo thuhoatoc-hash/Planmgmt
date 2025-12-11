@@ -37,11 +37,17 @@ export interface ProjectStatusItem {
   order: number;
 }
 
+export enum PartnerType {
+  CUSTOMER = 'CUSTOMER', // Khách hàng (Đầu ra)
+  SUPPLIER = 'SUPPLIER'  // Đối tác/Nhà thầu (Đầu vào)
+}
+
 export interface Partner {
   id: string;
   name: string;
   code: string;
   contactInfo: string;
+  type: PartnerType; // New field
 }
 
 export enum ProjectType {

@@ -2,9 +2,10 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Project, Contract, ContractType, Category, CategoryType, KPIMonthlyData, Task, User, TaskStatus, InstallmentStatus, EmployeeEvaluation, UserRole, BirthdayEvent } from '../types';
-import { Wallet, TrendingUp, TrendingDown, Activity, Settings, Check, X, SlidersHorizontal, CheckSquare, Award, AlertTriangle, Target, Gift, Phone } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, Activity, Settings, Check, X, SlidersHorizontal, CheckSquare, Award, AlertTriangle, Target, Gift, Phone, ClipboardList, Clock } from 'lucide-react';
 
 interface DashboardProps {
+  currentUser?: User | null;
   projects: Project[];
   contracts: Contract[];
   categories: Category[];
@@ -29,11 +30,12 @@ const DEFAULT_CONFIG = {
   showKPIChart: true,
   showTaskChart: true,
   showEvaluationChart: true,
+  showMyTasks: true,
   showDueTasks: true,
   showBirthdays: true,
 };
 
-const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, kpiData = [], tasks = [], users = [], evaluations = [], events = [] }) => {
+const Dashboard: React.FC<DashboardProps> = ({ currentUser, projects, contracts, categories, kpiData = [], tasks = [], users = [], evaluations = [], events = [] }) => {
   // State for customization
   const [config, setConfig] = useState(DEFAULT_CONFIG);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
@@ -205,6 +207,17 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, 
       };
   }, [kpiData]);
 
+  // --- My To-Do Tasks Calculation ---
+  const myToDos = useMemo(() => {
+      if (!currentUser) return [];
+      
+      return tasks.filter(t => {
+          return t.assigneeId === currentUser.id &&
+                 t.status !== TaskStatus.COMPLETED &&
+                 t.status !== TaskStatus.CANCELLED;
+      }).sort((a,b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime());
+  }, [tasks, currentUser]);
+
   // --- Task Stats Calculation ---
   const taskStats = useMemo(() => {
       const today = new Date();
@@ -367,8 +380,9 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, 
                     { key: 'showCost', label: 'Thẻ Chi phí' },
                     { key: 'showProfit', label: 'Thẻ Lợi nhuận' },
                     { key: 'showRevenue', label: 'Thẻ Doanh thu' },
+                    { key: 'showMyTasks', label: 'Việc cần làm của tôi' },
                     { key: 'showBirthdays', label: 'Sinh nhật sắp tới' },
-                    { key: 'showDueTasks', label: 'Nhiệm vụ sắp đến hạn' },
+                    { key: 'showDueTasks', label: 'Nhiệm vụ sắp đến hạn (All)' },
                     { key: 'showKPIChart', label: 'Biểu đồ KPI' },
                     { key: 'showEvaluationChart', label: 'Biểu đồ Đánh giá KI' },
                     { key: 'showTaskChart', label: 'Biểu đồ Công việc' },
@@ -393,13 +407,71 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, 
         </div>
       </div>
 
+      {/* MY TO-DO LIST (NEW) */}
+      {config.showMyTasks && myToDos.length > 0 && (
+          <div className="bg-gradient-to-r from-indigo-50 to-white border border-indigo-100 rounded-xl p-6 animate-in slide-in-from-top-4 duration-300 shadow-sm">
+              <h3 className="flex items-center gap-2 text-indigo-900 font-bold mb-3">
+                  <ClipboardList className="w-5 h-5 text-indigo-600" /> 
+                  Việc cần làm của tôi ({myToDos.length})
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {myToDos.slice(0, 6).map(task => {
+                      const today = new Date();
+                      today.setHours(0,0,0,0);
+                      const deadline = new Date(task.deadline);
+                      deadline.setHours(0,0,0,0);
+                      
+                      const diffTime = deadline.getTime() - today.getTime();
+                      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                      
+                      let badgeClass = "bg-slate-100 text-slate-600 border-slate-200";
+                      let urgent = false;
+
+                      if (diffDays < 0) {
+                          badgeClass = "bg-red-50 text-red-700 border-red-200";
+                          urgent = true;
+                      } else if (diffDays <= 1) {
+                          badgeClass = "bg-orange-50 text-orange-700 border-orange-200";
+                          urgent = true;
+                      } else {
+                          badgeClass = "bg-blue-50 text-blue-700 border-blue-200";
+                      }
+
+                      return (
+                          <div key={task.id} className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm flex items-center justify-between hover:border-indigo-200 transition-colors">
+                              <div className="min-w-0 pr-2">
+                                  <div className={`font-medium text-sm truncate ${urgent ? 'text-slate-900' : 'text-slate-700'}`}>
+                                      {task.name}
+                                  </div>
+                                  <div className="text-xs text-slate-500 truncate">
+                                      {projects.find(p => p.id === task.projectId)?.name || 'Giao việc'}
+                                  </div>
+                              </div>
+                              <div className={`text-[10px] font-bold px-2 py-1 rounded border whitespace-nowrap flex items-center gap-1 ${badgeClass}`}>
+                                  {urgent && <AlertTriangle className="w-3 h-3" />}
+                                  {new Date(task.deadline).toLocaleDateString('vi-VN')}
+                              </div>
+                          </div>
+                      );
+                  })}
+              </div>
+              {myToDos.length > 6 && (
+                  <div className="mt-3 text-center">
+                      <span className="text-xs text-indigo-600 font-medium cursor-pointer hover:underline">
+                          Xem thêm {myToDos.length - 6} công việc khác...
+                      </span>
+                  </div>
+              )}
+          </div>
+      )}
+
       {/* Grid for Alerts: Due Tasks & Birthdays */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Due Tasks Alert */}
+          {/* Due Tasks Alert (General) */}
           {config.showDueTasks && taskStats.dueTasks.length > 0 && (
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 animate-in slide-in-from-top-4 duration-300">
                   <h3 className="flex items-center gap-2 text-amber-800 font-bold mb-2">
-                      <AlertTriangle className="w-5 h-5" /> Nhiệm vụ sắp/đã đến hạn ({taskStats.dueTasks.length})
+                      <AlertTriangle className="w-5 h-5" /> Nhiệm vụ sắp/đã đến hạn (Toàn bộ)
                   </h3>
                   <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
                       {taskStats.dueTasks.slice(0, 5).map(task => (

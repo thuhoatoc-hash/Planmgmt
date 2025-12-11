@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { Partner, Project, Contract, ContractType } from '../types';
-import { Briefcase, Plus, Edit, Trash2, Phone, X, FileText, Folder } from 'lucide-react';
+import { Partner, Project, Contract, ContractType, PartnerType } from '../types';
+import { Briefcase, Plus, Edit, Trash2, Phone, X, FileText, Folder, Users, Truck } from 'lucide-react';
 
 interface PartnerManagerProps {
   partners: Partner[];
@@ -24,7 +24,7 @@ const PartnerManager: React.FC<PartnerManagerProps> = ({ partners, projects, con
     if (p) {
       setEditing({ ...p });
     } else {
-      setEditing({ name: '', code: '', contactInfo: '' });
+      setEditing({ name: '', code: '', contactInfo: '', type: PartnerType.CUSTOMER });
     }
     setIsModalOpen(true);
   };
@@ -50,7 +50,7 @@ const PartnerManager: React.FC<PartnerManagerProps> = ({ partners, projects, con
         </div>
         <button 
           onClick={(e) => handleOpenModal(undefined, e)}
-          className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 flex items-center gap-2"
+          className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 flex items-center gap-2 shadow-sm font-medium"
         >
           <Plus className="w-4 h-4" /> Thêm Đối tác
         </button>
@@ -64,8 +64,8 @@ const PartnerManager: React.FC<PartnerManagerProps> = ({ partners, projects, con
                 className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer group"
             >
                 <div className="flex justify-between items-start mb-4">
-                    <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center text-indigo-600">
-                        <Briefcase className="w-5 h-5" />
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${p.type === PartnerType.SUPPLIER ? 'bg-orange-100 text-orange-600' : 'bg-indigo-50 text-indigo-600'}`}>
+                        {p.type === PartnerType.SUPPLIER ? <Truck className="w-5 h-5" /> : <Briefcase className="w-5 h-5" />}
                     </div>
                     <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button onClick={(e) => handleOpenModal(p, e)} className="p-1.5 text-slate-400 hover:text-indigo-600 rounded hover:bg-indigo-50">
@@ -77,8 +77,17 @@ const PartnerManager: React.FC<PartnerManagerProps> = ({ partners, projects, con
                     </div>
                 </div>
                 <h3 className="font-bold text-slate-800 mb-1 line-clamp-2 min-h-[1.5em]">{p.name}</h3>
-                <div className="inline-block px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded font-mono mb-4">
-                    {p.code}
+                <div className="flex items-center gap-2 mb-4">
+                    <div className="inline-block px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded font-mono">
+                        {p.code}
+                    </div>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                        p.type === PartnerType.SUPPLIER 
+                        ? 'bg-orange-50 text-orange-700 border border-orange-100' 
+                        : 'bg-blue-50 text-blue-700 border border-blue-100'
+                    }`}>
+                        {p.type === PartnerType.SUPPLIER ? 'Nhà cung cấp' : 'Khách hàng'}
+                    </span>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-slate-500 pt-4 border-t border-slate-100">
                     <Phone className="w-4 h-4" />
@@ -94,21 +103,48 @@ const PartnerManager: React.FC<PartnerManagerProps> = ({ partners, projects, con
           <div className="bg-white rounded-xl max-w-lg w-full p-6">
             <h2 className="text-xl font-bold mb-4 text-slate-800">{editing.id ? 'Sửa Đối tác' : 'Thêm Đối tác'}</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
+              
+              <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Loại đối tác</label>
+                  <div className="grid grid-cols-2 gap-3">
+                      <label className={`border rounded-lg p-3 flex items-center gap-2 cursor-pointer transition-colors ${editing.type === PartnerType.CUSTOMER ? 'bg-indigo-50 border-indigo-500 text-indigo-700' : 'border-slate-200 hover:bg-slate-50'}`}>
+                          <input 
+                            type="radio" 
+                            name="pType" 
+                            className="hidden"
+                            checked={editing.type === PartnerType.CUSTOMER} 
+                            onChange={() => setEditing({...editing, type: PartnerType.CUSTOMER})} 
+                          />
+                          <Users className="w-4 h-4" /> Khách hàng
+                      </label>
+                      <label className={`border rounded-lg p-3 flex items-center gap-2 cursor-pointer transition-colors ${editing.type === PartnerType.SUPPLIER ? 'bg-orange-50 border-orange-500 text-orange-700' : 'border-slate-200 hover:bg-slate-50'}`}>
+                          <input 
+                            type="radio" 
+                            name="pType" 
+                            className="hidden"
+                            checked={editing.type === PartnerType.SUPPLIER} 
+                            onChange={() => setEditing({...editing, type: PartnerType.SUPPLIER})} 
+                          />
+                          <Truck className="w-4 h-4" /> Nhà cung cấp
+                      </label>
+                  </div>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Mã đối tác</label>
-                <input required type="text" className="w-full p-2 border rounded" value={editing.code} onChange={e => setEditing({...editing, code: e.target.value.toUpperCase()})} />
+                <input required type="text" className="w-full p-2 border rounded focus:ring-2 focus:ring-indigo-500 outline-none" value={editing.code} onChange={e => setEditing({...editing, code: e.target.value.toUpperCase()})} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Tên đối tác</label>
-                <input required type="text" className="w-full p-2 border rounded" value={editing.name} onChange={e => setEditing({...editing, name: e.target.value})} />
+                <input required type="text" className="w-full p-2 border rounded focus:ring-2 focus:ring-indigo-500 outline-none" value={editing.name} onChange={e => setEditing({...editing, name: e.target.value})} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Thông tin liên hệ (SĐT/Email/Địa chỉ)</label>
-                <input type="text" className="w-full p-2 border rounded" value={editing.contactInfo} onChange={e => setEditing({...editing, contactInfo: e.target.value})} />
+                <input type="text" className="w-full p-2 border rounded focus:ring-2 focus:ring-indigo-500 outline-none" value={editing.contactInfo} onChange={e => setEditing({...editing, contactInfo: e.target.value})} />
               </div>
-              <div className="flex justify-end gap-3 mt-6">
+              <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-100">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded">Hủy</button>
-                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">Lưu</button>
+                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">Lưu thông tin</button>
               </div>
             </form>
           </div>
@@ -124,12 +160,19 @@ const PartnerManager: React.FC<PartnerManagerProps> = ({ partners, projects, con
                 </button>
                 
                 <div className="flex items-center gap-3 mb-6">
-                    <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center text-indigo-600">
-                         <Briefcase className="w-6 h-6" />
+                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${detailPartner.type === PartnerType.SUPPLIER ? 'bg-orange-100 text-orange-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                         {detailPartner.type === PartnerType.SUPPLIER ? <Truck className="w-6 h-6" /> : <Briefcase className="w-6 h-6" />}
                     </div>
                     <div>
                         <h2 className="text-xl font-bold text-slate-800">{detailPartner.name}</h2>
-                        <div className="flex gap-2 text-sm text-slate-500">
+                        <div className="flex gap-2 text-sm text-slate-500 items-center">
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                detailPartner.type === PartnerType.SUPPLIER 
+                                ? 'bg-orange-50 text-orange-700 border border-orange-100' 
+                                : 'bg-blue-50 text-blue-700 border border-blue-100'
+                            }`}>
+                                {detailPartner.type === PartnerType.SUPPLIER ? 'Nhà cung cấp' : 'Khách hàng'}
+                            </span>
                             <span>Mã: {detailPartner.code}</span>
                             <span>•</span>
                             <span>{detailPartner.contactInfo}</span>

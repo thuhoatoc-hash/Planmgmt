@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { KPIMonthlyData, KPIGroup, KPIItem, UserRole, User } from '../types';
-import { TrendingUp, AlertCircle, CheckCircle, Lock, Unlock, Plus, Trash2, PlusCircle, Copy, CheckSquare, Square, BarChart3, List, FileBarChart } from 'lucide-react';
+import { TrendingUp, AlertCircle, CheckCircle, Lock, Unlock, Plus, Trash2, PlusCircle, Copy, CheckSquare, Square, BarChart3, List, FileBarChart, Bell } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 interface KPIManagementProps {
@@ -214,6 +214,29 @@ const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, use
     return { groups: processedGroups, totalScore: grandTotalScore, completed: completedCount, total: totalItemsCount };
   }, [currentData]);
 
+  // --- AT RISK ITEMS MEMO ---
+  const atRiskItems = useMemo(() => {
+      if (!calculatedData) return [];
+      const riskList: { groupName: string; name: string; target: number; actual: number; percent: number }[] = [];
+      
+      calculatedData.groups.forEach(g => {
+          g.items.forEach(i => {
+              // Consider item at risk if it has a target, weight, and completion is less than 100%
+              if (i.target > 0 && i.weight > 0 && i.percent < 100) {
+                  riskList.push({
+                      groupName: g.name,
+                      name: i.name,
+                      target: i.target,
+                      actual: i.actual,
+                      percent: i.percent
+                  });
+              }
+          });
+      });
+      // Sort by lowest percentage first
+      return riskList.sort((a,b) => a.percent - b.percent);
+  }, [calculatedData]);
+
   const handleInitMonth = () => {
       const sortedMonths = [...kpiData].sort((a,b) => b.month.localeCompare(a.month));
       const latest = sortedMonths[0];
@@ -373,6 +396,38 @@ const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, use
             />
         </div>
       </div>
+
+      {/* --- ALERTS SECTION (NEW) --- */}
+      {atRiskItems.length > 0 && (
+          <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 animate-in slide-in-from-top-4 duration-300 mb-6">
+              <h3 className="flex items-center gap-2 text-orange-800 font-bold mb-3">
+                  <Bell className="w-5 h-5" /> 
+                  Nhắc nhở: {atRiskItems.length} Chỉ tiêu rủi ro chưa hoàn thành
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-60 overflow-y-auto pr-2">
+                  {atRiskItems.map((item, idx) => (
+                      <div key={idx} className="bg-white p-3 rounded-lg border border-orange-100 shadow-sm flex flex-col justify-between hover:border-orange-300 transition-colors">
+                          <div>
+                              <div className="text-[10px] text-slate-500 uppercase font-bold mb-1 line-clamp-1 flex items-center gap-1">
+                                  <AlertCircle className="w-3 h-3 text-orange-500" />
+                                  {item.groupName}
+                              </div>
+                              <div className="font-medium text-slate-800 text-sm mb-1">{item.name}</div>
+                          </div>
+                          <div className="mt-2">
+                              <div className="flex justify-between text-xs text-slate-600 mb-1">
+                                  <span>Tiến độ: <span className="font-bold text-orange-600">{item.percent.toFixed(1)}%</span></span>
+                                  <span className="font-mono">{formatNumber(item.actual)} / {formatNumber(item.target)}</span>
+                              </div>
+                              <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                                  <div className="bg-orange-500 h-full rounded-full" style={{width: `${Math.min(item.percent, 100)}%`}}></div>
+                              </div>
+                          </div>
+                      </div>
+                  ))}
+              </div>
+          </div>
+      )}
 
       {/* --- TREND CHART --- */}
       {showTrend && trendData.length > 0 && (

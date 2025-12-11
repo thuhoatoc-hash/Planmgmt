@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Project, Contract, Category, ContractType, CategoryType, ProjectType, ProductType, User, Partner, ProjectStatusItem, UserRole, Task, TaskStatus, ContractInstallment, InstallmentStatus, TaskType, CustomerObligation, ObligationStatus, FundingSource, FundingSourceStatus } from '../types';
+import { Project, Contract, Category, ContractType, CategoryType, ProjectType, ProductType, User, Partner, ProjectStatusItem, UserRole, Task, TaskStatus, ContractInstallment, InstallmentStatus, TaskType, CustomerObligation, ObligationStatus, FundingSource, FundingSourceStatus, PartnerType } from '../types';
 import { ArrowLeft, Plus, Calendar, User as UserIcon, Building2, Edit, Trash2, Tag, Box, ListTodo, PlusCircle, MinusCircle, Clock, CheckSquare, Users, Target, AlertCircle, Shield, Coins, Landmark, RefreshCcw } from 'lucide-react';
 import CurrencyInput from './CurrencyInput';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -551,6 +551,12 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
     );
   };
 
+  // Determine contract category type for modal (Revenue/Cost) to filter partners
+  const currentCategoryType = useMemo(() => {
+      const category = categories.find(c => c.id === contractForm.categoryId);
+      return category?.type;
+  }, [contractForm.categoryId, categories]);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -1073,9 +1079,21 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                             placeholder="Chọn hoặc nhập tên đối tác..." 
                         />
                         <datalist id="partners-list">
-                            {partners.map(p => (
-                                <option key={p.id} value={p.name} />
-                            ))}
+                            {partners
+                                // Filter partners based on Contract Type:
+                                // If Revenue (OUTPUT) -> Show Customers
+                                // If Cost (INPUT) -> Show Suppliers
+                                // If Category not selected -> Show all (or strictly follow type logic)
+                                .filter(p => {
+                                    if (!currentCategoryType) return true;
+                                    if (currentCategoryType === CategoryType.REVENUE) return p.type === PartnerType.CUSTOMER || !p.type;
+                                    if (currentCategoryType === CategoryType.COST) return p.type === PartnerType.SUPPLIER || !p.type;
+                                    return true;
+                                })
+                                .map(p => (
+                                    <option key={p.id} value={p.name} />
+                                ))
+                            }
                         </datalist>
                    </div>
                </div>
