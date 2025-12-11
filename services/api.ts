@@ -1,6 +1,6 @@
 
 import { supabase } from '../lib/supabase';
-import { Project, Contract, Category, User, Partner, ProjectStatusItem, Task, KPIMonthlyData, EmployeeEvaluation } from '../types';
+import { Project, Contract, Category, User, Partner, ProjectStatusItem, Task, KPIMonthlyData, EmployeeEvaluation, BirthdayEvent } from '../types';
 
 // Helper: Check if string is valid UUID
 function isValidUUID(uuid: string) {
@@ -126,5 +126,10 @@ export const api = {
     getAll: () => fetchAll<EmployeeEvaluation>('employee_evaluations'),
     save: (e: EmployeeEvaluation) => upsert<EmployeeEvaluation>('employee_evaluations', e),
     delete: (id: string) => remove('employee_evaluations', id),
+  },
+  events: {
+    getAll: () => fetchAll<BirthdayEvent>('birthday_events'),
+    save: (e: BirthdayEvent) => upsert<BirthdayEvent>('birthday_events', e),
+    delete: (id: string) => remove('birthday_events', id),
   }
 };

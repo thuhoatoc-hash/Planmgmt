@@ -224,3 +224,12 @@ export interface EmployeeEvaluation {
   grade: 'A+' | 'A' | 'B' | 'C' | 'D';
   note?: string;
 }
+
+// --- Event/Birthday Types ---
+export interface BirthdayEvent {
+  id: string;
+  fullName: string;
+  title: string; // Chức danh
+  date: string; // YYYY-MM-DD
+  phoneNumber?: string;
+}

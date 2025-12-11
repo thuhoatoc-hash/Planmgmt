@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { LayoutDashboard, FolderKanban, LogOut, Menu, X, Settings, Signal, BarChart3, Download, Target, Award, CheckSquare } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, LogOut, Menu, X, Settings, Signal, BarChart3, Download, Target, Award, CheckSquare, CalendarDays } from 'lucide-react';
 import { User } from '../types';
 
 interface LayoutProps {
@@ -19,12 +19,13 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, currentPath, 
   // Updated Menu Structure
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'tasks', label: 'Quản lý Nhiệm vụ', icon: CheckSquare }, // New Main Menu Item
+    { id: 'tasks', label: 'Quản lý Nhiệm vụ', icon: CheckSquare }, 
     { id: 'projects', label: 'Dự án', icon: FolderKanban },
     { id: 'kpi', label: 'Điều hành chỉ tiêu', icon: Target },
     { id: 'evaluation', label: 'Đánh giá KI', icon: Award },
+    { id: 'events', label: 'Sự kiện (Sinh nhật)', icon: CalendarDays }, // New Item
     { id: 'reports', label: 'Báo cáo', icon: BarChart3 },
-    { id: 'settings', label: 'Cấu hình hệ thống', icon: Settings } // Combined settings
+    { id: 'settings', label: 'Cấu hình hệ thống', icon: Settings }
   ];
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);

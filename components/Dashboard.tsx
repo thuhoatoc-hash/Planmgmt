@@ -1,8 +1,8 @@
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Project, Contract, ContractType, Category, CategoryType, KPIMonthlyData, Task, User, TaskStatus, InstallmentStatus, EmployeeEvaluation, UserRole } from '../types';
-import { Wallet, TrendingUp, TrendingDown, Activity, Settings, Check, X, SlidersHorizontal, CheckSquare, Award, AlertTriangle, Target } from 'lucide-react';
+import { Project, Contract, ContractType, Category, CategoryType, KPIMonthlyData, Task, User, TaskStatus, InstallmentStatus, EmployeeEvaluation, UserRole, BirthdayEvent } from '../types';
+import { Wallet, TrendingUp, TrendingDown, Activity, Settings, Check, X, SlidersHorizontal, CheckSquare, Award, AlertTriangle, Target, Gift, Phone } from 'lucide-react';
 
 interface DashboardProps {
   projects: Project[];
@@ -12,6 +12,7 @@ interface DashboardProps {
   tasks?: Task[];
   users?: User[];
   evaluations?: EmployeeEvaluation[];
+  events?: BirthdayEvent[];
 }
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#FF6B6B'];
@@ -29,9 +30,10 @@ const DEFAULT_CONFIG = {
   showTaskChart: true,
   showEvaluationChart: true,
   showDueTasks: true,
+  showBirthdays: true,
 };
 
-const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, kpiData = [], tasks = [], users = [], evaluations = [] }) => {
+const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, kpiData = [], tasks = [], users = [], evaluations = [], events = [] }) => {
   // State for customization
   const [config, setConfig] = useState(DEFAULT_CONFIG);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
@@ -286,6 +288,37 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, 
       };
   }, [evaluations, users]);
 
+  // --- Upcoming Birthdays ---
+  const upcomingBirthdays = useMemo(() => {
+      if (!events || events.length === 0) return [];
+      
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      const nextWeek = new Date(today);
+      nextWeek.setDate(today.getDate() + 7);
+
+      return events.map(evt => {
+          const dob = new Date(evt.date);
+          // Set year to current year to compare
+          const currentYearBday = new Date(today.getFullYear(), dob.getMonth(), dob.getDate());
+          
+          // If birthday has passed this year, check next year (though usually we care about "coming up")
+          // But here we just want upcoming in next 7 days.
+          // Handle end of year case: if today is Dec 30 and bday is Jan 2
+          let targetDate = currentYearBday;
+          if (currentYearBday < today) {
+              targetDate = new Date(today.getFullYear() + 1, dob.getMonth(), dob.getDate());
+          }
+
+          const diffTime = targetDate.getTime() - today.getTime();
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+          return { ...evt, daysUntil: diffDays, targetDate };
+      })
+      .filter(evt => evt.daysUntil >= 0 && evt.daysUntil <= 7)
+      .sort((a,b) => a.daysUntil - b.daysUntil);
+  }, [events]);
+
   const StatCard = ({ title, value, subValue, icon: Icon, colorClass }: any) => (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex items-start justify-between animate-in zoom-in duration-300">
       <div>
@@ -334,6 +367,7 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, 
                     { key: 'showCost', label: 'Thẻ Chi phí' },
                     { key: 'showProfit', label: 'Thẻ Lợi nhuận' },
                     { key: 'showRevenue', label: 'Thẻ Doanh thu' },
+                    { key: 'showBirthdays', label: 'Sinh nhật sắp tới' },
                     { key: 'showDueTasks', label: 'Nhiệm vụ sắp đến hạn' },
                     { key: 'showKPIChart', label: 'Biểu đồ KPI' },
                     { key: 'showEvaluationChart', label: 'Biểu đồ Đánh giá KI' },
@@ -359,34 +393,61 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, 
         </div>
       </div>
 
-      {/* Due Tasks Alert Section (Email Reminder Simulation) */}
-      {config.showDueTasks && taskStats.dueTasks.length > 0 && (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 animate-in slide-in-from-top-4 duration-300">
-              <h3 className="flex items-center gap-2 text-amber-800 font-bold mb-2">
-                  <AlertTriangle className="w-5 h-5" /> Cảnh báo: {taskStats.dueTasks.length} Nhiệm vụ sắp/đã đến hạn (Email Reminder)
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {taskStats.dueTasks.slice(0, 6).map(task => (
-                      <div key={task.id} className="bg-white p-3 rounded-lg border border-amber-100 shadow-sm flex items-start justify-between">
-                          <div>
-                              <div className="font-medium text-slate-800 text-sm">{task.name}</div>
-                              <div className="text-xs text-slate-500 mt-1">
-                                  {users.find(u => u.id === task.assigneeId)?.fullName}
+      {/* Grid for Alerts: Due Tasks & Birthdays */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Due Tasks Alert */}
+          {config.showDueTasks && taskStats.dueTasks.length > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 animate-in slide-in-from-top-4 duration-300">
+                  <h3 className="flex items-center gap-2 text-amber-800 font-bold mb-2">
+                      <AlertTriangle className="w-5 h-5" /> Nhiệm vụ sắp/đã đến hạn ({taskStats.dueTasks.length})
+                  </h3>
+                  <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                      {taskStats.dueTasks.slice(0, 5).map(task => (
+                          <div key={task.id} className="bg-white p-2.5 rounded-lg border border-amber-100 shadow-sm flex items-center justify-between">
+                              <div className="min-w-0">
+                                  <div className="font-medium text-slate-800 text-sm truncate">{task.name}</div>
+                                  <div className="text-xs text-slate-500">
+                                      {users.find(u => u.id === task.assigneeId)?.fullName}
+                                  </div>
+                              </div>
+                              <div className="text-xs font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded shrink-0">
+                                  {new Date(task.deadline).toLocaleDateString('vi-VN')}
                               </div>
                           </div>
-                          <div className="text-xs font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded">
-                              {new Date(task.deadline).toLocaleDateString('vi-VN')}
-                          </div>
-                      </div>
-                  ))}
-                  {taskStats.dueTasks.length > 6 && (
-                      <div className="flex items-center justify-center text-sm text-amber-700 font-medium">
-                          + {taskStats.dueTasks.length - 6} nhiệm vụ khác...
-                      </div>
-                  )}
+                      ))}
+                  </div>
               </div>
-          </div>
-      )}
+          )}
+
+          {/* Birthdays Alert */}
+          {config.showBirthdays && upcomingBirthdays.length > 0 && (
+              <div className="bg-pink-50 border border-pink-200 rounded-xl p-4 animate-in slide-in-from-top-4 duration-300">
+                  <h3 className="flex items-center gap-2 text-pink-800 font-bold mb-2">
+                      <Gift className="w-5 h-5" /> Sắp sinh nhật (7 ngày tới)
+                  </h3>
+                  <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                      {upcomingBirthdays.map(evt => (
+                          <div key={evt.id} className="bg-white p-2.5 rounded-lg border border-pink-100 shadow-sm flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 rounded-full bg-pink-100 text-pink-500 flex items-center justify-center font-bold text-xs shrink-0">
+                                      {evt.daysUntil === 0 ? 'H.Nay' : `${evt.targetDate.getDate()}/${evt.targetDate.getMonth()+1}`}
+                                  </div>
+                                  <div className="min-w-0">
+                                      <div className="font-medium text-slate-800 text-sm truncate">{evt.fullName}</div>
+                                      <div className="text-xs text-slate-500 truncate">{evt.title}</div>
+                                  </div>
+                              </div>
+                              {evt.phoneNumber && (
+                                  <a href={`tel:${evt.phoneNumber}`} className="text-pink-400 hover:text-pink-600 p-1">
+                                      <Phone className="w-4 h-4" />
+                                  </a>
+                              )}
+                          </div>
+                      ))}
+                  </div>
+              </div>
+          )}
+      </div>
 
       {/* KPI Section */}
       {config.showKPIChart && kpiSummary && (

@@ -11,7 +11,8 @@ import Reports from './components/Reports';
 import KPIManagement from './components/KPIManagement';
 import EmployeeEvaluationManager from './components/EmployeeEvaluation';
 import TaskManagement from './components/TaskManagement';
-import { User, Project, Contract, Category, Partner, ProjectStatusItem, Task, KPIMonthlyData, EmployeeEvaluation, TaskStatus } from './types';
+import EventManager from './components/EventManager';
+import { User, Project, Contract, Category, Partner, ProjectStatusItem, Task, KPIMonthlyData, EmployeeEvaluation, TaskStatus, BirthdayEvent } from './types';
 import { api } from './services/api';
 import { Loader2 } from 'lucide-react';
 
@@ -58,6 +59,7 @@ const App: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [kpiData, setKpiData] = useState<KPIMonthlyData[]>([]);
   const [evaluations, setEvaluations] = useState<EmployeeEvaluation[]>([]);
+  const [events, setEvents] = useState<BirthdayEvent[]>([]);
 
   // View State
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -67,7 +69,7 @@ const App: React.FC = () => {
     setIsAppLoading(true);
     try {
         const [
-            pData, cData, catData, uData, partData, sData, tData, kData, eData
+            pData, cData, catData, uData, partData, sData, tData, kData, eData, evtData
         ] = await Promise.all([
             api.projects.getAll(),
             api.contracts.getAll(),
@@ -77,7 +79,8 @@ const App: React.FC = () => {
             api.statuses.getAll(),
             api.tasks.getAll(),
             api.kpi.getAll(),
-            api.evaluations.getAll()
+            api.evaluations.getAll(),
+            api.events.getAll()
         ]);
 
         setProjects(pData);
@@ -89,6 +92,7 @@ const App: React.FC = () => {
         setTasks(tData);
         setKpiData(kData);
         setEvaluations(eData);
+        setEvents(evtData);
 
         // Check for task reminders after loading
         checkTaskReminders(tData, uData);
@@ -300,6 +304,20 @@ const App: React.FC = () => {
       }
   };
 
+  // Event Handlers
+  const handleAddEvent = async (e: BirthdayEvent) => {
+      const saved = await api.events.save(e);
+      if (saved) setEvents([...events, saved]);
+  };
+  const handleUpdateEvent = async (e: BirthdayEvent) => {
+      const saved = await api.events.save(e);
+      if (saved) setEvents(events.map(existing => existing.id === saved.id ? saved : existing));
+  };
+  const handleDeleteEvent = async (id: string) => {
+      const success = await api.events.delete(id);
+      if (success) setEvents(events.filter(e => e.id !== id));
+  };
+
   // Navigation Logic
   const handleNavigate = (path: string) => {
     setCurrentPath(path);
@@ -345,6 +363,7 @@ const App: React.FC = () => {
                   tasks={tasks}
                   users={users}
                   evaluations={evaluations}
+                  events={events}
                />;
       case 'kpi':
         return <KPIManagement kpiData={kpiData} onUpdateKPI={handleUpdateKPI} user={user} />;
@@ -359,6 +378,13 @@ const App: React.FC = () => {
                   onAddTask={handleAddTask}
                   onUpdateTask={handleUpdateTask}
                   onDeleteTask={handleDeleteTask}
+               />;
+      case 'events':
+        return <EventManager 
+                  events={events}
+                  onAddEvent={handleAddEvent}
+                  onUpdateEvent={handleUpdateEvent}
+                  onDeleteEvent={handleDeleteEvent}
                />;
       case 'reports':
         return <Reports projects={projects} contracts={contracts} categories={categories} users={users} />;
