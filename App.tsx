@@ -5,15 +5,13 @@ import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import ProjectList from './components/ProjectList';
 import ProjectDetail from './components/ProjectDetail';
-import CategoryManager from './components/CategoryManager';
-import UserManager from './components/UserManager';
-import PartnerManager from './components/PartnerManager';
 import ConfigurationManager from './components/ConfigurationManager';
 import UserProfile from './components/UserProfile';
 import Reports from './components/Reports';
 import KPIManagement from './components/KPIManagement';
 import EmployeeEvaluationManager from './components/EmployeeEvaluation';
-import { User, Project, Contract, Category, Partner, ProjectStatusItem, Task, KPIMonthlyData, EmployeeEvaluation } from './types';
+import TaskManagement from './components/TaskManagement';
+import { User, Project, Contract, Category, Partner, ProjectStatusItem, Task, KPIMonthlyData, EmployeeEvaluation, TaskStatus } from './types';
 import { api } from './services/api';
 import { Loader2 } from 'lucide-react';
 
@@ -91,11 +89,41 @@ const App: React.FC = () => {
         setTasks(tData);
         setKpiData(kData);
         setEvaluations(eData);
+
+        // Check for task reminders after loading
+        checkTaskReminders(tData, uData);
     } catch (error) {
         console.error("Failed to fetch initial data", error);
     } finally {
         setIsAppLoading(false);
     }
+  };
+
+  const checkTaskReminders = (tasksToCheck: Task[], usersList: User[]) => {
+      // Simulate Backend Email Cron Job
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      const dueTomorrow = tasksToCheck.filter(t => {
+          if (t.status === TaskStatus.COMPLETED || t.status === TaskStatus.CANCELLED) return false;
+          const deadline = new Date(t.deadline);
+          deadline.setHours(0,0,0,0);
+          return deadline.getTime() === tomorrow.getTime();
+      });
+
+      if (dueTomorrow.length > 0) {
+          console.group('📧 EMAIL REMINDER SYSTEM SIMULATION');
+          console.log(`Found ${dueTomorrow.length} tasks due tomorrow (${tomorrow.toLocaleDateString()}). Sending reminders...`);
+          dueTomorrow.forEach(task => {
+              const assignee = usersList.find(u => u.id === task.assigneeId);
+              if (assignee) {
+                  console.log(`-> Sending email to ${assignee.email || assignee.username} for task "${task.name}"`);
+              }
+          });
+          console.groupEnd();
+      }
   };
 
   useEffect(() => {
@@ -194,13 +222,11 @@ const App: React.FC = () => {
           if (saved) {
               setUsers(prevUsers => [...prevUsers, saved]);
           } else {
-              // Fallback: If DB insert fails (e.g. no permission or RLS), update UI anyway so user sees it
               console.warn("User insert returned null, falling back to local state.");
               setUsers(prevUsers => [...prevUsers, u]);
           }
       } catch (error) {
           console.error("Add user failed:", error);
-          // Fallback on error
           setUsers(prevUsers => [...prevUsers, u]);
       }
   };
@@ -324,6 +350,16 @@ const App: React.FC = () => {
         return <KPIManagement kpiData={kpiData} onUpdateKPI={handleUpdateKPI} user={user} />;
       case 'evaluation':
         return <EmployeeEvaluationManager users={users} currentUser={user} />;
+      case 'tasks':
+        return <TaskManagement 
+                  tasks={tasks}
+                  projects={projects}
+                  users={users}
+                  currentUser={user}
+                  onAddTask={handleAddTask}
+                  onUpdateTask={handleUpdateTask}
+                  onDeleteTask={handleDeleteTask}
+               />;
       case 'reports':
         return <Reports projects={projects} contracts={contracts} categories={categories} users={users} />;
       case 'projects':
@@ -338,21 +374,28 @@ const App: React.FC = () => {
                   onDeleteProject={handleDeleteProject}
                   onSelectProject={setSelectedProject} 
                />;
-      case 'categories':
-        return <CategoryManager categories={categories} onAddCategory={handleAddCategory} onDeleteCategory={handleDeleteCategory} />;
-      case 'users':
-        return <UserManager users={users} onAddUser={handleAddUser} onUpdateUser={handleUpdateUser} onDeleteUser={handleDeleteUser} />;
-      case 'partners':
-        return <PartnerManager 
-                  partners={partners} 
-                  projects={projects} 
-                  contracts={contracts}
-                  onAdd={handleAddPartner} 
-                  onUpdate={handleUpdatePartner} 
-                  onDelete={handleDeletePartner} 
-               />;
+      // Consolidated Settings Route
       case 'settings':
-        return <ConfigurationManager statuses={statuses} onAddStatus={handleAddStatus} onUpdateStatus={handleUpdateStatus} onDeleteStatus={handleDeleteStatus} />;
+        return <ConfigurationManager 
+                  currentUser={user}
+                  statuses={statuses}
+                  users={users}
+                  partners={partners}
+                  categories={categories}
+                  projects={projects}
+                  contracts={contracts}
+                  onAddStatus={handleAddStatus}
+                  onUpdateStatus={handleUpdateStatus}
+                  onDeleteStatus={handleDeleteStatus}
+                  onAddUser={handleAddUser}
+                  onUpdateUser={handleUpdateUser}
+                  onDeleteUser={handleDeleteUser}
+                  onAddPartner={handleAddPartner}
+                  onUpdatePartner={handleUpdatePartner}
+                  onDeletePartner={handleDeletePartner}
+                  onAddCategory={handleAddCategory}
+                  onDeleteCategory={handleDeleteCategory}
+               />;
       default:
         return <div>Not found</div>;
     }

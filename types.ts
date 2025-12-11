@@ -55,6 +55,34 @@ export enum ProductType {
   HYBRID = 'HYBRID', // Hỗn hợp
 }
 
+// --- Customer Obligation Types ---
+export enum ObligationStatus {
+  NO_SOURCE = 'NO_SOURCE',         // Chưa có nguồn
+  SOURCE_RECEIVED = 'SOURCE_RECEIVED', // Nguồn đã về
+  PAID = 'PAID',                   // Đã chi
+  NOT_PAID = 'NOT_PAID',           // Không chi
+}
+
+export enum FundingSourceStatus {
+  RECEIVED = 'RECEIVED', // Đã về
+  PENDING = 'PENDING',   // Chưa về
+}
+
+export interface FundingSource {
+  id: string;
+  name: string; // Tên nguồn (VD: Từ đối tác A)
+  value: number; // Số tiền
+  status: FundingSourceStatus;
+}
+
+export interface CustomerObligation {
+  percentage: number; // Tỷ lệ % / Doanh thu
+  value: number;      // Giá trị tiền
+  status: ObligationStatus; // Hiện trạng
+  deadline?: string; // Thời gian thực hiện (YYYY-MM-DD)
+  sources: FundingSource[]; // Danh sách nguồn tiền
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -71,6 +99,7 @@ export interface Project {
   amId?: string;
   pmId?: string;
   partnerId?: string;
+  customerObligation?: CustomerObligation; // New Field
 }
 
 export enum ContractType {
@@ -118,19 +147,31 @@ export interface Contract {
 }
 
 export enum TaskStatus {
-  NEW = 'NEW',
-  IN_PROGRESS = 'IN_PROGRESS',
-  COMPLETED = 'COMPLETED',
-  LATE = 'LATE'
+  NOT_STARTED = 'NOT_STARTED', // Chưa bắt đầu
+  IN_PROGRESS = 'IN_PROGRESS', // Đang thực hiện
+  COMPLETED = 'COMPLETED',     // Hoàn thành
+  EXTENSION_REQUESTED = 'EXTENSION_REQUESTED', // Đề xuất gia hạn
+  CANCELLED = 'CANCELLED'      // Hủy
+}
+
+export enum TaskType {
+  PROJECT = 'PROJECT', // Nhiệm vụ thuộc dự án
+  ADHOC = 'ADHOC',     // Giao việc / Sự vụ
 }
 
 export interface Task {
     id: string;
-    projectId: string;
+    projectId?: string; // Optional: only if type is PROJECT
+    taskType: TaskType;
     name: string;
-    assigneeId: string;
+    description?: string; // Nội dung, mô tả
+    outputStandard?: string; // Kết quả đầu ra
+    assignerId: string; // Người giao
+    assigneeId: string; // Người chủ trì
+    collaboratorIds?: string[]; // Người phối hợp
     status: TaskStatus;
     deadline: string;
+    completedDate?: string; // Ngày hoàn thành thực tế
 }
 
 // --- KPI Types ---

@@ -2,11 +2,16 @@
 import { supabase } from '../lib/supabase';
 import { Project, Contract, Category, User, Partner, ProjectStatusItem, Task, KPIMonthlyData, EmployeeEvaluation } from '../types';
 
+// Helper: Check if string is valid UUID
+function isValidUUID(uuid: string) {
+  const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return regex.test(uuid);
+}
+
 // Generic helper to fetch data
 async function fetchAll<T>(table: string): Promise<T[]> {
   const { data, error } = await supabase.from(table).select('*');
   if (error) {
-    // Log stringified error to see code/message (e.g., "relation does not exist")
     console.error(`Error fetching ${table}:`, JSON.stringify(error, null, 2));
     return [];
   }
@@ -14,10 +19,25 @@ async function fetchAll<T>(table: string): Promise<T[]> {
 }
 
 // Generic helper to upsert data
-async function upsert<T extends { id: string }>(table: string, item: T): Promise<T | null> {
-  const { data, error } = await supabase.from(table).upsert(item).select().single();
+// Modified to handle ID generation logic
+async function upsert<T extends { id?: string }>(table: string, item: T): Promise<T | null> {
+  const payload = { ...item };
+
+  // CRITICAL FIX: If ID is present but looks like a temp ID (e.g. 'task_123') or empty, 
+  // remove it so Supabase/Postgres generates a real UUID.
+  if (payload.id && !isValidUUID(payload.id)) {
+      delete payload.id;
+  }
+  if (payload.id === '') {
+      delete payload.id;
+  }
+
+  const { data, error } = await supabase.from(table).upsert(payload).select().single();
+  
   if (error) {
     console.error(`Error upserting into ${table}:`, JSON.stringify(error, null, 2));
+    // Optional: Throw error to let UI know
+    alert(`Lỗi lưu dữ liệu (${table}): ${error.message}`);
     return null;
   }
   return data as T;
@@ -28,6 +48,7 @@ async function remove(table: string, id: string): Promise<boolean> {
   const { error } = await supabase.from(table).delete().eq('id', id);
   if (error) {
     console.error(`Error deleting from ${table}:`, JSON.stringify(error, null, 2));
+    alert(`Lỗi xóa dữ liệu: ${error.message}`);
     return false;
   }
   return true;

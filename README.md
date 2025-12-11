@@ -1,3 +1,4 @@
+
 # PM Quản lý dự án kinh doanh - Viettel Hà Nội
 
 Hệ thống quản lý phương án kinh doanh, theo dõi hợp đồng, doanh thu, chi phí và báo cáo KPI.
@@ -64,3 +65,16 @@ Nếu bạn muốn dùng GitHub Pages (miễn phí hoàn toàn nhưng cấu hìn
    npm run build
    ```
 4. Đẩy thư mục `dist` lên nhánh `gh-pages` của GitHub.
+
+## 4. Cập nhật Code (Redeploy)
+
+Khi bạn có chỉnh sửa mới và muốn cập nhật lên trang web đã deploy trên Vercel:
+
+1. Mở terminal tại thư mục dự án.
+2. Chạy các lệnh sau để đẩy code mới lên GitHub:
+   ```bash
+   git add .
+   git commit -m "Mô tả những thay đổi của bạn"
+   git push
+   ```
+3. Vercel sẽ **tự động** phát hiện code mới trên GitHub và tiến hành Build lại (Redeploy). Quá trình này mất khoảng 1-2 phút.

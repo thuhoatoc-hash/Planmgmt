@@ -1,8 +1,8 @@
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Project, Contract, ContractType, Category, CategoryType, KPIMonthlyData, Task, User, TaskStatus, InstallmentStatus, EmployeeEvaluation } from '../types';
-import { Wallet, TrendingUp, TrendingDown, Activity, Settings, Check, X, SlidersHorizontal, Target, CheckSquare, Award } from 'lucide-react';
+import { Project, Contract, ContractType, Category, CategoryType, KPIMonthlyData, Task, User, TaskStatus, InstallmentStatus, EmployeeEvaluation, UserRole } from '../types';
+import { Wallet, TrendingUp, TrendingDown, Activity, Settings, Check, X, SlidersHorizontal, Target, CheckSquare, Award, Clock, AlertTriangle } from 'lucide-react';
 
 interface DashboardProps {
   projects: Project[];
@@ -14,7 +14,7 @@ interface DashboardProps {
   evaluations?: EmployeeEvaluation[];
 }
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#FF6B6B'];
 const KPI_COLORS = ['#10b981', '#f97316']; // Green for completed, Orange for incomplete
 
 // Default configuration
@@ -28,6 +28,7 @@ const DEFAULT_CONFIG = {
   showKPIChart: true,
   showTaskChart: true,
   showEvaluationChart: true,
+  showDueTasks: true,
 };
 
 const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, kpiData = [], tasks = [], users = [], evaluations = [] }) => {
@@ -204,14 +205,30 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, 
 
   // --- Task Stats Calculation ---
   const taskStats = useMemo(() => {
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
 
-      // 1. By AM (User)
+      // Calculate Due Tasks (Simulating Email Reminder)
+      const dueTasks = tasks.filter(t => {
+          if (t.status === TaskStatus.COMPLETED || t.status === TaskStatus.CANCELLED) return false;
+          const deadline = new Date(t.deadline);
+          // Check if deadline is today or tomorrow (or passed)
+          return deadline <= tomorrow;
+      }).sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime());
+
+      // 1. By AM (User) - Modified to account for new statuses
       const tasksByAM = users.map(user => {
           const userTasks = tasks.filter(t => t.assigneeId === user.id);
           const total = userTasks.length;
-          const late = userTasks.filter(t => t.status !== TaskStatus.COMPLETED && t.deadline < today).length;
-          // Only return AMs who have tasks
+          // Consider "Late" if deadline passed AND not completed/cancelled
+          const late = userTasks.filter(t => 
+            (t.status !== TaskStatus.COMPLETED && t.status !== TaskStatus.CANCELLED) && 
+            new Date(t.deadline) < today
+          ).length;
+          
           return { name: user.fullName.split(' ').pop(), fullName: user.fullName, total, late }; 
       }).filter(stat => stat.total > 0).sort((a,b) => b.total - a.total);
 
@@ -219,22 +236,34 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, 
       const tasksByProject = projects.map(proj => {
           const projTasks = tasks.filter(t => t.projectId === proj.id);
           const total = projTasks.length;
-          const late = projTasks.filter(t => t.status !== TaskStatus.COMPLETED && t.deadline < today).length;
-           // Only return Projects that have tasks
+          const late = projTasks.filter(t => 
+            (t.status !== TaskStatus.COMPLETED && t.status !== TaskStatus.CANCELLED) && 
+            new Date(t.deadline) < today
+          ).length;
+          
           return { name: proj.code, fullName: proj.name, total, late };
       }).filter(stat => stat.total > 0).sort((a,b) => b.total - a.total);
 
-      return { tasksByAM, tasksByProject };
+      return { tasksByAM, tasksByProject, dueTasks };
   }, [tasks, users, projects]);
 
   // --- Evaluation Stats Calculation ---
   const evaluationStats = useMemo(() => {
       if (!evaluations || evaluations.length === 0) return null;
-      // Get latest month
+      
+      // Get latest month available in evaluations
       const months = Array.from(new Set(evaluations.map(e => e.month))).sort().reverse();
       const latestMonth = months[0];
       
-      const currentEvals = evaluations.filter(e => e.month === latestMonth);
+      // Filter valid users (Only AM and PM)
+      const validUserIds = users
+        .filter(u => u.role === UserRole.AM || u.role === UserRole.PM)
+        .map(u => u.id);
+
+      // Filter evaluations: Must match latest month AND belong to a valid AM/PM
+      const currentEvals = evaluations.filter(e => 
+          e.month === latestMonth && validUserIds.includes(e.userId)
+      );
       
       const distribution = [
           { name: 'A+', value: 0, fill: '#eab308' }, // Yellow-500
@@ -255,7 +284,7 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, 
           avgScore: currentEvals.reduce((acc, curr) => acc + curr.totalScore, 0) / (currentEvals.length || 1),
           data: distribution
       };
-  }, [evaluations]);
+  }, [evaluations, users]);
 
   const StatCard = ({ title, value, subValue, icon: Icon, colorClass }: any) => (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex items-start justify-between animate-in zoom-in duration-300">
@@ -305,6 +334,7 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, 
                     { key: 'showCost', label: 'Thẻ Chi phí' },
                     { key: 'showProfit', label: 'Thẻ Lợi nhuận' },
                     { key: 'showRevenue', label: 'Thẻ Doanh thu' },
+                    { key: 'showDueTasks', label: 'Nhiệm vụ sắp đến hạn' },
                     { key: 'showKPIChart', label: 'Biểu đồ KPI' },
                     { key: 'showEvaluationChart', label: 'Biểu đồ Đánh giá KI' },
                     { key: 'showTaskChart', label: 'Biểu đồ Công việc' },
@@ -328,6 +358,35 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, 
           </div>
         </div>
       </div>
+
+      {/* Due Tasks Alert Section (Email Reminder Simulation) */}
+      {config.showDueTasks && taskStats.dueTasks.length > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 animate-in slide-in-from-top-4 duration-300">
+              <h3 className="flex items-center gap-2 text-amber-800 font-bold mb-2">
+                  <AlertTriangle className="w-5 h-5" /> Cảnh báo: {taskStats.dueTasks.length} Nhiệm vụ sắp/đã đến hạn (Email Reminder)
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {taskStats.dueTasks.slice(0, 6).map(task => (
+                      <div key={task.id} className="bg-white p-3 rounded-lg border border-amber-100 shadow-sm flex items-start justify-between">
+                          <div>
+                              <div className="font-medium text-slate-800 text-sm">{task.name}</div>
+                              <div className="text-xs text-slate-500 mt-1">
+                                  {users.find(u => u.id === task.assigneeId)?.fullName}
+                              </div>
+                          </div>
+                          <div className="text-xs font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded">
+                              {new Date(task.deadline).toLocaleDateString('vi-VN')}
+                          </div>
+                      </div>
+                  ))}
+                  {taskStats.dueTasks.length > 6 && (
+                      <div className="flex items-center justify-center text-sm text-amber-700 font-medium">
+                          + {taskStats.dueTasks.length - 6} nhiệm vụ khác...
+                      </div>
+                  )}
+              </div>
+          </div>
+      )}
 
       {/* KPI Section */}
       {config.showKPIChart && kpiSummary && (
@@ -441,7 +500,7 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, 
                                                 <div className="bg-white p-3 border border-slate-200 shadow-lg rounded-lg text-xs">
                                                     <p className="font-bold text-slate-800 mb-1">{payload[0].payload.fullName}</p>
                                                     <p className="text-indigo-600">Tổng số việc: {payload[0].value}</p>
-                                                    <p className="text-rose-500">Trễ hạn: {payload[1].value}</p>
+                                                    <p className="text-rose-500">Quá hạn: {payload[1].value}</p>
                                                 </div>
                                             );
                                         }
@@ -450,7 +509,7 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, 
                                 />
                                 <Legend />
                                 <Bar dataKey="total" name="Tổng số việc" fill="#6366f1" radius={[4, 4, 0, 0]} barSize={24} />
-                                <Bar dataKey="late" name="Trễ hạn" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={24} />
+                                <Bar dataKey="late" name="Quá hạn" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={24} />
                             </BarChart>
                         </ResponsiveContainer>
                     ) : (
@@ -484,7 +543,7 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, 
                                                 <div className="bg-white p-3 border border-slate-200 shadow-lg rounded-lg text-xs">
                                                     <p className="font-bold text-slate-800 mb-1">{payload[0].payload.fullName}</p>
                                                     <p className="text-indigo-600">Tổng số việc: {payload[0].value}</p>
-                                                    <p className="text-rose-500">Trễ hạn: {payload[1].value}</p>
+                                                    <p className="text-rose-500">Quá hạn: {payload[1].value}</p>
                                                 </div>
                                             );
                                         }
@@ -493,7 +552,7 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, 
                                 />
                                 <Legend />
                                 <Bar dataKey="total" name="Tổng số việc" fill="#6366f1" radius={[4, 4, 0, 0]} barSize={24} />
-                                <Bar dataKey="late" name="Trễ hạn" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={24} />
+                                <Bar dataKey="late" name="Quá hạn" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={24} />
                             </BarChart>
                         </ResponsiveContainer>
                     ) : (

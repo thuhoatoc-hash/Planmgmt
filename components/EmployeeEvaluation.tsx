@@ -88,7 +88,7 @@ const EmployeeEvaluationManager: React.FC<EmployeeEvaluationProps> = ({ users, c
       } else {
           setCurrentEval(null);
       }
-  }, [selectedUser, selectedMonth, users]); 
+  }, [selectedUser, selectedMonth, users, evaluations]); // Added evaluations dependency to update form if data changes
 
   const calculateScore = (criteria: KICriterium[]) => {
       let total = 0;
@@ -170,25 +170,40 @@ const EmployeeEvaluationManager: React.FC<EmployeeEvaluationProps> = ({ users, c
   const formatNumber = (num: number) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 1 }).format(num);
 
   // --- FILTER LOGIC ---
-  const filteredUsers = users.filter(u => 
-      // 1. Chỉ hiển thị AM hoặc PM
-      (u.role === UserRole.AM || u.role === UserRole.PM) && 
-      // 2. Tìm kiếm theo tên/username
-      (u.fullName.toLowerCase().includes(searchTerm.toLowerCase()) || u.username.toLowerCase().includes(searchTerm.toLowerCase()))
+  // Only AM or PM
+  const validUsers = useMemo(() => {
+    return users.filter(u => u.role === UserRole.AM || u.role === UserRole.PM);
+  }, [users]);
+
+  // List filtered by search
+  const filteredUsers = validUsers.filter(u => 
+      u.fullName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      u.username.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // --- STATS LOGIC ---
   const summaryStats = useMemo(() => {
-    const currentMonthEvals = evaluations.filter(e => e.month === selectedMonth);
-    const total = filteredUsers.length; 
+    // Determine the base population for stats:
+    // It should be ALL valid AM/PM users, so the stats reflect the whole department
+    // independent of the search filter.
+    const total = validUsers.length; 
     if(total === 0) return [];
     
+    // Get all evaluations for the selected month
+    // AND CRITICALLY: Filter out any evaluations that belong to users NOT in validUsers
+    // (e.g. users who were deleted or changed role to USER/ADMIN)
+    const validUserIds = validUsers.map(u => u.id);
+    const currentMonthEvals = evaluations.filter(e => 
+        e.month === selectedMonth && validUserIds.includes(e.userId)
+    );
+
     const grades = ['A+', 'A', 'B', 'C', 'D'];
     return grades.map(g => {
         const count = currentMonthEvals.filter(e => e.grade === g).length;
         const percent = (count / total) * 100;
         return { grade: g, count, percent };
     });
-  }, [evaluations, selectedMonth, filteredUsers]);
+  }, [evaluations, selectedMonth, validUsers]);
 
 
   if (loading) return <div className="p-8 text-center">Đang tải dữ liệu...</div>;
@@ -233,7 +248,7 @@ const EmployeeEvaluationManager: React.FC<EmployeeEvaluationProps> = ({ users, c
         {/* User Table Section */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-4 border-b border-slate-200 flex items-center justify-between">
-                <h3 className="font-bold text-slate-800">Danh sách Nhân viên</h3>
+                <h3 className="font-bold text-slate-800">Danh sách Nhân viên ({filteredUsers.length})</h3>
                  <div className="relative w-64">
                     <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input 
@@ -258,7 +273,9 @@ const EmployeeEvaluationManager: React.FC<EmployeeEvaluationProps> = ({ users, c
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                    {filteredUsers.map((user, index) => {
+                    {filteredUsers.length === 0 ? (
+                        <tr><td colSpan={7} className="px-6 py-8 text-center text-slate-500">Không tìm thấy nhân viên nào</td></tr>
+                    ) : filteredUsers.map((user, index) => {
                         const evalData = evaluations.find(e => e.userId === user.id && e.month === selectedMonth);
                         const isSelected = selectedUser === user.id;
 

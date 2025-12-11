@@ -1,5 +1,6 @@
 
-import { Category, CategoryType, Contract, ContractType, Project, Partner, ProjectStatusItem, User, UserRole, ProjectType, ProductType, Task, TaskStatus, InstallmentStatus, KPIMonthlyData } from '../types';
+
+import { Category, CategoryType, Contract, ContractType, Project, Partner, ProjectStatusItem, User, UserRole, ProjectType, ProductType, Task, TaskStatus, InstallmentStatus, KPIMonthlyData, TaskType } from '../types';
 
 export const MOCK_USERS: User[] = [
   { id: '1', username: 'admin', password: '123', fullName: 'Quản trị viên', role: UserRole.ADMIN, phoneNumber: '0901234567', avatarUrl: '' },
@@ -89,9 +90,9 @@ export const MOCK_CONTRACTS: Contract[] = [
 ];
 
 export const MOCK_TASKS: Task[] = [
-    { id: 't1', projectId: 'prj_1', name: 'Khảo sát hiện trường đợt 1', assigneeId: '4', status: TaskStatus.COMPLETED, deadline: '2024-01-15' },
-    { id: 't2', projectId: 'prj_1', name: 'Lên phương án thiết kế sơ bộ', assigneeId: '4', status: TaskStatus.IN_PROGRESS, deadline: '2024-02-28' },
-    { id: 't3', projectId: 'prj_2', name: 'Gặp gỡ chủ đầu tư', assigneeId: '3', status: TaskStatus.LATE, deadline: '2024-05-10' },
+    { id: 't1', projectId: 'prj_1', taskType: TaskType.PROJECT, name: 'Khảo sát hiện trường đợt 1', assigneeId: '4', assignerId: '1', status: TaskStatus.COMPLETED, deadline: '2024-01-15' },
+    { id: 't2', projectId: 'prj_1', taskType: TaskType.PROJECT, name: 'Lên phương án thiết kế sơ bộ', assigneeId: '4', assignerId: '1', status: TaskStatus.IN_PROGRESS, deadline: '2024-02-28' },
+    { id: 't3', projectId: 'prj_2', taskType: TaskType.PROJECT, name: 'Gặp gỡ chủ đầu tư', assigneeId: '3', assignerId: '1', status: TaskStatus.IN_PROGRESS, deadline: '2024-05-10' },
 ];
 
 export const MOCK_KPI: KPIMonthlyData[] = [

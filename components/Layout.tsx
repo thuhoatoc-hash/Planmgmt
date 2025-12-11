@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { LayoutDashboard, FolderKanban, Tags, Users, LogOut, Menu, X, Settings, Briefcase, Signal, BarChart3, Download, Target, Award } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, Tags, Users, LogOut, Menu, X, Settings, Briefcase, Signal, BarChart3, Download, Target, Award, CheckSquare } from 'lucide-react';
 import { User } from '../types';
 
 interface LayoutProps {
@@ -16,27 +16,22 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, currentPath, 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
+  // Updated Menu Structure
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'kpi', label: 'Điều hành chỉ tiêu', icon: Target },
-    { id: 'evaluation', label: 'Đánh giá KI', icon: Award }, // New Menu Item
-    { id: 'reports', label: 'Báo cáo', icon: BarChart3 },
+    { id: 'tasks', label: 'Quản lý Nhiệm vụ', icon: CheckSquare }, // New Main Menu Item
     { id: 'projects', label: 'Dự án', icon: FolderKanban },
-    { id: 'partners', label: 'Đối tác', icon: Briefcase },
-    { id: 'categories', label: 'Danh mục', icon: Tags },
-    ...(user?.role === 'ADMIN' ? [
-        { id: 'users', label: 'Người dùng', icon: Users },
-        { id: 'settings', label: 'Cấu hình', icon: Settings }
-    ] : []),
+    { id: 'kpi', label: 'Điều hành chỉ tiêu', icon: Target },
+    { id: 'evaluation', label: 'Đánh giá KI', icon: Award },
+    { id: 'reports', label: 'Báo cáo', icon: BarChart3 },
+    { id: 'settings', label: 'Cấu hình hệ thống', icon: Settings } // Combined settings
   ];
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {
-      // Prevent the mini-infobar from appearing on mobile
       e.preventDefault();
-      // Stash the event so it can be triggered later.
       setDeferredPrompt(e);
     };
 
@@ -49,12 +44,9 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, currentPath, 
 
   const handleInstallClick = async () => {
     if (!deferredPrompt) return;
-    // Show the install prompt
     deferredPrompt.prompt();
-    // Wait for the user to respond to the prompt
     const { outcome } = await deferredPrompt.userChoice;
     console.log(`User response to the install prompt: ${outcome}`);
-    // We've used the prompt, and can't use it again, throw it away
     setDeferredPrompt(null);
   };
 
