@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Task, TaskStatus, TaskType, Project, User } from '../types';
-import { Plus, Search, Edit, Trash2, CheckSquare, Clock, AlertTriangle, Briefcase, FileText, Filter, Calendar, Users } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, CheckSquare, Clock, AlertTriangle, Briefcase, FileText, Calendar } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 
 interface TaskManagementProps {

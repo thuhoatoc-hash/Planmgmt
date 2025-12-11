@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { LayoutDashboard, FolderKanban, Tags, Users, LogOut, Menu, X, Settings, Briefcase, Signal, BarChart3, Download, Target, Award, CheckSquare } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, LogOut, Menu, X, Settings, Signal, BarChart3, Download, Target, Award, CheckSquare } from 'lucide-react';
 import { User } from '../types';
 
 interface LayoutProps {

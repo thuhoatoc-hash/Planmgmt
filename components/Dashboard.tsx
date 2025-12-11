@@ -2,7 +2,7 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Project, Contract, ContractType, Category, CategoryType, KPIMonthlyData, Task, User, TaskStatus, InstallmentStatus, EmployeeEvaluation, UserRole } from '../types';
-import { Wallet, TrendingUp, TrendingDown, Activity, Settings, Check, X, SlidersHorizontal, Target, CheckSquare, Award, Clock, AlertTriangle } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, Activity, Settings, Check, X, SlidersHorizontal, CheckSquare, Award, AlertTriangle, Target } from 'lucide-react';
 
 interface DashboardProps {
   projects: Project[];

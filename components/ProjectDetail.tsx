@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Project, Contract, Category, ContractType, CategoryType, ProjectType, ProductType, User, Partner, ProjectStatusItem, UserRole, Task, TaskStatus, ContractInstallment, InstallmentStatus, TaskType, CustomerObligation, ObligationStatus, FundingSource, FundingSourceStatus } from '../types';
-import { ArrowLeft, Plus, Calendar, User as UserIcon, Building2, Edit, Trash2, Tag, Box, ListTodo, PlusCircle, MinusCircle, Clock, CheckSquare, Users, FileText, Target, AlertCircle, Shield, HandCoins, Landmark } from 'lucide-react';
+import { ArrowLeft, Plus, Calendar, User as UserIcon, Building2, Edit, Trash2, Tag, Box, ListTodo, PlusCircle, MinusCircle, Clock, CheckSquare, Users, Target, AlertCircle, Shield, Coins, Landmark } from 'lucide-react';
 import CurrencyInput from './CurrencyInput';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
@@ -829,7 +829,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
                     <div className="flex items-center justify-between mb-6">
                         <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                            <HandCoins className="w-5 h-5 text-indigo-600" />
+                            <Coins className="w-5 h-5 text-indigo-600" />
                             Quản lý Nghĩa vụ Khách hàng
                         </h3>
                         <div className="text-sm text-slate-500">
