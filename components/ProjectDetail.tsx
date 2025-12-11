@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Project, Contract, Category, ContractType, CategoryType, ProjectType, ProductType, User, Partner, ProjectStatusItem, UserRole, Task, TaskStatus, ContractInstallment, InstallmentStatus, TaskType, CustomerObligation, ObligationStatus, FundingSource, FundingSourceStatus } from '../types';
-import { ArrowLeft, Plus, Calendar, User as UserIcon, Building2, Edit, Trash2, Tag, Box, ListTodo, PlusCircle, MinusCircle, Clock, CheckSquare, Users, Target, AlertCircle, Shield, Coins, Landmark } from 'lucide-react';
+import { ArrowLeft, Plus, Calendar, User as UserIcon, Building2, Edit, Trash2, Tag, Box, ListTodo, PlusCircle, MinusCircle, Clock, CheckSquare, Users, Target, AlertCircle, Shield, Coins, Landmark, RefreshCcw } from 'lucide-react';
 import CurrencyInput from './CurrencyInput';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
@@ -111,26 +111,25 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
   const [taskForm, setTaskForm] = useState<Partial<Task>>(initialTaskState);
 
   // --- CUSTOMER OBLIGATION STATE (Local) ---
-  const [obligationForm, setObligationForm] = useState<CustomerObligation>({
+  const defaultObligation: CustomerObligation = {
       percentage: 0,
       value: 0,
       status: ObligationStatus.NO_SOURCE,
       deadline: '',
       sources: []
-  });
+  };
+  const [obligationForm, setObligationForm] = useState<CustomerObligation>(defaultObligation);
 
   useEffect(() => {
-      // Initialize obligation form when project loads or tab changes
+      // Re-sync local state when project prop updates
       if (project.customerObligation) {
-          setObligationForm(project.customerObligation);
-      } else {
           setObligationForm({
-              percentage: 0,
-              value: 0,
-              status: ObligationStatus.NO_SOURCE,
-              deadline: '',
-              sources: []
+              ...defaultObligation,
+              ...project.customerObligation,
+              sources: Array.isArray(project.customerObligation.sources) ? project.customerObligation.sources : []
           });
+      } else {
+          setObligationForm(defaultObligation);
       }
   }, [project]);
 
@@ -373,7 +372,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
       };
       setObligationForm(prev => ({
           ...prev,
-          sources: [...prev.sources, newSource]
+          sources: [...(prev.sources || []), newSource]
       }));
   };
 
@@ -403,15 +402,38 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
   };
 
   const handleSaveObligation = () => {
+      // Ensure the object is clean
+      const cleanObligation: CustomerObligation = {
+          percentage: Number(obligationForm.percentage),
+          value: Number(obligationForm.value),
+          status: obligationForm.status,
+          deadline: obligationForm.deadline || '',
+          sources: Array.isArray(obligationForm.sources) ? obligationForm.sources : []
+      };
+
       if (window.confirm('Bạn có chắc chắn muốn cập nhật thông tin Nghĩa vụ khách hàng?')) {
           const updatedProject: Project = {
               ...project,
-              customerObligation: obligationForm
+              customerObligation: cleanObligation
           };
           onUpdateProject(updatedProject);
-          // Assuming successful update triggers a re-render or data refresh up the chain
-          // but we can add a small visual feedback
-          alert('Đã gửi yêu cầu cập nhật.');
+          alert('Đã gửi yêu cầu lưu dữ liệu.');
+      }
+  };
+
+  const handleResetObligation = () => {
+      if (window.confirm('CẢNH BÁO: Thao tác này sẽ xóa trắng dữ liệu Nghĩa vụ khách hàng hiện tại của dự án này. Bạn có chắc không?')) {
+          const updatedProject: Project = {
+              ...project,
+              customerObligation: undefined // Set to undefined to remove from DB (if supported) or send empty object
+          };
+          // Reset Local State
+          setObligationForm(defaultObligation);
+          // Save to DB
+          onUpdateProject({
+              ...project,
+              customerObligation: defaultObligation // Send empty default to clear DB JSON
+          });
       }
   };
 
@@ -832,8 +854,17 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                             <Coins className="w-5 h-5 text-indigo-600" />
                             Quản lý Nghĩa vụ Khách hàng
                         </h3>
-                        <div className="text-sm text-slate-500">
-                            Doanh số ký (đã chốt): <span className="font-bold text-indigo-600">{formatCurrency(stats.sales)}</span>
+                        <div className="flex items-center gap-4">
+                            <div className="text-sm text-slate-500">
+                                Doanh số ký (đã chốt): <span className="font-bold text-indigo-600">{formatCurrency(stats.sales)}</span>
+                            </div>
+                            <button 
+                                onClick={handleResetObligation}
+                                className="text-xs bg-red-50 text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-100 font-medium flex items-center gap-1 border border-red-200"
+                                title="Xóa toàn bộ dữ liệu nghĩa vụ để nhập lại"
+                            >
+                                <RefreshCcw className="w-3 h-3" /> Reset dữ liệu
+                            </button>
                         </div>
                     </div>
 
@@ -896,11 +927,11 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                                 <div className="flex justify-between items-center text-sm font-medium">
                                     <span className="text-slate-600">Tổng nguồn đã có:</span>
                                     <span className={`font-bold ${
-                                        obligationForm.sources.reduce((a,b) => a + b.value, 0) >= obligationForm.value 
+                                        (obligationForm.sources || []).reduce((a,b) => a + b.value, 0) >= obligationForm.value 
                                         ? 'text-emerald-600' 
                                         : 'text-orange-600'
                                     }`}>
-                                        {formatCurrency(obligationForm.sources.reduce((a,b) => a + b.value, 0))}
+                                        {formatCurrency((obligationForm.sources || []).reduce((a,b) => a + b.value, 0))}
                                     </span>
                                 </div>
                             </div>
@@ -932,7 +963,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {obligationForm.sources.length === 0 ? (
+                                    {(!obligationForm.sources || obligationForm.sources.length === 0) ? (
                                         <tr><td colSpan={4} className="px-4 py-6 text-center text-slate-400 italic">Chưa có nguồn tiền nào được thêm.</td></tr>
                                     ) : (
                                         obligationForm.sources.map(source => (
