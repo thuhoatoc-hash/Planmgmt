@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { User, UserRole } from '../types';
-import { Shield, User as UserIcon, Phone, Edit, Trash2, Plus, Lock, Briefcase, Zap } from 'lucide-react';
+import { Shield, User as UserIcon, Phone, Edit, Trash2, Plus, Lock, Briefcase, Zap, Mail } from 'lucide-react';
 import { hashPassword } from '../lib/crypto';
 
 interface UserManagerProps {
@@ -26,6 +26,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, onAddUser, onUpdateUse
         username: '', 
         fullName: '', 
         phoneNumber: '',
+        email: '',
         avatarUrl: ''
       });
       setPasswordInput('123'); // Default password for new users
@@ -108,11 +109,18 @@ const UserManager: React.FC<UserManagerProps> = ({ users, onAddUser, onUpdateUse
                   </div>
                 </td>
                 <td className="px-6 py-4">
-                    {user.phoneNumber && (
-                        <div className="flex items-center gap-2 text-sm text-slate-600">
-                            <Phone className="w-3 h-3" /> {user.phoneNumber}
-                        </div>
-                    )}
+                    <div className="flex flex-col gap-1">
+                        {user.email && (
+                            <div className="flex items-center gap-2 text-sm text-slate-600">
+                                <Mail className="w-3 h-3 text-slate-400" /> {user.email}
+                            </div>
+                        )}
+                        {user.phoneNumber && (
+                            <div className="flex items-center gap-2 text-sm text-slate-600">
+                                <Phone className="w-3 h-3 text-slate-400" /> {user.phoneNumber}
+                            </div>
+                        )}
+                    </div>
                 </td>
                 <td className="px-6 py-4">
                   {getRoleBadge(user.role)}
@@ -161,9 +169,15 @@ const UserManager: React.FC<UserManagerProps> = ({ users, onAddUser, onUpdateUse
                 <input required type="text" className="w-full p-2 border rounded" value={editingUser.fullName} onChange={e => setEditingUser({...editingUser, fullName: e.target.value})} />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Số điện thoại</label>
-                <input type="text" className="w-full p-2 border rounded" value={editingUser.phoneNumber || ''} onChange={e => setEditingUser({...editingUser, phoneNumber: e.target.value})} />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                    <input type="email" className="w-full p-2 border rounded" value={editingUser.email || ''} onChange={e => setEditingUser({...editingUser, email: e.target.value})} placeholder="abc@viettel.com.vn" />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Số điện thoại</label>
+                    <input type="text" className="w-full p-2 border rounded" value={editingUser.phoneNumber || ''} onChange={e => setEditingUser({...editingUser, phoneNumber: e.target.value})} />
+                </div>
               </div>
 
               <div>

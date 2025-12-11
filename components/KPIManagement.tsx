@@ -54,20 +54,44 @@ const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, use
     
     if (rangeData.length === 0) return null;
 
-    // We need to merge items by name/id across months
-    // Structure: Group Name -> Item Name -> { target, actual }
+    // Structure: Group Name -> { Group Totals, Items Map }
     const aggregation: Record<string, { 
         name: string, 
+        unit: string,
+        groupTarget: number,
+        groupActual: number,
         items: Record<string, { name: string, unit: string, target: number, actual: number, count: number }> 
     }> = {};
 
     rangeData.forEach(monthData => {
         monthData.groups.forEach(group => {
             if (!aggregation[group.name]) {
-                aggregation[group.name] = { name: group.name, items: {} };
+                aggregation[group.name] = { 
+                    name: group.name, 
+                    unit: group.unit || '',
+                    groupTarget: 0,
+                    groupActual: 0,
+                    items: {} 
+                };
             }
             
+            // Calculate Monthly Group Totals
+            let monthGroupTarget = group.target || 0;
+            let monthGroupActual = group.actual || 0;
+
+            // Recalculate sums if autoCalculate is true (to ensure accuracy)
+            if (group.autoCalculate) {
+                monthGroupTarget = group.items.reduce((s, i) => s + (i.target || 0), 0);
+                monthGroupActual = group.items.reduce((s, i) => s + (i.actual || 0), 0);
+            }
+
+            aggregation[group.name].groupTarget += monthGroupTarget;
+            aggregation[group.name].groupActual += monthGroupActual;
+            // Update unit if found later
+            if (group.unit) aggregation[group.name].unit = group.unit;
+            
             group.items.forEach(item => {
+                // Key by name to aggregate across months
                 if (!aggregation[group.name].items[item.name]) {
                     aggregation[group.name].items[item.name] = { 
                         name: item.name, 
@@ -86,6 +110,10 @@ const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, use
 
     return Object.values(aggregation).map(group => ({
         name: group.name,
+        unit: group.unit,
+        target: group.groupTarget,
+        actual: group.groupActual,
+        percent: group.groupTarget > 0 ? (group.groupActual / group.groupTarget) * 100 : 0,
         items: Object.values(group.items).map(item => ({
             ...item,
             percent: item.target > 0 ? (item.actual / item.target) * 100 : 0
@@ -747,15 +775,25 @@ const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, use
                                 {reportData.map((group, gIdx) => (
                                     <React.Fragment key={gIdx}>
                                         <tr className="bg-slate-100 font-bold text-slate-800">
-                                            <td colSpan={5} className="px-4 py-2 border-b border-slate-300">{group.name}</td>
+                                            <td className="px-4 py-2 border-b border-slate-300">{group.name}</td>
+                                            <td className="px-4 py-2 border-b border-slate-300 text-center text-slate-600">{group.unit}</td>
+                                            <td className="px-4 py-2 border-b border-slate-300 text-right text-indigo-700">
+                                                {group.target > 0 ? formatNumber(group.target) : ''}
+                                            </td>
+                                            <td className="px-4 py-2 border-b border-slate-300 text-right text-emerald-700">
+                                                {group.actual > 0 ? formatNumber(group.actual) : ''}
+                                            </td>
+                                            <td className={`px-4 py-2 border-b border-slate-300 text-right ${group.percent >= 100 ? 'text-emerald-600' : 'text-orange-600'}`}>
+                                                 {group.target > 0 ? `${group.percent.toFixed(1)}%` : ''}
+                                            </td>
                                         </tr>
                                         {group.items.map((item, iIdx) => (
-                                            <tr key={iIdx} className="hover:bg-slate-50">
-                                                <td className="px-4 py-3 border-r border-slate-200 pl-8">{item.name}</td>
-                                                <td className="px-4 py-3 border-r border-slate-200 text-center text-slate-500">{item.unit}</td>
-                                                <td className="px-4 py-3 border-r border-slate-200 text-right font-medium">{formatNumber(item.target)}</td>
-                                                <td className="px-4 py-3 border-r border-slate-200 text-right font-bold text-indigo-700">{formatNumber(item.actual)}</td>
-                                                <td className={`px-4 py-3 text-right font-bold ${item.percent >= 100 ? 'text-emerald-600' : 'text-orange-600'}`}>
+                                            <tr key={iIdx} className="hover:bg-slate-50 bg-white">
+                                                <td className="px-4 py-2 border-r border-slate-200 pl-8 text-slate-700 font-medium">{item.name || '---'}</td>
+                                                <td className="px-4 py-2 border-r border-slate-200 text-center text-slate-500 text-xs">{item.unit}</td>
+                                                <td className="px-4 py-2 border-r border-slate-200 text-right font-medium text-slate-600">{formatNumber(item.target)}</td>
+                                                <td className="px-4 py-2 border-r border-slate-200 text-right font-bold text-slate-700">{formatNumber(item.actual)}</td>
+                                                <td className={`px-4 py-2 text-right font-bold text-xs ${item.percent >= 100 ? 'text-emerald-600' : 'text-orange-600'}`}>
                                                     {item.percent.toFixed(1)}%
                                                 </td>
                                             </tr>

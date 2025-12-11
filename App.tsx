@@ -17,7 +17,8 @@ import { User, Project, Contract, Category, Partner, ProjectStatusItem, Task, KP
 import { api } from './services/api';
 import { Loader2 } from 'lucide-react';
 
-const SESSION_DURATION = 60 * 60 * 1000; // 60 minutes in ms
+const SHORT_SESSION = 60 * 60 * 1000; // 60 minutes
+const LONG_SESSION = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 const App: React.FC = () => {
   // Global State with Persistence for Session
@@ -25,13 +26,18 @@ const App: React.FC = () => {
     try {
       const savedUser = localStorage.getItem('currentUser');
       const loginTime = localStorage.getItem('loginTime');
+      const rememberMe = localStorage.getItem('rememberMe') === 'true';
+      
       if (savedUser && loginTime) {
         const now = Date.now();
-        if (now - parseInt(loginTime) < SESSION_DURATION) {
+        const duration = rememberMe ? LONG_SESSION : SHORT_SESSION;
+        
+        if (now - parseInt(loginTime) < duration) {
           return JSON.parse(savedUser);
         } else {
           localStorage.removeItem('currentUser');
           localStorage.removeItem('loginTime');
+          localStorage.removeItem('rememberMe');
         }
       }
     } catch (e) {
@@ -103,12 +109,14 @@ const App: React.FC = () => {
     setUser(u);
     localStorage.setItem('currentUser', JSON.stringify(u));
     localStorage.setItem('loginTime', Date.now().toString());
+    // rememberMe is handled inside Login.tsx component before calling onLogin
   };
 
   const handleLogout = () => {
     setUser(null);
     localStorage.removeItem('currentUser');
     localStorage.removeItem('loginTime');
+    localStorage.removeItem('rememberMe');
     // Clear data
     setProjects([]);
     setContracts([]);
@@ -323,7 +331,14 @@ const App: React.FC = () => {
       case 'users':
         return <UserManager users={users} onAddUser={handleAddUser} onUpdateUser={handleUpdateUser} onDeleteUser={handleDeleteUser} />;
       case 'partners':
-        return <PartnerManager partners={partners} onAdd={handleAddPartner} onUpdate={handleUpdatePartner} onDelete={handleDeletePartner} />;
+        return <PartnerManager 
+                  partners={partners} 
+                  projects={projects} 
+                  contracts={contracts}
+                  onAdd={handleAddPartner} 
+                  onUpdate={handleUpdatePartner} 
+                  onDelete={handleDeletePartner} 
+               />;
       case 'settings':
         return <ConfigurationManager statuses={statuses} onAddStatus={handleAddStatus} onUpdateStatus={handleUpdateStatus} onDeleteStatus={handleDeleteStatus} />;
       default:
