@@ -73,7 +73,8 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
       name: '',
       value: 0,
       status: InstallmentStatus.PLANNING,
-      date: new Date().toISOString().split('T')[0]
+      date: new Date().toISOString().split('T')[0],
+      revenueMonth: new Date().toISOString().slice(0, 7) // Default to current month YYYY-MM
   });
 
   // --- PROJECT EDIT FORM STATE ---
@@ -154,7 +155,8 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
         name: '',
         value: 0,
         status: InstallmentStatus.PLANNING,
-        date: new Date().toISOString().split('T')[0]
+        date: new Date().toISOString().split('T')[0],
+        revenueMonth: new Date().toISOString().slice(0, 7)
     });
 
     if (contract) {
@@ -186,7 +188,8 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
         name: '',
         value: 0,
         status: InstallmentStatus.PLANNING,
-        date: new Date().toISOString().split('T')[0]
+        date: new Date().toISOString().split('T')[0],
+        revenueMonth: new Date().toISOString().slice(0, 7)
       });
   };
 
@@ -765,16 +768,19 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                     {/* List */}
                     <div className="space-y-2 mb-4">
                         {contractForm.installments?.map(ins => (
-                            <div key={ins.id} className="flex items-center gap-2 p-2 bg-slate-50 rounded border border-slate-200 text-sm">
-                                <span className="flex-1 font-medium">{ins.name}</span>
-                                <span className="w-32 text-right font-mono">{formatCurrency(ins.value)}</span>
-                                <span className={`text-xs px-2 py-0.5 rounded ${
+                            <div key={ins.id} className="grid grid-cols-12 gap-2 p-2 bg-slate-50 rounded border border-slate-200 text-sm items-center">
+                                <span className="col-span-4 font-medium truncate" title={ins.name}>{ins.name}</span>
+                                <span className="col-span-3 text-right font-mono">{formatCurrency(ins.value)}</span>
+                                <span className="col-span-2 text-xs text-slate-500 text-center">
+                                    {ins.revenueMonth ? `Kỳ: ${ins.revenueMonth}` : 'Chưa chọn kỳ'}
+                                </span>
+                                <span className={`col-span-2 text-xs px-1 py-0.5 rounded text-center ${
                                     ins.status === InstallmentStatus.PAID ? 'bg-green-100 text-green-700' :
                                     ins.status === InstallmentStatus.INVOICED ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 text-slate-600'
                                 }`}>
                                     {ins.status === InstallmentStatus.PAID ? 'Đã TT' : ins.status === InstallmentStatus.INVOICED ? 'Đã xuất HĐ' : 'Kế hoạch'}
                                 </span>
-                                <button type="button" onClick={() => handleRemoveInstallment(ins.id)} className="text-red-500 hover:bg-red-50 p-1 rounded">
+                                <button type="button" onClick={() => handleRemoveInstallment(ins.id)} className="col-span-1 text-red-500 hover:bg-red-50 p-1 rounded flex justify-center">
                                     <MinusCircle className="w-4 h-4" />
                                 </button>
                             </div>
@@ -785,8 +791,8 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                     </div>
 
                     {/* Add New Installment Inline Form */}
-                    <div className="flex gap-2 items-end bg-indigo-50 p-3 rounded-lg border border-indigo-100">
-                        <div className="flex-1">
+                    <div className="flex gap-2 items-end bg-indigo-50 p-3 rounded-lg border border-indigo-100 flex-wrap">
+                        <div className="flex-1 min-w-[200px]">
                             <label className="text-xs font-medium text-slate-500 block mb-1">Nội dung đợt</label>
                             <input 
                                 type="text" 
@@ -805,6 +811,15 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                              />
                         </div>
                         <div className="w-32">
+                             <label className="text-xs font-medium text-slate-500 block mb-1">Kỳ Doanh thu</label>
+                             <input 
+                                type="month"
+                                className="w-full p-1.5 text-sm border rounded"
+                                value={newInstallment.revenueMonth || ''}
+                                onChange={e => setNewInstallment({...newInstallment, revenueMonth: e.target.value})}
+                             />
+                        </div>
+                        <div className="w-28">
                              <label className="text-xs font-medium text-slate-500 block mb-1">Trạng thái</label>
                              <select 
                                 className="w-full p-1.5 text-sm border rounded"

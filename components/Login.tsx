@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { User } from '../types';
 import { api } from '../services/api';
 import { Signal, ArrowRight, Loader2 } from 'lucide-react';
+import { hashPassword } from '../lib/crypto';
 
 interface LoginProps {
   onLogin: (user: User) => void;
@@ -23,13 +24,32 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         // Fetch user from Supabase "users" table
         const user = await api.users.login(username);
 
-        if (user && user.password === password) {
-             onLogin(user);
+        if (user) {
+            // 1. Check if password matches plain text (Legacy support)
+            if (user.password === password) {
+                 // SECURITY UPGRADE: If plain text matched, hash it and update DB immediately
+                 const hashed = await hashPassword(password);
+                 const updatedUser = { ...user, password: hashed };
+                 await api.users.save(updatedUser);
+                 
+                 onLogin(updatedUser);
+                 return;
+            }
+
+            // 2. Check if password matches hash (New secure way)
+            const inputHash = await hashPassword(password);
+            if (user.password === inputHash) {
+                onLogin(user);
+                return;
+            }
+
+            setError('Tên đăng nhập hoặc mật khẩu không đúng.');
         } else {
              setError('Tên đăng nhập hoặc mật khẩu không đúng.');
         }
     } catch (err) {
         setError('Có lỗi xảy ra khi kết nối máy chủ.');
+        console.error(err);
     } finally {
         setLoading(false);
     }
@@ -96,7 +116,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         <div className="mt-8 pt-6 border-t border-slate-100 text-center">
           <p className="text-xs text-slate-400">Copyright @ Dzung Nguyen</p>
           <div className="mt-2 text-xs text-slate-400">
-            <p>Cloud Database Connected</p>
+            <p>Cloud Database Connected • Secured</p>
           </div>
         </div>
       </div>

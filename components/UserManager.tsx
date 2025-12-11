@@ -1,6 +1,8 @@
+
 import React, { useState } from 'react';
 import { User, UserRole } from '../types';
-import { Shield, User as UserIcon, Phone, Edit, Trash2, Plus, Lock } from 'lucide-react';
+import { Shield, User as UserIcon, Phone, Edit, Trash2, Plus, Lock, Briefcase, Zap } from 'lucide-react';
+import { hashPassword } from '../lib/crypto';
 
 interface UserManagerProps {
   users: User[];
@@ -12,31 +14,54 @@ interface UserManagerProps {
 const UserManager: React.FC<UserManagerProps> = ({ users, onAddUser, onUpdateUser, onDeleteUser }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<Partial<User>>({});
+  const [passwordInput, setPasswordInput] = useState('');
 
   const handleOpenModal = (user?: User) => {
     if (user) {
       setEditingUser({ ...user });
+      setPasswordInput(''); // Don't show existing password hash
     } else {
       setEditingUser({ 
-        role: UserRole.USER, 
+        role: UserRole.AM, // Default to AM
         username: '', 
         fullName: '', 
-        password: '123',
         phoneNumber: '',
         avatarUrl: ''
       });
+      setPasswordInput('123'); // Default password for new users
     }
     setIsModalOpen(true);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    let finalPassword = editingUser.password;
+    if (passwordInput) {
+        finalPassword = await hashPassword(passwordInput);
+    }
+
+    const userToSave = { ...editingUser, password: finalPassword } as User;
+
     if (editingUser.id) {
-      onUpdateUser(editingUser as User);
+      onUpdateUser(userToSave);
     } else {
-      onAddUser({ ...editingUser, id: `user_${Date.now()}` } as User);
+      onAddUser({ ...userToSave, id: `user_${Date.now()}` });
     }
     setIsModalOpen(false);
+  };
+
+  const getRoleBadge = (role: UserRole) => {
+      switch (role) {
+          case UserRole.ADMIN:
+              return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700"><Shield className="w-3 h-3" /> Quản trị viên</span>;
+          case UserRole.AM:
+              return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700"><Briefcase className="w-3 h-3" /> NV Kinh doanh (AM)</span>;
+          case UserRole.PM:
+              return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700"><Zap className="w-3 h-3" /> TV Giải pháp (PM)</span>;
+          default:
+              return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">Người dùng</span>;
+      }
   };
 
   return (
@@ -60,7 +85,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, onAddUser, onUpdateUse
             <tr>
               <th className="px-6 py-4 text-sm font-semibold text-slate-600">Người dùng</th>
               <th className="px-6 py-4 text-sm font-semibold text-slate-600">Thông tin liên hệ</th>
-              <th className="px-6 py-4 text-sm font-semibold text-slate-600">Vai trò</th>
+              <th className="px-6 py-4 text-sm font-semibold text-slate-600">Vai trò / Chức danh</th>
               <th className="px-6 py-4 text-sm font-semibold text-slate-600 text-right">Thao tác</th>
             </tr>
           </thead>
@@ -90,14 +115,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, onAddUser, onUpdateUse
                     )}
                 </td>
                 <td className="px-6 py-4">
-                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
-                    user.role === UserRole.ADMIN 
-                      ? 'bg-purple-100 text-purple-700' 
-                      : 'bg-blue-100 text-blue-700'
-                  }`}>
-                    {user.role === UserRole.ADMIN && <Shield className="w-3 h-3" />}
-                    {user.role}
-                  </span>
+                  {getRoleBadge(user.role)}
                 </td>
                 <td className="px-6 py-4 text-right">
                   <div className="flex items-center justify-end gap-2">
@@ -130,8 +148,10 @@ const UserManager: React.FC<UserManagerProps> = ({ users, onAddUser, onUpdateUse
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Vai trò</label>
                   <select className="w-full p-2 border rounded" value={editingUser.role} onChange={e => setEditingUser({...editingUser, role: e.target.value as UserRole})}>
-                    <option value={UserRole.USER}>User</option>
-                    <option value={UserRole.ADMIN}>Admin</option>
+                    <option value={UserRole.AM}>NV Kinh doanh (AM)</option>
+                    <option value={UserRole.PM}>TV Giải pháp (PM)</option>
+                    <option value={UserRole.ADMIN}>Quản trị (Admin)</option>
+                    <option value={UserRole.USER}>Khác (User)</option>
                   </select>
                 </div>
               </div>
@@ -158,9 +178,10 @@ const UserManager: React.FC<UserManagerProps> = ({ users, onAddUser, onUpdateUse
                  <input 
                     type="password" 
                     className="w-full p-2 border rounded" 
-                    value={editingUser.password || ''} 
-                    onChange={e => setEditingUser({...editingUser, password: e.target.value})} 
+                    value={passwordInput} 
+                    onChange={e => setPasswordInput(e.target.value)} 
                     required={!editingUser.id}
+                    placeholder={editingUser.id ? "********" : ""}
                 />
               </div>
               

@@ -1,8 +1,8 @@
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Project, Contract, ContractType, Category, CategoryType, KPIMonthlyData, Task, User, TaskStatus, InstallmentStatus } from '../types';
-import { Wallet, TrendingUp, TrendingDown, Activity, Settings, Check, X, SlidersHorizontal, Target, CheckSquare } from 'lucide-react';
+import { Project, Contract, ContractType, Category, CategoryType, KPIMonthlyData, Task, User, TaskStatus, InstallmentStatus, EmployeeEvaluation } from '../types';
+import { Wallet, TrendingUp, TrendingDown, Activity, Settings, Check, X, SlidersHorizontal, Target, CheckSquare, Award } from 'lucide-react';
 
 interface DashboardProps {
   projects: Project[];
@@ -11,6 +11,7 @@ interface DashboardProps {
   kpiData?: KPIMonthlyData[];
   tasks?: Task[];
   users?: User[];
+  evaluations?: EmployeeEvaluation[];
 }
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
@@ -26,9 +27,10 @@ const DEFAULT_CONFIG = {
   showCategoryChart: true,
   showKPIChart: true,
   showTaskChart: true,
+  showEvaluationChart: true,
 };
 
-const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, kpiData = [], tasks = [], users = [] }) => {
+const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, kpiData = [], tasks = [], users = [], evaluations = [] }) => {
   // State for customization
   const [config, setConfig] = useState(DEFAULT_CONFIG);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
@@ -225,6 +227,36 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, 
       return { tasksByAM, tasksByProject };
   }, [tasks, users, projects]);
 
+  // --- Evaluation Stats Calculation ---
+  const evaluationStats = useMemo(() => {
+      if (!evaluations || evaluations.length === 0) return null;
+      // Get latest month
+      const months = Array.from(new Set(evaluations.map(e => e.month))).sort().reverse();
+      const latestMonth = months[0];
+      
+      const currentEvals = evaluations.filter(e => e.month === latestMonth);
+      
+      const distribution = [
+          { name: 'A+', value: 0, fill: '#eab308' }, // Yellow-500
+          { name: 'A', value: 0, fill: '#22c55e' }, // Green-500
+          { name: 'B', value: 0, fill: '#3b82f6' }, // Blue-500
+          { name: 'C', value: 0, fill: '#f97316' }, // Orange-500
+          { name: 'D', value: 0, fill: '#ef4444' }, // Red-500
+      ];
+
+      currentEvals.forEach(e => {
+          const item = distribution.find(d => d.name === e.grade);
+          if (item) item.value++;
+      });
+      
+      return {
+          month: latestMonth,
+          total: currentEvals.length,
+          avgScore: currentEvals.reduce((acc, curr) => acc + curr.totalScore, 0) / (currentEvals.length || 1),
+          data: distribution
+      };
+  }, [evaluations]);
+
   const StatCard = ({ title, value, subValue, icon: Icon, colorClass }: any) => (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex items-start justify-between animate-in zoom-in duration-300">
       <div>
@@ -274,6 +306,7 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, 
                     { key: 'showProfit', label: 'Thẻ Lợi nhuận' },
                     { key: 'showRevenue', label: 'Thẻ Doanh thu' },
                     { key: 'showKPIChart', label: 'Biểu đồ KPI' },
+                    { key: 'showEvaluationChart', label: 'Biểu đồ Đánh giá KI' },
                     { key: 'showTaskChart', label: 'Biểu đồ Công việc' },
                     { key: 'showProjectChart', label: 'Biểu đồ Dự án' },
                     { key: 'showCategoryChart', label: 'Biểu đồ Danh mục' },
@@ -382,10 +415,10 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, 
         )}
       </div>
 
-      {/* TASK CHARTS (New) */}
-      {config.showTaskChart && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in duration-300">
-            {/* Chart By AM */}
+      {/* Charts Row: Task & Evaluation */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 animate-in fade-in duration-300">
+        {/* Task By AM */}
+        {config.showTaskChart && (
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                 <div className="flex items-center justify-between mb-6">
                     <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
@@ -425,8 +458,10 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, 
                     )}
                 </div>
             </div>
+        )}
 
-            {/* Chart By Project */}
+        {/* Task By Project */}
+        {config.showTaskChart && (
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                 <div className="flex items-center justify-between mb-6">
                     <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
@@ -466,8 +501,43 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, 
                     )}
                 </div>
             </div>
-        </div>
-      )}
+        )}
+
+        {/* Evaluation Chart (New) */}
+        {config.showEvaluationChart && (
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                        <Award className="w-5 h-5 text-amber-500" />
+                        Đánh giá KI ({evaluationStats?.month || 'N/A'})
+                    </h3>
+                </div>
+                <div className="h-64">
+                    {evaluationStats ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={evaluationStats.data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                <XAxis dataKey="name" tick={{fontSize: 12, fontWeight: 'bold'}} />
+                                <YAxis tick={{fontSize: 12}} allowDecimals={false} />
+                                <Tooltip 
+                                    cursor={{fill: '#f1f5f9'}}
+                                    formatter={(value, name, props) => [value, 'Nhân viên']}
+                                    contentStyle={{ borderRadius: '8px' }}
+                                />
+                                <Bar dataKey="value" name="Số lượng" radius={[4, 4, 0, 0]} barSize={40}>
+                                    {evaluationStats.data.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    ) : (
+                        <div className="h-full flex items-center justify-center text-slate-400">Chưa có dữ liệu đánh giá</div>
+                    )}
+                </div>
+            </div>
+        )}
+      </div>
 
       {/* Financial Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

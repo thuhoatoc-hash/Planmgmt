@@ -1,12 +1,13 @@
 
 import { supabase } from '../lib/supabase';
-import { Project, Contract, Category, User, Partner, ProjectStatusItem, Task, KPIMonthlyData } from '../types';
+import { Project, Contract, Category, User, Partner, ProjectStatusItem, Task, KPIMonthlyData, EmployeeEvaluation } from '../types';
 
 // Generic helper to fetch data
 async function fetchAll<T>(table: string): Promise<T[]> {
   const { data, error } = await supabase.from(table).select('*');
   if (error) {
-    console.error(`Error fetching ${table}:`, error);
+    // Log stringified error to see code/message (e.g., "relation does not exist")
+    console.error(`Error fetching ${table}:`, JSON.stringify(error, null, 2));
     return [];
   }
   return data as T[];
@@ -16,7 +17,7 @@ async function fetchAll<T>(table: string): Promise<T[]> {
 async function upsert<T extends { id: string }>(table: string, item: T): Promise<T | null> {
   const { data, error } = await supabase.from(table).upsert(item).select().single();
   if (error) {
-    console.error(`Error upserting into ${table}:`, error);
+    console.error(`Error upserting into ${table}:`, JSON.stringify(error, null, 2));
     return null;
   }
   return data as T;
@@ -26,7 +27,7 @@ async function upsert<T extends { id: string }>(table: string, item: T): Promise
 async function remove(table: string, id: string): Promise<boolean> {
   const { error } = await supabase.from(table).delete().eq('id', id);
   if (error) {
-    console.error(`Error deleting from ${table}:`, error);
+    console.error(`Error deleting from ${table}:`, JSON.stringify(error, null, 2));
     return false;
   }
   return true;
@@ -78,5 +79,10 @@ export const api = {
     getAll: () => fetchAll<KPIMonthlyData>('kpi_data'),
     save: (k: KPIMonthlyData) => upsert<KPIMonthlyData>('kpi_data', k),
     delete: (id: string) => remove('kpi_data', id),
+  },
+  evaluations: {
+    getAll: () => fetchAll<EmployeeEvaluation>('employee_evaluations'),
+    save: (e: EmployeeEvaluation) => upsert<EmployeeEvaluation>('employee_evaluations', e),
+    delete: (id: string) => remove('employee_evaluations', id),
   }
 };

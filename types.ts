@@ -1,7 +1,9 @@
 
 export enum UserRole {
   ADMIN = 'ADMIN',
-  USER = 'USER',
+  USER = 'USER', // General User (fallback)
+  AM = 'AM',     // Nhân viên Kinh doanh
+  PM = 'PM',     // Tư vấn Giải pháp
 }
 
 export interface User {
@@ -88,6 +90,7 @@ export interface ContractInstallment {
   value: number;      // Giá trị
   status: InstallmentStatus;
   date: string;       // Ngày dự kiến hoặc thực tế
+  revenueMonth?: string; // UPDATE: Tháng ghi nhận doanh thu (YYYY-MM)
   note?: string;
 }
 
@@ -155,4 +158,27 @@ export interface KPIMonthlyData {
   id: string;
   month: string; // YYYY-MM
   groups: KPIGroup[];
+}
+
+// --- KI Evaluation Types (New) ---
+
+export interface KICriterium {
+  id: string;
+  name: string;
+  unit: string;
+  target: number; // Mục tiêu
+  weight: number; // Tỷ trọng (%)
+  actual: number; // Kết quả thực hiện
+  score: number; // Điểm số quy đổi (đã nhân tỷ trọng)
+}
+
+export interface EmployeeEvaluation {
+  id: string;
+  userId: string;
+  month: string; // YYYY-MM
+  role: string; // Role at time of evaluation (AM/PM)
+  criteria: KICriterium[];
+  totalScore: number;
+  grade: 'A+' | 'A' | 'B' | 'C' | 'D';
+  note?: string;
 }

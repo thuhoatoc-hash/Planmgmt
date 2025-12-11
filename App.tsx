@@ -12,7 +12,8 @@ import ConfigurationManager from './components/ConfigurationManager';
 import UserProfile from './components/UserProfile';
 import Reports from './components/Reports';
 import KPIManagement from './components/KPIManagement';
-import { User, Project, Contract, Category, Partner, ProjectStatusItem, Task, KPIMonthlyData } from './types';
+import EmployeeEvaluationManager from './components/EmployeeEvaluation';
+import { User, Project, Contract, Category, Partner, ProjectStatusItem, Task, KPIMonthlyData, EmployeeEvaluation } from './types';
 import { api } from './services/api';
 import { Loader2 } from 'lucide-react';
 
@@ -52,6 +53,7 @@ const App: React.FC = () => {
   const [statuses, setStatuses] = useState<ProjectStatusItem[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [kpiData, setKpiData] = useState<KPIMonthlyData[]>([]);
+  const [evaluations, setEvaluations] = useState<EmployeeEvaluation[]>([]);
 
   // View State
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -61,7 +63,7 @@ const App: React.FC = () => {
     setIsAppLoading(true);
     try {
         const [
-            pData, cData, catData, uData, partData, sData, tData, kData
+            pData, cData, catData, uData, partData, sData, tData, kData, eData
         ] = await Promise.all([
             api.projects.getAll(),
             api.contracts.getAll(),
@@ -70,7 +72,8 @@ const App: React.FC = () => {
             api.partners.getAll(),
             api.statuses.getAll(),
             api.tasks.getAll(),
-            api.kpi.getAll()
+            api.kpi.getAll(),
+            api.evaluations.getAll()
         ]);
 
         setProjects(pData);
@@ -81,6 +84,7 @@ const App: React.FC = () => {
         setStatuses(sData.sort((a,b) => a.order - b.order));
         setTasks(tData);
         setKpiData(kData);
+        setEvaluations(eData);
     } catch (error) {
         console.error("Failed to fetch initial data", error);
     } finally {
@@ -294,9 +298,12 @@ const App: React.FC = () => {
                   kpiData={kpiData} 
                   tasks={tasks}
                   users={users}
+                  evaluations={evaluations}
                />;
       case 'kpi':
         return <KPIManagement kpiData={kpiData} onUpdateKPI={handleUpdateKPI} user={user} />;
+      case 'evaluation':
+        return <EmployeeEvaluationManager users={users} currentUser={user} />;
       case 'reports':
         return <Reports projects={projects} contracts={contracts} categories={categories} users={users} />;
       case 'projects':
