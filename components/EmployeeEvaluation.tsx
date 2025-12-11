@@ -62,7 +62,7 @@ const EmployeeEvaluationManager: React.FC<EmployeeEvaluationProps> = ({ users, c
               
               // Check role to select template
               const isPM = user?.role === UserRole.PM;
-              // Fallback to AM template if user role is AM or anything else (except Admin who shouldn't be here)
+              // Fallback to AM template if user role is AM or anything else
               const role = isPM ? 'PM' : 'AM';
               const template = isPM ? TEMPLATES.PM : TEMPLATES.AM;
 
@@ -88,7 +88,7 @@ const EmployeeEvaluationManager: React.FC<EmployeeEvaluationProps> = ({ users, c
       } else {
           setCurrentEval(null);
       }
-  }, [selectedUser, selectedMonth, users]); // Removed 'evaluations' dependency to prevent loop reset
+  }, [selectedUser, selectedMonth, users]); 
 
   const calculateScore = (criteria: KICriterium[]) => {
       let total = 0;
@@ -99,8 +99,6 @@ const EmployeeEvaluationManager: React.FC<EmployeeEvaluationProps> = ({ users, c
              const cappedPercent = Math.min(percent, 120); // Cap at 120% standard
              score = (cappedPercent * c.weight) / 100;
           } else if (c.target === 0 && c.weight > 0 && c.actual > 0) {
-              // Edge case: Target 0 but has weight and actual value (bonus?)
-              // For now keep 0 to avoid division by zero errors
               score = 0;
           }
           total += score;
@@ -117,7 +115,6 @@ const EmployeeEvaluationManager: React.FC<EmployeeEvaluationProps> = ({ users, c
       return 'D';
   };
 
-  // Icon Helper for List and Summary
   const getGradeIcon = (grade: string) => {
       switch (grade) {
           case 'A+': return <Star className="w-5 h-5 text-yellow-500 fill-yellow-100" />;
@@ -155,15 +152,11 @@ const EmployeeEvaluationManager: React.FC<EmployeeEvaluationProps> = ({ users, c
         const savedData = await api.evaluations.save(toSave);
         
         if (savedData) {
-            // 1. Update local list state immediately so the sidebar updates
             setEvaluations(prev => {
                 const others = prev.filter(e => e.id !== savedData.id);
                 return [...others, savedData];
             });
-            
-            // 2. Update current form state to ensure it has the ID
             setCurrentEval(savedData);
-            
             alert('Đã lưu kết quả đánh giá thành công!');
         } else {
             alert('Lỗi khi lưu dữ liệu. Vui lòng thử lại.');
@@ -176,14 +169,17 @@ const EmployeeEvaluationManager: React.FC<EmployeeEvaluationProps> = ({ users, c
 
   const formatNumber = (num: number) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 1 }).format(num);
 
+  // --- FILTER LOGIC ---
   const filteredUsers = users.filter(u => 
-      u.role !== UserRole.ADMIN && 
+      // 1. Chỉ hiển thị AM hoặc PM
+      (u.role === UserRole.AM || u.role === UserRole.PM) && 
+      // 2. Tìm kiếm theo tên/username
       (u.fullName.toLowerCase().includes(searchTerm.toLowerCase()) || u.username.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const summaryStats = useMemo(() => {
     const currentMonthEvals = evaluations.filter(e => e.month === selectedMonth);
-    const total = filteredUsers.length; // Use filtered users count as base for total employees
+    const total = filteredUsers.length; 
     if(total === 0) return [];
     
     const grades = ['A+', 'A', 'B', 'C', 'D'];
@@ -252,6 +248,7 @@ const EmployeeEvaluationManager: React.FC<EmployeeEvaluationProps> = ({ users, c
             <table className="w-full text-left">
                 <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
                     <tr>
+                        <th className="px-6 py-4 w-12 text-center">STT</th>
                         <th className="px-6 py-4">Nhân viên</th>
                         <th className="px-6 py-4">Vai trò</th>
                         <th className="px-6 py-4 text-center">Trạng thái</th>
@@ -261,12 +258,15 @@ const EmployeeEvaluationManager: React.FC<EmployeeEvaluationProps> = ({ users, c
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                    {filteredUsers.map(user => {
+                    {filteredUsers.map((user, index) => {
                         const evalData = evaluations.find(e => e.userId === user.id && e.month === selectedMonth);
                         const isSelected = selectedUser === user.id;
 
                         return (
                             <tr key={user.id} className={`hover:bg-slate-50 transition-colors ${isSelected ? 'bg-indigo-50/50' : ''}`}>
+                                <td className="px-6 py-4 text-center font-medium text-slate-500">
+                                    {index + 1}
+                                </td>
                                 <td className="px-6 py-4">
                                      <div className="flex items-center gap-3">
                                         <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-sm font-bold text-slate-500">
@@ -332,7 +332,7 @@ const EmployeeEvaluationManager: React.FC<EmployeeEvaluationProps> = ({ users, c
             </table>
         </div>
 
-        {/* Detail Form Section (Conditional Render) */}
+        {/* Detail Form Section */}
         {selectedUser && currentEval && (
              <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-lg animate-in slide-in-from-bottom-4 duration-300 ring-4 ring-indigo-50">
                 <div className="px-6 py-4 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white flex justify-between items-center sticky top-0 z-10">

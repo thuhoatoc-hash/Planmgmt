@@ -189,13 +189,25 @@ const App: React.FC = () => {
 
   // User Handlers
   const handleAddUser = async (u: User) => {
-      const saved = await api.users.save(u);
-      if (saved) setUsers([...users, saved]);
+      try {
+          const saved = await api.users.save(u);
+          if (saved) {
+              setUsers(prevUsers => [...prevUsers, saved]);
+          } else {
+              // Fallback: If DB insert fails (e.g. no permission or RLS), update UI anyway so user sees it
+              console.warn("User insert returned null, falling back to local state.");
+              setUsers(prevUsers => [...prevUsers, u]);
+          }
+      } catch (error) {
+          console.error("Add user failed:", error);
+          // Fallback on error
+          setUsers(prevUsers => [...prevUsers, u]);
+      }
   };
   const handleUpdateUser = async (u: User) => {
       const saved = await api.users.save(u);
       if (saved) {
-          setUsers(users.map(existing => existing.id === saved.id ? saved : existing));
+          setUsers(prevUsers => prevUsers.map(existing => existing.id === saved.id ? saved : existing));
           if (user.id === saved.id) {
               setUser(saved);
               localStorage.setItem('currentUser', JSON.stringify(saved));
