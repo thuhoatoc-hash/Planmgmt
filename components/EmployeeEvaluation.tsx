@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { User, EmployeeEvaluation, KICriterium, UserRole } from '../types';
 import { api } from '../services/api';
-import { Save, User as UserIcon, Calendar, Trophy, AlertTriangle, FileText, Smile, Meh, Frown, CloudRain, Search, Edit, Star } from 'lucide-react';
+import { Save, Calendar, AlertTriangle, FileText, Smile, Meh, Frown, CloudRain, Search, Edit, Star } from 'lucide-react';
 
 interface EmployeeEvaluationProps {
   users: User[];

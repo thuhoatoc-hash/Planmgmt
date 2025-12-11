@@ -1,8 +1,8 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { User } from '../types';
 import { api } from '../services/api';
-import { Signal, ArrowRight, Loader2, Eye, EyeOff, Lock, Mail, CheckCircle } from 'lucide-react';
+import { Signal, ArrowRight, Loader2, Eye, EyeOff, Lock, CheckCircle } from 'lucide-react';
 import { hashPassword } from '../lib/crypto';
 
 interface LoginProps {
