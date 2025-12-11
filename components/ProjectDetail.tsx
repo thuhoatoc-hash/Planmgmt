@@ -423,10 +423,6 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
 
   const handleResetObligation = () => {
       if (window.confirm('CẢNH BÁO: Thao tác này sẽ xóa trắng dữ liệu Nghĩa vụ khách hàng hiện tại của dự án này. Bạn có chắc không?')) {
-          const updatedProject: Project = {
-              ...project,
-              customerObligation: undefined // Set to undefined to remove from DB (if supported) or send empty object
-          };
           // Reset Local State
           setObligationForm(defaultObligation);
           // Save to DB
