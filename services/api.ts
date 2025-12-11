@@ -44,12 +44,21 @@ async function upsert<T extends { id?: string }>(table: string, item: T): Promis
   
   if (error) {
     console.error(`Error upserting into ${table}:`, JSON.stringify(error, null, 2));
+    
     // Provide a more friendly error message based on common issues
     let msg = error.message;
+    let title = `Lỗi lưu dữ liệu (${table})`;
+
     if (msg.includes('Could not find the') && msg.includes('column')) {
-        msg = `Lỗi cấu trúc dữ liệu: Bảng '${table}' trên Supabase thiếu cột. Vui lòng chạy lệnh SQL cập nhật. (${error.message})`;
+        const missingColumn = msg.match(/'([^']+)' column/)?.[1] || 'không xác định';
+        title = "LỖI CẤU TRÚC DATABASE";
+        msg = `Bảng '${table}' trên Supabase đang thiếu cột '${missingColumn}'.\n\nVui lòng vào Supabase > SQL Editor và chạy lệnh:\nALTER TABLE ${table} ADD COLUMN "${missingColumn}" text; (hoặc jsonb/int tùy loại dữ liệu)`;
+    } else if (msg.includes('violates not-null constraint')) {
+        title = "LỖI DỮ LIỆU BẮT BUỘC";
+        msg = `Dữ liệu gửi lên thiếu trường bắt buộc. Chi tiết: ${error.message}`;
     }
-    alert(`Lỗi lưu dữ liệu (${table}): ${msg}`);
+
+    alert(`${title}:\n${msg}`);
     return null;
   }
   return data as T;
