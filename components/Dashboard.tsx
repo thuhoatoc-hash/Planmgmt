@@ -521,7 +521,7 @@ const Dashboard: React.FC<DashboardProps> = ({ projects, contracts, categories, 
                                 <YAxis tick={{fontSize: 12}} allowDecimals={false} />
                                 <Tooltip 
                                     cursor={{fill: '#f1f5f9'}}
-                                    formatter={(value, name, props) => [value, 'Nhân viên']}
+                                    formatter={(value) => [value, 'Nhân viên']}
                                     contentStyle={{ borderRadius: '8px' }}
                                 />
                                 <Bar dataKey="value" name="Số lượng" radius={[4, 4, 0, 0]} barSize={40}>

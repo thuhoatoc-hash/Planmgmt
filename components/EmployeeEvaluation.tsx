@@ -1,8 +1,8 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, EmployeeEvaluation, KICriterium, UserRole } from '../types';
 import { api } from '../services/api';
-import { Save, User as UserIcon, Calendar, Trophy, AlertTriangle, FileText, Smile, Meh, Frown, CloudRain, Search, CheckCircle } from 'lucide-react';
+import { Save, User as UserIcon, Calendar, Trophy, AlertTriangle, FileText, Smile, Meh, Frown, CloudRain, Search } from 'lucide-react';
 
 interface EmployeeEvaluationProps {
   users: User[];
