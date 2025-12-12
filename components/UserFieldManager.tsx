@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { UserFieldDefinition, FieldType } from '../types';
-import { Plus, Trash2, GripVertical, Settings2 } from 'lucide-react';
+import { Plus, Trash2, Settings2 } from 'lucide-react';
 
 interface UserFieldManagerProps {
   fields: UserFieldDefinition[];

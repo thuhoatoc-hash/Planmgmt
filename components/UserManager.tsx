@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { User, UserRole, Role, UserFieldDefinition } from '../types';
-import { Shield, User as UserIcon, Phone, Edit, Trash2, Plus, Lock, Briefcase, Zap, Mail, CheckCircle2 } from 'lucide-react';
+import { Shield, User as UserIcon, Phone, Edit, Trash2, Plus, Lock, Zap, Mail, CheckCircle2 } from 'lucide-react';
 import { hashPassword } from '../lib/crypto';
 
 interface UserManagerProps {

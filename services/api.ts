@@ -2,12 +2,6 @@
 import { supabase } from '../lib/supabase';
 import { Project, Contract, Category, User, Partner, ProjectStatusItem, Task, KPIMonthlyData, EmployeeEvaluation, BirthdayEvent, Role, UserFieldDefinition } from '../types';
 
-// Helper: Check if string is valid UUID (kept for reference or specific needs, but not enforced on generic upsert for text IDs)
-function isValidUUID(uuid: string) {
-  const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  return regex.test(uuid);
-}
-
 // Generic helper to fetch data
 async function fetchAll<T>(table: string): Promise<T[]> {
   const { data, error } = await supabase.from(table).select('*');
