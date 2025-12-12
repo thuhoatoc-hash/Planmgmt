@@ -1,19 +1,21 @@
+
 import React, { useState, useMemo } from 'react';
-import { Project, Contract, Category, User, ContractType } from '../types';
+import { Project, Contract, Category, User, ContractType, Task, TaskStatus, InstallmentStatus } from '../types';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Download, Filter, Calendar, BarChart3, PieChart as PieChartIcon, User as UserIcon, TrendingUp } from 'lucide-react';
+import { Download, Filter, Calendar, BarChart3, PieChart as PieChartIcon, User as UserIcon, TrendingUp, CheckSquare } from 'lucide-react';
 
 interface ReportsProps {
   projects: Project[];
   contracts: Contract[];
   categories: Category[];
   users: User[];
+  tasks?: Task[]; // Add optional tasks prop
 }
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#FF6B6B'];
 
-const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, users }) => {
-  const [activeTab, setActiveTab] = useState<'GENERAL' | 'COST' | 'AM' | 'TREND'>('GENERAL');
+const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, users, tasks = [] }) => {
+  const [activeTab, setActiveTab] = useState<'GENERAL' | 'COST' | 'AM' | 'TREND' | 'TASKS'>('GENERAL');
   
   // Date Filter State
   const [startDate, setStartDate] = useState(new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0]); // First day of year
@@ -50,12 +52,28 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
     return contracts.filter(c => c.signedDate >= startDate && c.signedDate <= endDate);
   }, [contracts, startDate, endDate]);
 
+  const filteredTasks = useMemo(() => {
+      // Filter by deadline within range
+      return tasks.filter(t => t.deadline >= startDate && t.deadline <= endDate);
+  }, [tasks, startDate, endDate]);
+
   // --- REPORT 1: GENERAL (Revenue, Sales, Cost by Project) ---
   const generalData = useMemo(() => {
     return projects.map(p => {
         const pContracts = filteredContracts.filter(c => c.projectId === p.id);
         const sales = pContracts.filter(c => c.type === ContractType.OUTPUT && c.status !== 'CANCELLED').reduce((sum, c) => sum + c.value, 0);
-        const revenue = pContracts.filter(c => c.type === ContractType.OUTPUT && c.status === 'COMPLETED').reduce((sum, c) => sum + c.value, 0);
+        
+        // Calculate Revenue based on installments or completed status
+        const revenue = pContracts.filter(c => c.type === ContractType.OUTPUT && c.status !== 'CANCELLED').reduce((sum, c) => {
+            if (c.installments && c.installments.length > 0) {
+                return sum + c.installments
+                    .filter(i => i.status === InstallmentStatus.INVOICED || i.status === InstallmentStatus.PAID)
+                    .reduce((s, i) => s + i.value, 0);
+            } else {
+                return sum + (c.status === 'COMPLETED' ? c.value : 0);
+            }
+        }, 0);
+
         const cost = pContracts.filter(c => c.type === ContractType.INPUT && c.status !== 'CANCELLED').reduce((sum, c) => sum + c.value, 0);
         return {
             projectName: p.name,
@@ -91,17 +109,40 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
   const amData = useMemo(() => {
       const amMap: Record<string, { amName: string, sales: number, revenue: number }> = {};
       
-      // Initialize AMs
-      users.filter(u => u.username.includes('am') || u.role === 'USER').forEach(u => {
-          amMap[u.id] = { amName: u.fullName, sales: 0, revenue: 0 };
-      });
-
-      // Iterate contracts to fill data
+      // Iterate contracts to fill data (More reliable than iterating users first)
       filteredContracts.filter(c => c.type === ContractType.OUTPUT).forEach(c => {
           const project = projects.find(p => p.id === c.projectId);
-          if (project && project.amId && amMap[project.amId]) {
-              if (c.status !== 'CANCELLED') amMap[project.amId].sales += c.value;
-              if (c.status === 'COMPLETED') amMap[project.amId].revenue += c.value;
+          // Only process if project exists and has an AM
+          if (project && project.amId) {
+              const amId = project.amId;
+              
+              // Initialize entry if not exists
+              if (!amMap[amId]) {
+                  const user = users.find(u => u.id === amId);
+                  amMap[amId] = { 
+                      amName: user ? user.fullName : 'Unknown AM', 
+                      sales: 0, 
+                      revenue: 0 
+                  };
+              }
+
+              // Calculate Sales (Signed Contracts)
+              if (c.status !== 'CANCELLED') {
+                  amMap[amId].sales += c.value;
+              }
+
+              // Calculate Revenue (Installments Invoiced/Paid OR Completed Contract)
+              if (c.status !== 'CANCELLED') {
+                  let contractRevenue = 0;
+                  if (c.installments && c.installments.length > 0) {
+                      contractRevenue = c.installments
+                          .filter(i => i.status === InstallmentStatus.INVOICED || i.status === InstallmentStatus.PAID)
+                          .reduce((sum, i) => sum + i.value, 0);
+                  } else if (c.status === 'COMPLETED') {
+                      contractRevenue = c.value;
+                  }
+                  amMap[amId].revenue += contractRevenue;
+              }
           }
       });
 
@@ -124,7 +165,7 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
           if (c.type === ContractType.OUTPUT && c.status !== 'CANCELLED') {
               trendMap[key].sales += c.value;
               if (c.status === 'COMPLETED') {
-                 trendMap[key].revenue += c.value;
+                 trendMap[key].revenue += c.value; // Simplified trend for revenue to keep consistent with signed date
               }
           } else if (c.type === ContractType.INPUT && c.status !== 'CANCELLED') {
               trendMap[key].cost += c.value;
@@ -134,12 +175,44 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
       return Object.values(trendMap).sort((a,b) => a.date.localeCompare(b.date));
   }, [filteredContracts]);
 
+  // --- REPORT 5: TASKS REPORT ---
+  const taskReportData = useMemo(() => {
+      const assigneeMap: Record<string, { name: string, total: number, completed: number, late: number, inProgress: number }> = {};
+      
+      const today = new Date();
+      today.setHours(0,0,0,0);
+
+      filteredTasks.forEach(t => {
+          if (!assigneeMap[t.assigneeId]) {
+              const user = users.find(u => u.id === t.assigneeId);
+              assigneeMap[t.assigneeId] = { 
+                  name: user ? user.fullName : 'Unknown', 
+                  total: 0, 
+                  completed: 0, 
+                  late: 0, 
+                  inProgress: 0 
+              };
+          }
+          const entry = assigneeMap[t.assigneeId];
+          entry.total += 1;
+          
+          if (t.status === TaskStatus.COMPLETED) {
+              entry.completed += 1;
+          } else {
+              if (t.status === TaskStatus.IN_PROGRESS) entry.inProgress += 1;
+              if (new Date(t.deadline) < today && t.status !== TaskStatus.CANCELLED) entry.late += 1;
+          }
+      });
+
+      return Object.values(assigneeMap).filter(d => d.total > 0).sort((a,b) => b.total - a.total);
+  }, [filteredTasks, users]);
+
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-6 animate-in fade-in duration-500 pb-20">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
            <h1 className="text-2xl font-bold text-slate-800">Báo cáo & Thống kê</h1>
-           <p className="text-slate-500">Phân tích hiệu quả hoạt động kinh doanh (LN = Doanh số - Chi phí)</p>
+           <p className="text-slate-500">Phân tích hiệu quả hoạt động kinh doanh và công việc</p>
         </div>
         <div className="flex gap-2">
              <button 
@@ -148,6 +221,7 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
                     if(activeTab === 'COST') exportToCSV(costData, `Bao_Cao_Chi_Phi_${startDate}_${endDate}`);
                     if(activeTab === 'AM') exportToCSV(amData, `Bao_Cao_AM_${startDate}_${endDate}`);
                     if(activeTab === 'TREND') exportToCSV(trendData, `Bao_Cao_Xu_Huong_${startDate}_${endDate}`);
+                    if(activeTab === 'TASKS') exportToCSV(taskReportData, `Bao_Cao_Nhiem_Vu_${startDate}_${endDate}`);
                 }}
                 className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 flex items-center gap-2 shadow-sm font-medium"
              >
@@ -160,7 +234,7 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center gap-4">
          <div className="flex items-center gap-2 text-slate-700 font-medium">
             <Filter className="w-5 h-5 text-slate-500" />
-            Bộ lọc:
+            Bộ lọc thời gian:
          </div>
          <div className="flex items-center gap-2">
             <div className="relative">
@@ -197,6 +271,7 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
             { id: 'TREND', label: 'Xu hướng (Trend)', icon: TrendingUp },
             { id: 'COST', label: 'Phân tích Chi phí', icon: PieChartIcon },
             { id: 'AM', label: 'Hiệu quả AM', icon: UserIcon },
+            { id: 'TASKS', label: 'Thống kê Nhiệm vụ', icon: CheckSquare },
           ].map(tab => (
              <button
               key={tab.id}
@@ -450,6 +525,110 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
                             )}
                         </tbody>
                     </table>
+                 </div>
+             </div>
+         )}
+
+         {/* --- TASKS REPORT --- */}
+         {activeTab === 'TASKS' && (
+             <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-300">
+                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                     <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-96">
+                        <h3 className="font-bold text-slate-700 mb-4">Tỷ lệ Hoàn thành Nhiệm vụ theo Nhân sự</h3>
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={taskReportData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                <XAxis dataKey="name" tick={{fontSize: 12}} />
+                                <YAxis />
+                                <Tooltip />
+                                <Legend />
+                                <Bar dataKey="completed" name="Hoàn thành" stackId="a" fill="#10b981" barSize={30} />
+                                <Bar dataKey="inProgress" name="Đang làm" stackId="a" fill="#3b82f6" barSize={30} />
+                                <Bar dataKey="late" name="Quá hạn" stackId="a" fill="#ef4444" barSize={30} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                     </div>
+                     
+                     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm h-full">
+                        <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
+                            <h3 className="font-bold text-slate-800">Chi tiết Nhiệm vụ theo Nhân sự</h3>
+                        </div>
+                        <div className="overflow-y-auto max-h-[340px]">
+                            <table className="w-full text-sm text-left">
+                                <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 sticky top-0">
+                                    <tr>
+                                        <th className="px-6 py-3">Nhân sự</th>
+                                        <th className="px-6 py-3 text-right">Tổng việc</th>
+                                        <th className="px-6 py-3 text-right">Hoàn thành</th>
+                                        <th className="px-6 py-3 text-right">Tỷ lệ HT</th>
+                                        <th className="px-6 py-3 text-right text-red-600">Quá hạn</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {taskReportData.map((row, idx) => (
+                                        <tr key={idx} className="hover:bg-slate-50">
+                                            <td className="px-6 py-3 font-medium text-slate-800">{row.name}</td>
+                                            <td className="px-6 py-3 text-right">{row.total}</td>
+                                            <td className="px-6 py-3 text-right text-emerald-600 font-bold">{row.completed}</td>
+                                            <td className="px-6 py-3 text-right">
+                                                {((row.completed / row.total) * 100).toFixed(0)}%
+                                            </td>
+                                            <td className="px-6 py-3 text-right text-red-600 font-bold">{row.late}</td>
+                                        </tr>
+                                    ))}
+                                    {taskReportData.length === 0 && (
+                                        <tr><td colSpan={5} className="px-6 py-8 text-center text-slate-400">Không có dữ liệu</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                     </div>
+                 </div>
+
+                 {/* Detailed Task List Table */}
+                 <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                    <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
+                        <h3 className="font-bold text-slate-800">Danh sách Chi tiết Nhiệm vụ ({startDate} đến {endDate})</h3>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                                <tr>
+                                    <th className="px-6 py-3">Tên Nhiệm vụ</th>
+                                    <th className="px-6 py-3">Người thực hiện</th>
+                                    <th className="px-6 py-3">Hạn chót</th>
+                                    <th className="px-6 py-3 text-center">Trạng thái</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {filteredTasks.map(task => {
+                                    const assigneeName = users.find(u => u.id === task.assigneeId)?.fullName || 'Unknown';
+                                    return (
+                                        <tr key={task.id} className="hover:bg-slate-50">
+                                            <td className="px-6 py-3 font-medium text-slate-800">{task.name}</td>
+                                            <td className="px-6 py-3 text-slate-600">{assigneeName}</td>
+                                            <td className="px-6 py-3 text-slate-600">{new Date(task.deadline).toLocaleDateString('vi-VN')}</td>
+                                            <td className="px-6 py-3 text-center">
+                                                <span className={`px-2 py-1 rounded text-xs font-bold ${
+                                                    task.status === TaskStatus.COMPLETED ? 'bg-emerald-100 text-emerald-700' :
+                                                    task.status === TaskStatus.IN_PROGRESS ? 'bg-blue-100 text-blue-700' :
+                                                    task.status === TaskStatus.CANCELLED ? 'bg-red-100 text-red-700' :
+                                                    'bg-slate-100 text-slate-700'
+                                                }`}>
+                                                    {task.status === TaskStatus.COMPLETED ? 'Hoàn thành' :
+                                                     task.status === TaskStatus.IN_PROGRESS ? 'Đang làm' :
+                                                     task.status === TaskStatus.CANCELLED ? 'Hủy' : 'Mới'}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                                {filteredTasks.length === 0 && (
+                                    <tr><td colSpan={4} className="px-6 py-8 text-center text-slate-400">Không có nhiệm vụ nào trong khoảng thời gian này</td></tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                  </div>
              </div>
          )}

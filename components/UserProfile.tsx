@@ -1,6 +1,7 @@
+
 import React, { useState } from 'react';
 import { User } from '../types';
-import { X, Lock, Phone, Image } from 'lucide-react';
+import { X, Lock, Phone, Image, Mail } from 'lucide-react';
 
 interface UserProfileProps {
   user: User;
@@ -13,6 +14,13 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onUpdate, onClose }) =>
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate Email
+    if (!formData.email || !formData.email.trim()) {
+        alert("Email là bắt buộc!");
+        return;
+    }
+
     const updatedUser = { ...user, ...formData };
     // If password is empty, don't update it
     if (!formData.password) {
@@ -42,6 +50,20 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onUpdate, onClose }) =>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-2">
+                <Mail className="w-4 h-4" /> Email <span className="text-red-500">*</span>
+            </label>
+            <input 
+                required
+                type="email" 
+                className="w-full p-2 border rounded-lg" 
+                value={formData.email || ''} 
+                onChange={e => setFormData({...formData, email: e.target.value})} 
+                placeholder="Nhập email..." 
+            />
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-2">
                 <Phone className="w-4 h-4" /> Số điện thoại

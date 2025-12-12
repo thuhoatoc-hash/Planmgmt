@@ -1,23 +1,25 @@
+
 {
   "name": "PM Quản lý dự án - Viettel HN",
   "short_name": "PM Viettel",
   "description": "Hệ thống quản lý phương án kinh doanh dự án Viettel Hà Nội",
-  "start_url": "/",
-  "id": "/",
+  "id": "pm-viettel-hanoi",
+  "start_url": "./index.html",
+  "scope": ".",
   "display": "standalone",
   "background_color": "#f8fafc",
   "theme_color": "#EE0033",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Viettel_logo_2021.svg/512px-Viettel_logo_2021.svg.png",
-      "sizes": "512x512",
+      "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Viettel_logo_2021.svg/192px-Viettel_logo_2021.svg.png",
+      "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Viettel_logo_2021.svg/192px-Viettel_logo_2021.svg.png",
-      "sizes": "192x192",
+      "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Viettel_logo_2021.svg/512px-Viettel_logo_2021.svg.png",
+      "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
     }
