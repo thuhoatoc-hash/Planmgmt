@@ -12,7 +12,7 @@ import KPIManagement from './components/KPIManagement';
 import EmployeeEvaluationManager from './components/EmployeeEvaluation';
 import TaskManagement from './components/TaskManagement';
 import EventManager from './components/EventManager';
-import { User, Project, Contract, Category, Partner, ProjectStatusItem, Task, KPIMonthlyData, EmployeeEvaluation, TaskStatus, BirthdayEvent } from './types';
+import { User, Project, Contract, Category, Partner, ProjectStatusItem, Task, KPIMonthlyData, EmployeeEvaluation, TaskStatus, BirthdayEvent, Role, UserRole, ResourceType } from './types';
 import { api } from './services/api';
 import { Loader2 } from 'lucide-react';
 
@@ -60,6 +60,7 @@ const App: React.FC = () => {
   const [kpiData, setKpiData] = useState<KPIMonthlyData[]>([]);
   const [evaluations, setEvaluations] = useState<EmployeeEvaluation[]>([]);
   const [events, setEvents] = useState<BirthdayEvent[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
 
   // View State
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -69,7 +70,7 @@ const App: React.FC = () => {
     setIsAppLoading(true);
     try {
         const [
-            pData, cData, catData, uData, partData, sData, tData, kData, eData, evtData
+            pData, cData, catData, uData, partData, sData, tData, kData, eData, evtData, roleData
         ] = await Promise.all([
             api.projects.getAll(),
             api.contracts.getAll(),
@@ -80,7 +81,8 @@ const App: React.FC = () => {
             api.tasks.getAll(),
             api.kpi.getAll(),
             api.evaluations.getAll(),
-            api.events.getAll()
+            api.events.getAll(),
+            api.roles.getAll()
         ]);
 
         setProjects(pData);
@@ -93,6 +95,7 @@ const App: React.FC = () => {
         setKpiData(kData);
         setEvaluations(eData);
         setEvents(evtData);
+        setRoles(roleData);
 
         // Check for task reminders after loading
         checkTaskReminders(tData, uData);
@@ -152,6 +155,16 @@ const App: React.FC = () => {
     // Clear data
     setProjects([]);
     setContracts([]);
+  };
+
+  // Helper to check permission
+  const checkPermission = (resource: ResourceType, action: 'view' | 'edit' | 'delete' = 'view') => {
+      if (!user) return false;
+      if (user.role === UserRole.ADMIN) return true; // Super Admin bypass
+      if (!user.roleId) return true; // Legacy user fallback (optional)
+      
+      const userRole = roles.find(r => r.id === user.roleId);
+      return userRole?.permissions?.[resource]?.[action] || false;
   };
 
   if (!user) {
@@ -353,6 +366,14 @@ const App: React.FC = () => {
       );
     }
 
+    // Permission Guard for Routes
+    if (currentPath === 'kpi' && !checkPermission('KPI')) return <div className="p-8 text-center text-slate-500">Bạn không có quyền truy cập module này.</div>;
+    if (currentPath === 'evaluation' && !checkPermission('EVALUATION')) return <div className="p-8 text-center text-slate-500">Bạn không có quyền truy cập module này.</div>;
+    if (currentPath === 'reports' && !checkPermission('REPORTS')) return <div className="p-8 text-center text-slate-500">Bạn không có quyền truy cập module này.</div>;
+    if (currentPath === 'settings' && !checkPermission('CONFIG')) return <div className="p-8 text-center text-slate-500">Bạn không có quyền truy cập module này.</div>;
+    if (currentPath === 'tasks' && !checkPermission('TASKS')) return <div className="p-8 text-center text-slate-500">Bạn không có quyền truy cập module này.</div>;
+    if (currentPath === 'events' && !checkPermission('EVENTS')) return <div className="p-8 text-center text-slate-500">Bạn không có quyền truy cập module này.</div>;
+
     switch (currentPath) {
       case 'dashboard':
         return <Dashboard 
@@ -365,6 +386,7 @@ const App: React.FC = () => {
                   users={users}
                   evaluations={evaluations}
                   events={events}
+                  roles={roles} // Pass roles to Dashboard for widget permission check
                />;
       case 'kpi':
         return <KPIManagement kpiData={kpiData} onUpdateKPI={handleUpdateKPI} user={user} />;
@@ -435,6 +457,7 @@ const App: React.FC = () => {
       currentPath={currentPath} 
       onNavigate={handleNavigate}
       onOpenProfile={() => setIsProfileOpen(true)}
+      roles={roles} // Pass roles to Layout
     >
       {renderContent()}
       {isProfileOpen && (

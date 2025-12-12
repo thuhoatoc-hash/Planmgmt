@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Project, Contract, ContractType, Category, CategoryType, KPIMonthlyData, Task, User, TaskStatus, InstallmentStatus, EmployeeEvaluation, UserRole, BirthdayEvent } from '../types';
+import { Project, Contract, ContractType, Category, CategoryType, KPIMonthlyData, Task, User, TaskStatus, InstallmentStatus, EmployeeEvaluation, UserRole, BirthdayEvent, Role } from '../types';
 import { Wallet, TrendingUp, TrendingDown, Activity, Settings, Check, X, SlidersHorizontal, CheckSquare, Award, AlertTriangle, Target, Gift, Phone, ClipboardList } from 'lucide-react';
 
 interface DashboardProps {
@@ -14,6 +14,7 @@ interface DashboardProps {
   users?: User[];
   evaluations?: EmployeeEvaluation[];
   events?: BirthdayEvent[];
+  roles?: Role[];
 }
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#FF6B6B'];
@@ -35,11 +36,21 @@ const DEFAULT_CONFIG = {
   showBirthdays: true,
 };
 
-const Dashboard: React.FC<DashboardProps> = ({ currentUser, projects, contracts, categories, kpiData = [], tasks = [], users = [], evaluations = [], events = [] }) => {
+const Dashboard: React.FC<DashboardProps> = ({ currentUser, projects, contracts, categories, kpiData = [], tasks = [], users = [], evaluations = [], events = [], roles = [] }) => {
   // State for customization
   const [config, setConfig] = useState(DEFAULT_CONFIG);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const configRef = useRef<HTMLDivElement>(null);
+
+  // Helper to check permission
+  const canViewEvaluation = useMemo(() => {
+      if (!currentUser) return false;
+      if (currentUser.role === UserRole.ADMIN) return true;
+      if (!currentUser.roleId) return true; // Legacy
+      
+      const userRole = roles.find(r => r.id === currentUser.roleId);
+      return userRole?.permissions?.['EVALUATION']?.view || false;
+  }, [currentUser, roles]);
 
   // Load config from local storage
   useEffect(() => {
@@ -384,7 +395,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, projects, contracts,
                     { key: 'showBirthdays', label: 'Sinh nhật sắp tới' },
                     { key: 'showDueTasks', label: 'Nhiệm vụ sắp đến hạn (All)' },
                     { key: 'showKPIChart', label: 'Biểu đồ KPI' },
-                    { key: 'showEvaluationChart', label: 'Biểu đồ Đánh giá KI' },
+                    ...(canViewEvaluation ? [{ key: 'showEvaluationChart', label: 'Biểu đồ Đánh giá KI' }] : []),
                     { key: 'showTaskChart', label: 'Biểu đồ Công việc' },
                     { key: 'showProjectChart', label: 'Biểu đồ Dự án' },
                     { key: 'showCategoryChart', label: 'Biểu đồ Danh mục' },
@@ -696,7 +707,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, projects, contracts,
         )}
 
         {/* Evaluation Chart (New) */}
-        {config.showEvaluationChart && (
+        {config.showEvaluationChart && canViewEvaluation && (
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                 <div className="flex items-center justify-between mb-6">
                     <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">

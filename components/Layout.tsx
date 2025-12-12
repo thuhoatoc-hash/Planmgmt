@@ -1,20 +1,52 @@
 
 import React, { useEffect, useState } from 'react';
 import { LayoutDashboard, FolderKanban, LogOut, Menu, X, Settings, Signal, BarChart3, Download, Target, Award, CheckSquare, CalendarDays } from 'lucide-react';
-import { User } from '../types';
+import { User, Role, UserRole, ResourceType } from '../types';
 
 interface LayoutProps {
   children: React.ReactNode;
   user: User | null;
+  roles?: Role[]; // Roles passed from App
   onLogout: () => void;
   currentPath: string;
   onNavigate: (path: string) => void;
   onOpenProfile: () => void;
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, currentPath, onNavigate, onOpenProfile }) => {
+const Layout: React.FC<LayoutProps> = ({ children, user, roles = [], onLogout, currentPath, onNavigate, onOpenProfile }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  // Map menu IDs to ResourceType for permission checking
+  const MENU_RESOURCE_MAP: Record<string, ResourceType> = {
+      'dashboard': 'PROJECTS', // Default accessible, logic below overrides
+      'tasks': 'TASKS',
+      'projects': 'PROJECTS',
+      'kpi': 'KPI',
+      'evaluation': 'EVALUATION',
+      'events': 'EVENTS',
+      'reports': 'REPORTS',
+      'settings': 'CONFIG'
+  };
+
+  // Helper to check if a menu item should be shown
+  const canViewMenu = (itemId: string) => {
+      // Dashboard is always visible
+      if (itemId === 'dashboard') return true;
+
+      // Super Admin bypass
+      if (user?.role === UserRole.ADMIN) return true;
+
+      // Legacy fallback: if no roleId, allow all (or restrict as needed)
+      if (!user?.roleId) return true;
+
+      const userRole = roles.find(r => r.id === user.roleId);
+      if (!userRole) return false; // Role not found? Deny.
+
+      const resource = MENU_RESOURCE_MAP[itemId];
+      // Check 'view' permission for the resource
+      return userRole.permissions?.[resource]?.view || false;
+  };
 
   // Updated Menu Structure
   const menuItems = [
@@ -23,10 +55,10 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, currentPath, 
     { id: 'projects', label: 'Dự án', icon: FolderKanban },
     { id: 'kpi', label: 'Điều hành chỉ tiêu', icon: Target },
     { id: 'evaluation', label: 'Đánh giá KI', icon: Award },
-    { id: 'events', label: 'Sự kiện (Sinh nhật)', icon: CalendarDays }, // New Item
+    { id: 'events', label: 'Sự kiện (Sinh nhật)', icon: CalendarDays },
     { id: 'reports', label: 'Báo cáo', icon: BarChart3 },
     { id: 'settings', label: 'Cấu hình hệ thống', icon: Settings }
-  ];
+  ].filter(item => canViewMenu(item.id));
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
@@ -50,6 +82,11 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, currentPath, 
     console.log(`User response to the install prompt: ${outcome}`);
     setDeferredPrompt(null);
   };
+
+  // Get display role name
+  const roleName = user?.roleId 
+    ? roles.find(r => r.id === user.roleId)?.name 
+    : user?.role;
 
   return (
     <div className="flex h-screen bg-slate-50 text-slate-800 font-sans overflow-hidden">
@@ -125,7 +162,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, currentPath, 
             )}
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-slate-900 truncate">{user?.fullName}</p>
-              <p className="text-xs text-slate-500 truncate">{user?.role}</p>
+              <p className="text-xs text-slate-500 truncate">{roleName}</p>
             </div>
           </button>
           <button
