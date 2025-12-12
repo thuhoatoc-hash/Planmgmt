@@ -64,6 +64,7 @@ const App: React.FC = () => {
 
   // View State
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
 
   // --- FETCH DATA FROM SUPABASE ---
   const fetchAllData = async () => {
@@ -332,10 +333,17 @@ const App: React.FC = () => {
   };
 
   // Navigation Logic
-  const handleNavigate = (path: string) => {
+  const handleNavigate = (path: string, id?: string) => {
     setCurrentPath(path);
     if (path !== 'projects') {
       setSelectedProject(null);
+    }
+    
+    // Handle Event Selection
+    if (path === 'events' && id) {
+        setSelectedEventId(id);
+    } else {
+        setSelectedEventId(null);
     }
   };
 
@@ -387,6 +395,7 @@ const App: React.FC = () => {
                   evaluations={evaluations}
                   events={events}
                   roles={roles} // Pass roles to Dashboard for widget permission check
+                  onNavigate={handleNavigate} // Pass handleNavigate here
                />;
       case 'kpi':
         return <KPIManagement kpiData={kpiData} onUpdateKPI={handleUpdateKPI} user={user} />;
@@ -405,6 +414,8 @@ const App: React.FC = () => {
       case 'events':
         return <EventManager 
                   events={events}
+                  initialSelectedId={selectedEventId}
+                  onClearSelection={() => setSelectedEventId(null)}
                   onAddEvent={handleAddEvent}
                   onUpdateEvent={handleUpdateEvent}
                   onDeleteEvent={handleDeleteEvent}

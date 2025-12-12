@@ -1,18 +1,21 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BirthdayEvent, EventType } from '../types';
 import { Plus, Edit, Trash2, Search, Gift, Phone, Calendar, Upload, Save, X, Info, Users, Briefcase } from 'lucide-react';
 
 interface EventManagerProps {
   events: BirthdayEvent[];
+  initialSelectedId?: string | null;
+  onClearSelection?: () => void;
   onAddEvent: (e: BirthdayEvent) => void;
   onUpdateEvent: (e: BirthdayEvent) => void;
   onDeleteEvent: (id: string) => void;
 }
 
-const EventManager: React.FC<EventManagerProps> = ({ events, onAddEvent, onUpdateEvent, onDeleteEvent }) => {
+const EventManager: React.FC<EventManagerProps> = ({ events, initialSelectedId, onClearSelection, onAddEvent, onUpdateEvent, onDeleteEvent }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<string>('ALL');
+  const [filterMonth, setFilterMonth] = useState<string>(''); // '' = All months, '1'...'12'
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isImportMode, setIsImportMode] = useState(false);
   const [formData, setFormData] = useState<Partial<BirthdayEvent>>({ 
@@ -25,11 +28,29 @@ const EventManager: React.FC<EventManagerProps> = ({ events, onAddEvent, onUpdat
   const [importText, setImportText] = useState('');
   const [importDefaultType, setImportDefaultType] = useState<EventType>(EventType.INTERNAL);
 
+  // Effect to handle navigation from Dashboard
+  useEffect(() => {
+      if (initialSelectedId) {
+          const targetEvent = events.find(e => e.id === initialSelectedId);
+          if (targetEvent) {
+              handleOpenModal(targetEvent);
+              // Clear the selection in parent to prevent reopening if user closes modal
+              if (onClearSelection) onClearSelection();
+          }
+      }
+  }, [initialSelectedId, events]);
+
   const filteredEvents = events.filter(e => {
     const matchText = e.fullName.toLowerCase().includes(searchTerm.toLowerCase()) || 
                       e.title.toLowerCase().includes(searchTerm.toLowerCase());
     const matchType = filterType === 'ALL' || (e.type || EventType.INTERNAL) === filterType;
-    return matchText && matchType;
+    
+    // Filter by Month
+    const eventDate = new Date(e.date);
+    const eventMonth = eventDate.getMonth() + 1; // 1-12
+    const matchMonth = filterMonth === '' || eventMonth.toString() === filterMonth;
+
+    return matchText && matchType && matchMonth;
   }).sort((a, b) => {
       // Sort by month/day (ignoring year) to show calendar order
       const dateA = new Date(a.date);
@@ -168,21 +189,39 @@ const EventManager: React.FC<EventManagerProps> = ({ events, onAddEvent, onUpdat
                     onChange={e => setSearchTerm(e.target.value)}
                 />
             </div>
-            <select 
-                className="px-4 py-2 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-white min-w-[150px]"
-                value={filterType}
-                onChange={e => setFilterType(e.target.value)}
-            >
-                <option value="ALL">Tất cả loại</option>
-                <option value={EventType.INTERNAL}>Nội bộ</option>
-                <option value={EventType.CUSTOMER}>Khách hàng</option>
-            </select>
+            
+            <div className="flex gap-2">
+                <select 
+                    className="px-4 py-2 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-white min-w-[120px]"
+                    value={filterMonth}
+                    onChange={e => setFilterMonth(e.target.value)}
+                >
+                    <option value="">Cả năm</option>
+                    {Array.from({length: 12}, (_, i) => i + 1).map(m => (
+                        <option key={m} value={m.toString()}>Tháng {m}</option>
+                    ))}
+                </select>
+
+                <select 
+                    className="px-4 py-2 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-white min-w-[150px]"
+                    value={filterType}
+                    onChange={e => setFilterType(e.target.value)}
+                >
+                    <option value="ALL">Tất cả loại</option>
+                    <option value={EventType.INTERNAL}>Nội bộ</option>
+                    <option value={EventType.CUSTOMER}>Khách hàng</option>
+                </select>
+            </div>
         </div>
 
         {/* List */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredEvents.map(event => {
                 const isCustomer = event.type === EventType.CUSTOMER;
+                const dobYear = new Date(event.date).getFullYear();
+                const currentYear = new Date().getFullYear();
+                const age = currentYear - dobYear;
+
                 return (
                     <div key={event.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all group flex flex-col relative overflow-hidden">
                         <div className={`absolute top-0 left-0 w-1 h-full ${isCustomer ? 'bg-orange-500' : 'bg-indigo-500'}`}></div>
@@ -210,6 +249,7 @@ const EventManager: React.FC<EventManagerProps> = ({ events, onAddEvent, onUpdat
                             <div className={`flex items-center gap-2 font-bold px-2 py-1 rounded ${isCustomer ? 'text-orange-700 bg-orange-50' : 'text-indigo-700 bg-indigo-50'}`}>
                                 <Calendar className="w-4 h-4" />
                                 {formatDate(event.date)}
+                                <span className="text-xs font-normal opacity-70 ml-1">({age}t)</span>
                             </div>
                             {event.phoneNumber && (
                                 <div className="flex items-center gap-1 text-slate-500">
