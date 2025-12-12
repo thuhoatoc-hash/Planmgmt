@@ -6,15 +6,47 @@ export enum UserRole {
   PM = 'PM',     // Tư vấn Giải pháp
 }
 
+// --- NEW PERMISSION TYPES ---
+export type ResourceType = 'PROJECTS' | 'CONTRACTS' | 'TASKS' | 'KPI' | 'EVALUATION' | 'EVENTS' | 'USERS' | 'CONFIG' | 'REPORTS';
+export type ActionType = 'view' | 'edit' | 'delete';
+
+export interface Permission {
+    view: boolean;
+    edit: boolean;
+    delete: boolean;
+}
+
+export interface Role {
+    id: string;
+    name: string;
+    description?: string;
+    permissions: Record<string, Permission>; // Key is ResourceType
+}
+
+// --- NEW CUSTOM FIELD TYPES ---
+export type FieldType = 'text' | 'number' | 'date' | 'select' | 'image';
+
+export interface UserFieldDefinition {
+    id: string;
+    key: string; // e.g. "gender"
+    label: string; // e.g. "Giới tính"
+    type: FieldType;
+    options?: string; // Comma separated for select
+    required?: boolean;
+    order?: number;
+}
+
 export interface User {
   id: string;
   username: string;
   fullName: string;
-  role: UserRole;
+  role: UserRole; // Legacy role enum (kept for fallback)
+  roleId?: string; // New Dynamic Role ID
   password?: string;
   phoneNumber?: string;
   email?: string;
   avatarUrl?: string;
+  extendedInfo?: Record<string, any>; // Stores values for custom fields
 }
 
 export enum CategoryType {
@@ -47,7 +79,7 @@ export interface Partner {
   name: string;
   code: string;
   contactInfo: string;
-  type: PartnerType; // New field
+  type: PartnerType; 
 }
 
 export enum ProjectType {
@@ -105,7 +137,7 @@ export interface Project {
   amId?: string;
   pmId?: string;
   partnerId?: string;
-  customerObligation?: CustomerObligation; // New Field
+  customerObligation?: CustomerObligation; 
 }
 
 export enum ContractType {
@@ -174,32 +206,29 @@ export interface Task {
     outputStandard?: string; // Kết quả đầu ra
     assignerId: string; // Người giao
     assigneeId: string; // Người chủ trì
-    collaboratorIds?: string[]; // Người phối hợp
+    collaboratorIds?: string[]; // Người phối
     status: TaskStatus;
     deadline: string;
-    completedDate?: string; // Ngày hoàn thành thực tế
-}
-
-// --- KPI Types ---
-
-export interface KPIItem {
-  id: string;
-  name: string;
-  unit: string; // Đơn vị tính (Tr.đồng, %, DA...)
-  target: number; // Mục tiêu
-  weight: number; // Tỷ trọng (%)
-  actual: number; // Kết quả thực hiện
 }
 
 export interface KPIGroup {
   id: string;
   name: string;
-  unit?: string;
-  target?: number; // Optional: for groups that act as summary rows
-  weight?: number; // Optional: for groups that have a weight
-  actual?: number; // Optional: calculated actual for group
-  autoCalculate?: boolean; // If true, target/actual is sum of children
+  unit: string;
+  weight: number; // Tỷ trọng nhóm
+  autoCalculate?: boolean; // Tự động cộng tổng từ items
+  target?: number; // Mục tiêu nhóm (nếu không auto)
+  actual?: number; // Thực hiện nhóm (nếu không auto)
   items: KPIItem[];
+}
+
+export interface KPIItem {
+  id: string;
+  name: string;
+  unit: string;
+  target: number;
+  weight: number; // Tỷ trọng trong nhóm
+  actual: number;
 }
 
 export interface KPIMonthlyData {
@@ -208,34 +237,37 @@ export interface KPIMonthlyData {
   groups: KPIGroup[];
 }
 
-// --- KI Evaluation Types (New) ---
-
 export interface KICriterium {
-  id: string;
-  name: string;
-  unit: string;
-  target: number; // Mục tiêu
-  weight: number; // Tỷ trọng (%)
-  actual: number; // Kết quả thực hiện
-  score: number; // Điểm số quy đổi (đã nhân tỷ trọng)
+    id: string;
+    name: string;
+    unit: string;
+    weight: number;
+    target: number;
+    actual: number;
+    score: number;
 }
 
 export interface EmployeeEvaluation {
-  id: string;
-  userId: string;
-  month: string; // YYYY-MM
-  role: string; // Role at time of evaluation (AM/PM)
-  criteria: KICriterium[];
-  totalScore: number;
-  grade: 'A+' | 'A' | 'B' | 'C' | 'D';
-  note?: string;
+    id: string;
+    userId: string;
+    month: string; // YYYY-MM
+    role: string; // AM or PM
+    criteria: KICriterium[];
+    totalScore: number;
+    grade: string; // A, B, C...
+    note?: string;
 }
 
-// --- Event/Birthday Types ---
+export enum EventType {
+  INTERNAL = 'INTERNAL', // Nội bộ
+  CUSTOMER = 'CUSTOMER'  // Khách hàng
+}
+
 export interface BirthdayEvent {
-  id: string;
-  fullName: string;
-  title: string; // Chức danh
-  date: string; // YYYY-MM-DD
-  phoneNumber?: string;
+    id: string;
+    fullName: string;
+    title: string;
+    date: string; // YYYY-MM-DD
+    phoneNumber?: string;
+    type?: EventType;
 }

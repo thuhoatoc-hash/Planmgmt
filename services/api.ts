@@ -1,8 +1,8 @@
 
 import { supabase } from '../lib/supabase';
-import { Project, Contract, Category, User, Partner, ProjectStatusItem, Task, KPIMonthlyData, EmployeeEvaluation, BirthdayEvent } from '../types';
+import { Project, Contract, Category, User, Partner, ProjectStatusItem, Task, KPIMonthlyData, EmployeeEvaluation, BirthdayEvent, Role, UserFieldDefinition } from '../types';
 
-// Helper: Check if string is valid UUID
+// Helper: Check if string is valid UUID (kept for reference or specific needs, but not enforced on generic upsert for text IDs)
 function isValidUUID(uuid: string) {
   const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   return regex.test(uuid);
@@ -19,20 +19,14 @@ async function fetchAll<T>(table: string): Promise<T[]> {
 }
 
 // Generic helper to upsert data
-// Modified to handle ID generation logic ROBUSTLY
 async function upsert<T extends { id?: string }>(table: string, item: T): Promise<T | null> {
   const payload = { ...item };
 
-  // FIX FOR "null value in column id" ERROR:
-  // If the ID is missing, empty, or a temp ID (like 'user_123'), we must ensure
-  // a valid UUID is sent to the DB if the DB doesn't have a DEFAULT value set up.
-  // We generate a UUID v4 client-side to be safe.
-  if (!payload.id || !isValidUUID(payload.id)) {
+  if (!payload.id) {
       if (typeof crypto !== 'undefined' && crypto.randomUUID) {
           payload.id = crypto.randomUUID();
       } else {
-          // Fallback for older browsers (unlikely with Vite/modern React but safe to have)
-          // Simple UUID v4 generator
+          // Fallback for older browsers
           payload.id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
             var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
             return v.toString(16);
@@ -101,6 +95,16 @@ export const api = {
         if (error) return null;
         return data as User;
     }
+  },
+  roles: {
+      getAll: () => fetchAll<Role>('roles'),
+      save: (r: Role) => upsert<Role>('roles', r),
+      delete: (id: string) => remove('roles', id),
+  },
+  fieldDefinitions: {
+      getAll: () => fetchAll<UserFieldDefinition>('user_field_definitions'),
+      save: (f: UserFieldDefinition) => upsert<UserFieldDefinition>('user_field_definitions', f),
+      delete: (id: string) => remove('user_field_definitions', id),
   },
   partners: {
     getAll: () => fetchAll<Partner>('partners'),

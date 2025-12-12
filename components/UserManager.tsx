@@ -1,17 +1,19 @@
 
 import React, { useState } from 'react';
-import { User, UserRole } from '../types';
+import { User, UserRole, Role, UserFieldDefinition } from '../types';
 import { Shield, User as UserIcon, Phone, Edit, Trash2, Plus, Lock, Briefcase, Zap, Mail, CheckCircle2 } from 'lucide-react';
 import { hashPassword } from '../lib/crypto';
 
 interface UserManagerProps {
   users: User[];
+  roles: Role[]; // Passed from parent
+  fieldDefinitions: UserFieldDefinition[]; // Passed from parent
   onAddUser: (u: User) => void;
   onUpdateUser: (u: User) => void;
   onDeleteUser: (id: string) => void;
 }
 
-const UserManager: React.FC<UserManagerProps> = ({ users, onAddUser, onUpdateUser, onDeleteUser }) => {
+const UserManager: React.FC<UserManagerProps> = ({ users, roles, fieldDefinitions, onAddUser, onUpdateUser, onDeleteUser }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<Partial<User>>({});
   const [passwordInput, setPasswordInput] = useState('');
@@ -22,12 +24,13 @@ const UserManager: React.FC<UserManagerProps> = ({ users, onAddUser, onUpdateUse
       setPasswordInput(''); // Don't show existing password hash
     } else {
       setEditingUser({ 
-        role: UserRole.AM, // Default to AM
+        role: UserRole.AM, // Default fallback
         username: '', 
         fullName: '', 
         phoneNumber: '',
         email: '',
-        avatarUrl: ''
+        avatarUrl: '',
+        extendedInfo: {}
       });
       setPasswordInput('123'); // Default password for new users
     }
@@ -54,8 +57,19 @@ const UserManager: React.FC<UserManagerProps> = ({ users, onAddUser, onUpdateUse
     if (passwordInput) {
         finalPassword = await hashPassword(passwordInput);
     }
+    
+    // Sync Legacy role for backward compatibility
+    let legacyRole = editingUser.role || UserRole.USER;
+    if (editingUser.roleId) {
+        const selectedRole = roles.find(r => r.id === editingUser.roleId);
+        // Map dynamic role name to closest legacy role or just default to USER/AM
+        if (selectedRole?.name.toUpperCase().includes('ADMIN')) legacyRole = UserRole.ADMIN;
+        else if (selectedRole?.name.toUpperCase().includes('AM')) legacyRole = UserRole.AM;
+        else if (selectedRole?.name.toUpperCase().includes('PM')) legacyRole = UserRole.PM;
+        else legacyRole = UserRole.USER;
+    }
 
-    const userToSave = { ...editingUser, password: finalPassword } as User;
+    const userToSave = { ...editingUser, password: finalPassword, role: legacyRole } as User;
 
     if (editingUser.id) {
       onUpdateUser(userToSave);
@@ -65,60 +79,30 @@ const UserManager: React.FC<UserManagerProps> = ({ users, onAddUser, onUpdateUse
     setIsModalOpen(false);
   };
 
-  const getRoleBadge = (role: UserRole) => {
-      switch (role) {
-          case UserRole.ADMIN:
-              return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700"><Shield className="w-3 h-3" /> Quản trị viên</span>;
-          case UserRole.AM:
-              return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700"><Briefcase className="w-3 h-3" /> NV Kinh doanh (AM)</span>;
-          case UserRole.PM:
-              return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700"><Zap className="w-3 h-3" /> TV Giải pháp (PM)</span>;
-          default:
-              return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">Người dùng</span>;
-      }
+  const handleExtendedChange = (key: string, value: any) => {
+      setEditingUser(prev => ({
+          ...prev,
+          extendedInfo: {
+              ...(prev.extendedInfo || {}),
+              [key]: value
+          }
+      }));
   };
 
-  const roleOptions = [
-      { 
-          value: UserRole.AM, 
-          label: 'NV Kinh doanh (AM)', 
-          icon: Briefcase, 
-          desc: 'Phụ trách khách hàng, chỉ tiêu doanh số.',
-          activeClass: 'border-blue-500 bg-blue-50 ring-1 ring-blue-500', 
-          iconClass: 'bg-blue-100 text-blue-700' 
-      },
-      { 
-          value: UserRole.PM, 
-          label: 'TV Giải pháp (PM)', 
-          icon: Zap, 
-          desc: 'Phụ trách kỹ thuật, triển khai dự án.',
-          activeClass: 'border-indigo-500 bg-indigo-50 ring-1 ring-indigo-500', 
-          iconClass: 'bg-indigo-100 text-indigo-700' 
-      },
-      { 
-          value: UserRole.ADMIN, 
-          label: 'Quản trị viên', 
-          icon: Shield, 
-          desc: 'Toàn quyền cấu hình hệ thống.',
-          activeClass: 'border-purple-500 bg-purple-50 ring-1 ring-purple-500', 
-          iconClass: 'bg-purple-100 text-purple-700' 
-      },
-      { 
-          value: UserRole.USER, 
-          label: 'User (Khác)', 
-          icon: UserIcon, 
-          desc: 'Quyền xem cơ bản, không tác nghiệp.',
-          activeClass: 'border-slate-500 bg-slate-50 ring-1 ring-slate-500', 
-          iconClass: 'bg-slate-100 text-slate-700' 
-      },
-  ];
+  const getRoleName = (user: User) => {
+      if (user.roleId) {
+          const r = roles.find(role => role.id === user.roleId);
+          if (r) return <span className="text-indigo-700 font-bold">{r.name}</span>;
+      }
+      return user.role; // Fallback
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-           <h1 className="text-2xl font-bold text-slate-800">Quản lý Người dùng</h1>
-           <p className="text-slate-500">Danh sách tài khoản và phân quyền hệ thống</p>
+           <h3 className="text-xl font-bold text-slate-800">Danh sách Người dùng</h3>
+           <p className="text-slate-500">Quản lý tài khoản, vai trò và thông tin mở rộng</p>
         </div>
         <button 
           onClick={() => handleOpenModal()}
@@ -134,7 +118,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, onAddUser, onUpdateUse
             <tr>
               <th className="px-6 py-4 text-sm font-semibold text-slate-600">Người dùng</th>
               <th className="px-6 py-4 text-sm font-semibold text-slate-600">Thông tin liên hệ</th>
-              <th className="px-6 py-4 text-sm font-semibold text-slate-600">Vai trò / Chức danh</th>
+              <th className="px-6 py-4 text-sm font-semibold text-slate-600">Vai trò</th>
               <th className="px-6 py-4 text-sm font-semibold text-slate-600 text-right">Thao tác</th>
             </tr>
           </thead>
@@ -172,7 +156,9 @@ const UserManager: React.FC<UserManagerProps> = ({ users, onAddUser, onUpdateUse
                     </div>
                 </td>
                 <td className="px-6 py-4">
-                  {getRoleBadge(user.role)}
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
+                      <Shield className="w-3 h-3" /> {getRoleName(user)}
+                  </span>
                 </td>
                 <td className="px-6 py-4 text-right">
                   <div className="flex items-center justify-end gap-2">
@@ -198,43 +184,44 @@ const UserManager: React.FC<UserManagerProps> = ({ users, onAddUser, onUpdateUse
             <h2 className="text-xl font-bold mb-6 text-slate-800">{editingUser.id ? 'Sửa Thông tin User' : 'Thêm User Mới'}</h2>
             <form onSubmit={handleSubmit} className="space-y-6">
               
-              {/* Role Selection Grid */}
+              {/* Dynamic Role Selection */}
               <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-3">Phân quyền Vai trò <span className="text-red-500">*</span></label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {roleOptions.map((option) => {
-                          const isSelected = editingUser.role === option.value;
-                          return (
-                              <div 
-                                key={option.value}
-                                onClick={() => setEditingUser({ ...editingUser, role: option.value })}
-                                className={`cursor-pointer rounded-xl p-3 border-2 transition-all flex items-start gap-3 relative ${
-                                    isSelected 
-                                    ? `bg-white ${option.activeClass}` 
-                                    : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                                }`}
-                              >
-                                  <div className={`p-2 rounded-lg shrink-0 ${isSelected ? option.iconClass : 'bg-slate-100 text-slate-500'}`}>
-                                      <option.icon className="w-5 h-5" />
-                                  </div>
-                                  <div>
-                                      <div className={`font-bold text-sm ${isSelected ? 'text-slate-800' : 'text-slate-600'}`}>{option.label}</div>
-                                      <div className="text-xs text-slate-500 mt-0.5 leading-tight">{option.desc}</div>
-                                  </div>
-                                  {isSelected && (
-                                      <div className="absolute top-3 right-3 text-indigo-600">
-                                          <CheckCircle2 className="w-5 h-5 fill-indigo-100" />
-                                      </div>
-                                  )}
+                  <label className="block text-sm font-bold text-slate-700 mb-3">Vai trò hệ thống <span className="text-red-500">*</span></label>
+                  <div className="grid grid-cols-2 gap-3">
+                      {roles.map(role => (
+                          <label 
+                              key={role.id}
+                              className={`cursor-pointer border rounded-lg p-3 flex items-center gap-3 transition-colors ${
+                                  editingUser.roleId === role.id 
+                                  ? 'bg-indigo-50 border-indigo-500 ring-1 ring-indigo-500' 
+                                  : 'bg-white border-slate-200 hover:bg-slate-50'
+                              }`}
+                          >
+                              <input 
+                                  type="radio" 
+                                  name="role"
+                                  className="hidden"
+                                  checked={editingUser.roleId === role.id}
+                                  onChange={() => setEditingUser({ ...editingUser, roleId: role.id })}
+                              />
+                              <Shield className={`w-5 h-5 ${editingUser.roleId === role.id ? 'text-indigo-600' : 'text-slate-400'}`} />
+                              <div>
+                                  <div className={`font-bold text-sm ${editingUser.roleId === role.id ? 'text-indigo-900' : 'text-slate-700'}`}>{role.name}</div>
+                                  <div className="text-xs text-slate-500 line-clamp-1">{role.description}</div>
                               </div>
-                          )
-                      })}
+                          </label>
+                      ))}
+                      {roles.length === 0 && (
+                          <div className="col-span-2 p-3 bg-amber-50 text-amber-700 text-sm rounded-lg border border-amber-200">
+                              Chưa có vai trò nào được định nghĩa. Vui lòng tạo vai trò trong tab "Vai trò & Phân quyền".
+                          </div>
+                      )}
                   </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Tên đăng nhập (Username) <span className="text-red-500">*</span></label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Tên đăng nhập <span className="text-red-500">*</span></label>
                   <input required disabled={!!editingUser.id} type="text" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" value={editingUser.username} onChange={e => setEditingUser({...editingUser, username: e.target.value})} placeholder="VD: am_hieu" />
                 </div>
                 <div>
@@ -246,33 +233,79 @@ const UserManager: React.FC<UserManagerProps> = ({ users, onAddUser, onUpdateUse
               <div className="grid grid-cols-2 gap-4">
                 <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Email <span className="text-red-500">*</span></label>
-                    <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <input 
-                            required
-                            type="email" 
-                            className="w-full pl-9 p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" 
-                            value={editingUser.email || ''} 
-                            onChange={e => setEditingUser({...editingUser, email: e.target.value})} 
-                            placeholder="email@viettel.com.vn" 
-                        />
-                    </div>
+                    <input required type="email" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" value={editingUser.email || ''} onChange={e => setEditingUser({...editingUser, email: e.target.value})} />
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Số điện thoại</label>
-                    <div className="relative">
-                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <input type="text" className="w-full pl-9 p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" value={editingUser.phoneNumber || ''} onChange={e => setEditingUser({...editingUser, phoneNumber: e.target.value})} placeholder="09xxxxxxxx" />
-                    </div>
+                    <input type="text" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" value={editingUser.phoneNumber || ''} onChange={e => setEditingUser({...editingUser, phoneNumber: e.target.value})} />
                 </div>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Avatar URL</label>
-                <input type="text" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" value={editingUser.avatarUrl || ''} onChange={e => setEditingUser({...editingUser, avatarUrl: e.target.value})} placeholder="https://example.com/avatar.jpg" />
+                <input type="text" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" value={editingUser.avatarUrl || ''} onChange={e => setEditingUser({...editingUser, avatarUrl: e.target.value})} />
               </div>
 
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+              {/* DYNAMIC FIELDS SECTION */}
+              {fieldDefinitions.length > 0 && (
+                  <div className="border-t border-slate-200 pt-4 mt-4">
+                      <h4 className="font-bold text-slate-700 mb-3 flex items-center gap-2">
+                          <Zap className="w-4 h-4 text-indigo-500" /> Thông tin mở rộng
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {fieldDefinitions.map(field => {
+                              const val = editingUser.extendedInfo?.[field.key] || '';
+                              return (
+                                  <div key={field.id} className={field.type === 'text' || field.type === 'image' ? 'col-span-2' : ''}>
+                                      <label className="block text-sm font-medium text-slate-700 mb-1">
+                                          {field.label} {field.required && <span className="text-red-500">*</span>}
+                                      </label>
+                                      
+                                      {field.type === 'text' || field.type === 'image' ? (
+                                          <input 
+                                            type="text"
+                                            className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                                            value={val}
+                                            onChange={e => handleExtendedChange(field.key, e.target.value)}
+                                            required={field.required}
+                                          />
+                                      ) : field.type === 'number' ? (
+                                          <input 
+                                            type="number"
+                                            className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                                            value={val}
+                                            onChange={e => handleExtendedChange(field.key, Number(e.target.value))}
+                                            required={field.required}
+                                          />
+                                      ) : field.type === 'date' ? (
+                                          <input 
+                                            type="date"
+                                            className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                                            value={val}
+                                            onChange={e => handleExtendedChange(field.key, e.target.value)}
+                                            required={field.required}
+                                          />
+                                      ) : field.type === 'select' ? (
+                                          <select 
+                                            className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                                            value={val}
+                                            onChange={e => handleExtendedChange(field.key, e.target.value)}
+                                            required={field.required}
+                                          >
+                                              <option value="">-- Chọn --</option>
+                                              {field.options?.split(',').map(opt => (
+                                                  <option key={opt.trim()} value={opt.trim()}>{opt.trim()}</option>
+                                              ))}
+                                          </select>
+                                      ) : null}
+                                  </div>
+                              )
+                          })}
+                      </div>
+                  </div>
+              )}
+
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mt-4">
                  <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
                     <Lock className="w-4 h-4 text-slate-500" /> 
                     {editingUser.id ? 'Đổi mật khẩu (Tùy chọn)' : 'Thiết lập mật khẩu'}

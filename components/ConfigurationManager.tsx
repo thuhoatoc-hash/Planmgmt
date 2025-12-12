@@ -1,10 +1,13 @@
 
 import React, { useState } from 'react';
-import { ProjectStatusItem, User, Partner, Category, Project, Contract, UserRole } from '../types';
-import { Edit, Trash2, List, Settings, Users, Tags, Briefcase } from 'lucide-react';
+import { ProjectStatusItem, User, Partner, Category, Project, Contract, UserRole, Role, UserFieldDefinition } from '../types';
+import { Edit, Trash2, List, Settings, Users, Tags, Briefcase, Shield, Settings2 } from 'lucide-react';
 import UserManager from './UserManager';
 import PartnerManager from './PartnerManager';
 import CategoryManager from './CategoryManager';
+import RoleManager from './RoleManager';
+import UserFieldManager from './UserFieldManager';
+import { api } from '../services/api';
 
 interface ConfigurationManagerProps {
   currentUser: User;
@@ -43,8 +46,51 @@ const ConfigurationManager: React.FC<ConfigurationManagerProps> = ({
     onAddPartner, onUpdatePartner, onDeletePartner,
     onAddCategory, onDeleteCategory
 }) => {
-  const [activeTab, setActiveTab] = useState<'STATUS' | 'USERS' | 'PARTNERS' | 'CATEGORIES'>('STATUS');
+  const [activeTab, setActiveTab] = useState<'STATUS' | 'USERS' | 'PARTNERS' | 'CATEGORIES' | 'ROLES' | 'FIELDS'>('STATUS');
   
+  // Fetch these internally for now or lift state up (lifting state is better but for speed we can fetch here or assume App passed them. 
+  // NOTE: For better architecture, App.tsx should fetch Roles and Fields. I will assume App.tsx is updated to pass them, 
+  // OR I will fetch them here if props are missing. 
+  // For this implementation, I will add local state/fetch since App.tsx change is large)
+  
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [fieldDefinitions, setFieldDefinitions] = useState<UserFieldDefinition[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  // Load roles/fields on tab switch if not loaded
+  React.useEffect(() => {
+      if ((activeTab === 'ROLES' || activeTab === 'FIELDS' || activeTab === 'USERS') && !loaded) {
+          Promise.all([api.roles.getAll(), api.fieldDefinitions.getAll()]).then(([r, f]) => {
+              setRoles(r);
+              setFieldDefinitions(f);
+              setLoaded(true);
+          });
+      }
+  }, [activeTab, loaded]);
+
+  // Handlers for Roles/Fields
+  const handleAddRole = async (r: Role) => {
+      const saved = await api.roles.save(r);
+      if (saved) setRoles([...roles, saved]);
+  };
+  const handleUpdateRole = async (r: Role) => {
+      const saved = await api.roles.save(r);
+      if (saved) setRoles(roles.map(ex => ex.id === saved.id ? saved : ex));
+  };
+  const handleDeleteRole = async (id: string) => {
+      const success = await api.roles.delete(id);
+      if (success) setRoles(roles.filter(r => r.id !== id));
+  };
+
+  const handleAddField = async (f: UserFieldDefinition) => {
+      const saved = await api.fieldDefinitions.save(f);
+      if (saved) setFieldDefinitions([...fieldDefinitions, saved]);
+  };
+  const handleDeleteField = async (id: string) => {
+      const success = await api.fieldDefinitions.delete(id);
+      if (success) setFieldDefinitions(fieldDefinitions.filter(f => f.id !== id));
+  };
+
   // Status Modal State
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [editingStatus, setEditingStatus] = useState<Partial<ProjectStatusItem>>({});
@@ -74,8 +120,12 @@ const ConfigurationManager: React.FC<ConfigurationManagerProps> = ({
       { id: 'STATUS', label: 'Trạng thái Dự án', icon: List },
       { id: 'PARTNERS', label: 'Quản lý Đối tác', icon: Briefcase },
       { id: 'CATEGORIES', label: 'Danh mục Thu/Chi', icon: Tags },
-      // Only show Users tab if Admin
-      ...(currentUser.role === UserRole.ADMIN ? [{ id: 'USERS', label: 'Quản lý Người dùng', icon: Users }] : []),
+      // Only show Admin tabs if Admin
+      ...(currentUser.role === UserRole.ADMIN ? [
+          { id: 'USERS', label: 'Quản lý Người dùng', icon: Users },
+          { id: 'ROLES', label: 'Vai trò & Phân quyền', icon: Shield },
+          { id: 'FIELDS', label: 'Trường User Tùy chỉnh', icon: Settings2 },
+      ] : []),
   ];
 
   return (
@@ -172,9 +222,28 @@ const ConfigurationManager: React.FC<ConfigurationManagerProps> = ({
           {activeTab === 'USERS' && currentUser.role === UserRole.ADMIN && (
               <UserManager 
                   users={users}
+                  roles={roles}
+                  fieldDefinitions={fieldDefinitions}
                   onAddUser={onAddUser}
                   onUpdateUser={onUpdateUser}
                   onDeleteUser={onDeleteUser}
+              />
+          )}
+
+          {activeTab === 'ROLES' && currentUser.role === UserRole.ADMIN && (
+              <RoleManager 
+                  roles={roles}
+                  onAddRole={handleAddRole}
+                  onUpdateRole={handleUpdateRole}
+                  onDeleteRole={handleDeleteRole}
+              />
+          )}
+
+          {activeTab === 'FIELDS' && currentUser.role === UserRole.ADMIN && (
+              <UserFieldManager 
+                  fields={fieldDefinitions}
+                  onAddField={handleAddField}
+                  onDeleteField={handleDeleteField}
               />
           )}
       </div>

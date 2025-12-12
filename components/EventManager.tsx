@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { BirthdayEvent } from '../types';
-import { Plus, Edit, Trash2, Search, Gift, Phone, Calendar, Upload, Save, X, Info } from 'lucide-react';
+import { BirthdayEvent, EventType } from '../types';
+import { Plus, Edit, Trash2, Search, Gift, Phone, Calendar, Upload, Save, X, Info, Users, Briefcase } from 'lucide-react';
 
 interface EventManagerProps {
   events: BirthdayEvent[];
@@ -12,15 +12,25 @@ interface EventManagerProps {
 
 const EventManager: React.FC<EventManagerProps> = ({ events, onAddEvent, onUpdateEvent, onDeleteEvent }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState<string>('ALL');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isImportMode, setIsImportMode] = useState(false);
-  const [formData, setFormData] = useState<Partial<BirthdayEvent>>({ fullName: '', title: '', date: '', phoneNumber: '' });
+  const [formData, setFormData] = useState<Partial<BirthdayEvent>>({ 
+      fullName: '', 
+      title: '', 
+      date: '', 
+      phoneNumber: '',
+      type: EventType.INTERNAL 
+  });
   const [importText, setImportText] = useState('');
+  const [importDefaultType, setImportDefaultType] = useState<EventType>(EventType.INTERNAL);
 
-  const filteredEvents = events.filter(e => 
-    e.fullName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    e.title.toLowerCase().includes(searchTerm.toLowerCase())
-  ).sort((a, b) => {
+  const filteredEvents = events.filter(e => {
+    const matchText = e.fullName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                      e.title.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchType = filterType === 'ALL' || (e.type || EventType.INTERNAL) === filterType;
+    return matchText && matchType;
+  }).sort((a, b) => {
       // Sort by month/day (ignoring year) to show calendar order
       const dateA = new Date(a.date);
       const dateB = new Date(b.date);
@@ -31,10 +41,10 @@ const EventManager: React.FC<EventManagerProps> = ({ events, onAddEvent, onUpdat
 
   const handleOpenModal = (event?: BirthdayEvent) => {
     if (event) {
-        setFormData({ ...event });
+        setFormData({ ...event, type: event.type || EventType.INTERNAL });
         setIsImportMode(false);
     } else {
-        setFormData({ fullName: '', title: '', date: '', phoneNumber: '' });
+        setFormData({ fullName: '', title: '', date: '', phoneNumber: '', type: EventType.INTERNAL });
         setIsImportMode(false);
     }
     setIsModalOpen(true);
@@ -42,6 +52,7 @@ const EventManager: React.FC<EventManagerProps> = ({ events, onAddEvent, onUpdat
 
   const handleOpenImport = () => {
       setImportText('');
+      setImportDefaultType(EventType.INTERNAL);
       setIsImportMode(true);
       setIsModalOpen(true);
   }
@@ -70,7 +81,6 @@ const EventManager: React.FC<EventManagerProps> = ({ events, onAddEvent, onUpdat
       lines.forEach(line => {
           if (!line.trim()) return;
           // Example format: Quách Tuấn Anh - PGĐ Trung tâm GP Y tế số, 15/01/1985
-          // Strategy: Split by comma first to get date, then split first part by ' - '
           
           try {
               const parts = line.split(',');
@@ -84,7 +94,6 @@ const EventManager: React.FC<EventManagerProps> = ({ events, onAddEvent, onUpdat
                   const isoDate = `${y}-${m}-${d}`;
 
                   // Parse Name and Title
-                  // Find the FIRST " - " separator? Or last? Usually "Name - Title"
                   const separatorIndex = infoPart.indexOf(' - ');
                   let fullName = infoPart;
                   let title = '';
@@ -99,7 +108,8 @@ const EventManager: React.FC<EventManagerProps> = ({ events, onAddEvent, onUpdat
                       fullName,
                       title,
                       date: isoDate,
-                      phoneNumber: ''
+                      phoneNumber: '',
+                      type: importDefaultType // Use the selected default type
                   };
                   
                   onAddEvent(newEvent);
@@ -135,7 +145,7 @@ const EventManager: React.FC<EventManagerProps> = ({ events, onAddEvent, onUpdat
                     onClick={handleOpenImport}
                     className="bg-slate-100 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-200 flex items-center gap-2 font-medium"
                 >
-                    <Upload className="w-4 h-4" /> Nhập nhanh (Text)
+                    <Upload className="w-4 h-4" /> Nhập nhanh
                 </button>
                 <button 
                     onClick={() => handleOpenModal()}
@@ -147,8 +157,8 @@ const EventManager: React.FC<EventManagerProps> = ({ events, onAddEvent, onUpdat
         </div>
 
         {/* Filter */}
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-            <div className="relative">
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex gap-4 flex-col md:flex-row">
+            <div className="relative flex-1">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input 
                     type="text" 
@@ -158,45 +168,62 @@ const EventManager: React.FC<EventManagerProps> = ({ events, onAddEvent, onUpdat
                     onChange={e => setSearchTerm(e.target.value)}
                 />
             </div>
+            <select 
+                className="px-4 py-2 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 bg-white min-w-[150px]"
+                value={filterType}
+                onChange={e => setFilterType(e.target.value)}
+            >
+                <option value="ALL">Tất cả loại</option>
+                <option value={EventType.INTERNAL}>Nội bộ</option>
+                <option value={EventType.CUSTOMER}>Khách hàng</option>
+            </select>
         </div>
 
         {/* List */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredEvents.map(event => (
-                <div key={event.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all group flex flex-col relative overflow-hidden">
-                    <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500"></div>
-                    <div className="flex justify-between items-start pl-3">
-                        <div>
-                            <h3 className="font-bold text-slate-800 text-lg">{event.fullName}</h3>
-                            <p className="text-sm text-slate-500 font-medium mb-2">{event.title}</p>
-                        </div>
-                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => handleOpenModal(event)} className="p-1.5 text-slate-400 hover:text-indigo-600 bg-slate-50 rounded">
-                                <Edit className="w-4 h-4" />
-                            </button>
-                            <button onClick={() => handleDelete(event.id)} className="p-1.5 text-slate-400 hover:text-red-600 bg-slate-50 rounded">
-                                <Trash2 className="w-4 h-4" />
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <div className="mt-auto pt-3 border-t border-slate-100 flex items-center justify-between pl-3 text-sm">
-                        <div className="flex items-center gap-2 text-indigo-600 font-bold bg-indigo-50 px-2 py-1 rounded">
-                            <Calendar className="w-4 h-4" />
-                            {formatDate(event.date)}
-                        </div>
-                        {event.phoneNumber && (
-                            <div className="flex items-center gap-1 text-slate-500">
-                                <Phone className="w-3 h-3" />
-                                {event.phoneNumber}
+            {filteredEvents.map(event => {
+                const isCustomer = event.type === EventType.CUSTOMER;
+                return (
+                    <div key={event.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all group flex flex-col relative overflow-hidden">
+                        <div className={`absolute top-0 left-0 w-1 h-full ${isCustomer ? 'bg-orange-500' : 'bg-indigo-500'}`}></div>
+                        <div className="flex justify-between items-start pl-3">
+                            <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                    <h3 className="font-bold text-slate-800 text-lg">{event.fullName}</h3>
+                                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold border ${isCustomer ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-indigo-50 text-indigo-700 border-indigo-200'}`}>
+                                        {isCustomer ? 'KH' : 'NB'}
+                                    </span>
+                                </div>
+                                <p className="text-sm text-slate-500 font-medium mb-2">{event.title}</p>
                             </div>
-                        )}
+                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onClick={() => handleOpenModal(event)} className="p-1.5 text-slate-400 hover:text-indigo-600 bg-slate-50 rounded">
+                                    <Edit className="w-4 h-4" />
+                                </button>
+                                <button onClick={() => handleDelete(event.id)} className="p-1.5 text-slate-400 hover:text-red-600 bg-slate-50 rounded">
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div className="mt-auto pt-3 border-t border-slate-100 flex items-center justify-between pl-3 text-sm">
+                            <div className={`flex items-center gap-2 font-bold px-2 py-1 rounded ${isCustomer ? 'text-orange-700 bg-orange-50' : 'text-indigo-700 bg-indigo-50'}`}>
+                                <Calendar className="w-4 h-4" />
+                                {formatDate(event.date)}
+                            </div>
+                            {event.phoneNumber && (
+                                <div className="flex items-center gap-1 text-slate-500">
+                                    <Phone className="w-3 h-3" />
+                                    {event.phoneNumber}
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </div>
-            ))}
+                );
+            })}
             {filteredEvents.length === 0 && (
                 <div className="col-span-full py-12 text-center text-slate-400 border border-dashed rounded-xl">
-                    Chưa có dữ liệu sinh nhật nào.
+                    Chưa có dữ liệu sinh nhật phù hợp.
                 </div>
             )}
         </div>
@@ -222,6 +249,33 @@ const EventManager: React.FC<EventManagerProps> = ({ events, onAddEvent, onUpdat
                                     <p className="mt-1 italic opacity-80">Ví dụ: Quách Tuấn Anh - PGĐ Trung tâm GP Y tế số, 15/01/1985</p>
                                 </div>
                             </div>
+                            
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Loại sự kiện mặc định cho đợt nhập này</label>
+                                <div className="flex gap-4">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input 
+                                            type="radio" 
+                                            name="importType" 
+                                            checked={importDefaultType === EventType.INTERNAL} 
+                                            onChange={() => setImportDefaultType(EventType.INTERNAL)}
+                                            className="text-indigo-600 focus:ring-indigo-500"
+                                        />
+                                        <span className="text-sm font-medium">Nội bộ (Nhân viên)</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input 
+                                            type="radio" 
+                                            name="importType" 
+                                            checked={importDefaultType === EventType.CUSTOMER} 
+                                            onChange={() => setImportDefaultType(EventType.CUSTOMER)}
+                                            className="text-indigo-600 focus:ring-indigo-500"
+                                        />
+                                        <span className="text-sm font-medium">Khách hàng / Đối tác</span>
+                                    </label>
+                                </div>
+                            </div>
+
                             <textarea 
                                 className="w-full h-48 p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none font-mono text-sm"
                                 placeholder="Paste danh sách vào đây..."
@@ -237,6 +291,32 @@ const EventManager: React.FC<EventManagerProps> = ({ events, onAddEvent, onUpdat
                         </div>
                     ) : (
                         <form onSubmit={handleSubmit} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">Loại đối tượng</label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <label className={`border rounded-lg p-3 flex items-center gap-2 cursor-pointer transition-colors ${formData.type === EventType.INTERNAL ? 'bg-indigo-50 border-indigo-500 text-indigo-700' : 'border-slate-200 hover:bg-slate-50'}`}>
+                                        <input 
+                                            type="radio" 
+                                            name="eventType" 
+                                            className="hidden"
+                                            checked={formData.type === EventType.INTERNAL} 
+                                            onChange={() => setFormData({...formData, type: EventType.INTERNAL})} 
+                                        />
+                                        <Users className="w-4 h-4" /> Nội bộ
+                                    </label>
+                                    <label className={`border rounded-lg p-3 flex items-center gap-2 cursor-pointer transition-colors ${formData.type === EventType.CUSTOMER ? 'bg-orange-50 border-orange-500 text-orange-700' : 'border-slate-200 hover:bg-slate-50'}`}>
+                                        <input 
+                                            type="radio" 
+                                            name="eventType" 
+                                            className="hidden"
+                                            checked={formData.type === EventType.CUSTOMER} 
+                                            onChange={() => setFormData({...formData, type: EventType.CUSTOMER})} 
+                                        />
+                                        <Briefcase className="w-4 h-4" /> Khách hàng
+                                    </label>
+                                </div>
+                            </div>
+
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Họ và tên</label>
                                 <input required type="text" className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-[#EE0033] outline-none" value={formData.fullName} onChange={e => setFormData({...formData, fullName: e.target.value})} placeholder="Nguyễn Văn A" />
