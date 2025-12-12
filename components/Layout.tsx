@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { LayoutDashboard, FolderKanban, LogOut, Menu, X, Settings, BarChart3, Download, Target, Award, CheckSquare, CalendarDays, Signal, Bell } from 'lucide-react';
 import { User, Role, UserRole, ResourceType } from '../types';
 import BannerSlider from './BannerSlider';
+import GeminiChat from './GeminiChat';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -12,9 +13,10 @@ interface LayoutProps {
   currentPath: string;
   onNavigate: (path: string) => void;
   onOpenProfile: () => void;
+  contextData?: any; // Dữ liệu cho Gemini
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, user, roles = [], onLogout, currentPath, onNavigate, onOpenProfile }) => {
+const Layout: React.FC<LayoutProps> = ({ children, user, roles = [], onLogout, currentPath, onNavigate, onOpenProfile, contextData }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
@@ -198,7 +200,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, roles = [], onLogout, c
           </button>
         </header>
 
-        <main className="flex-1 overflow-auto flex flex-col">
+        <main className="flex-1 overflow-auto flex flex-col relative">
           {/* Banner Slider Area - Global for all pages */}
           <BannerSlider />
 
@@ -219,6 +221,9 @@ const Layout: React.FC<LayoutProps> = ({ children, user, roles = [], onLogout, c
                 </p>
              </div>
           </footer>
+
+          {/* Gemini Chat AI - Available everywhere */}
+          {user && <GeminiChat contextData={contextData} />}
         </main>
       </div>
     </div>

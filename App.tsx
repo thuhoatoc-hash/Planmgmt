@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Layout from './components/Layout';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
@@ -171,6 +171,34 @@ const App: React.FC = () => {
       const userRole = roles.find(r => r.id === user.roleId);
       return userRole?.permissions?.[resource]?.[action] || false;
   };
+
+  // --- PREPARE DATA CONTEXT FOR AI ---
+  const contextData = useMemo(() => {
+      if (!user) return null;
+      return {
+          currentUser: { name: user.fullName, role: user.role },
+          stats: {
+              totalProjects: projects.length,
+              totalContracts: contracts.length,
+              totalTasks: tasks.length
+          },
+          projects: projects.map(p => ({
+              code: p.code,
+              name: p.name,
+              status: statuses.find(s => s.id === p.statusId)?.name,
+              am: users.find(u => u.id === p.amId)?.fullName,
+              pm: users.find(u => u.id === p.pmId)?.fullName,
+              revenue: p.plannedRevenue,
+              cost: p.plannedCost
+          })),
+          recentNotifications: notifications.slice(0, 3).map(n => ({ title: n.title, content: n.content })),
+          tasksDueSoon: tasks.filter(t => t.status !== TaskStatus.COMPLETED && t.status !== TaskStatus.CANCELLED).map(t => ({
+              name: t.name,
+              deadline: t.deadline,
+              assignee: users.find(u => u.id === t.assigneeId)?.fullName
+          }))
+      };
+  }, [user, projects, contracts, tasks, statuses, users, notifications]);
 
   if (!user) {
     return <Login onLogin={handleLogin} />;
@@ -497,6 +525,7 @@ const App: React.FC = () => {
       onNavigate={handleNavigate}
       onOpenProfile={() => setIsProfileOpen(true)}
       roles={roles} // Pass roles to Layout
+      contextData={contextData} // Pass Gemini Data Context
     >
       {renderContent()}
       {isProfileOpen && (

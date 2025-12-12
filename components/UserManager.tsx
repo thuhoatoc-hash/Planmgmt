@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, UserRole, Role, UserFieldDefinition, ActivityLog } from '../types';
-import { Shield, User as UserIcon, Phone, Edit, Trash2, Plus, Lock, Zap, Mail, CheckCircle2, History, Search, Download, RefreshCw } from 'lucide-react';
+import { Shield, User as UserIcon, Phone, Edit, Trash2, Plus, Lock, Zap, Mail, CheckCircle2, History, Search, Download } from 'lucide-react';
 import { hashPassword } from '../lib/crypto';
 import { api } from '../services/api';
 
@@ -25,10 +25,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, roles, fieldDefinition
   // Logs State
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
-  
-  // Search State
-  const [searchInput, setSearchInput] = useState(''); // Input value
-  const [activeSearchTerm, setActiveSearchTerm] = useState(''); // Actual filter value
+  const [logSearch, setLogSearch] = useState('');
 
   const handleOpenModal = (user?: User) => {
     if (user) {
@@ -129,20 +126,10 @@ const UserManager: React.FC<UserManagerProps> = ({ users, roles, fieldDefinition
       }
   }, [activeTab]);
 
-  const handleSearch = () => {
-      setActiveSearchTerm(searchInput);
-  };
-
-  const filteredLogs = logs.filter(l => {
-      if (!activeSearchTerm) return true;
-      const term = activeSearchTerm.toLowerCase();
-      return (
-          l.userName.toLowerCase().includes(term) || 
-          l.action.toLowerCase().includes(term) ||
-          l.target.toLowerCase().includes(term) ||
-          (l.details && l.details.toLowerCase().includes(term))
-      );
-  });
+  const filteredLogs = logs.filter(l => 
+      l.userName.toLowerCase().includes(logSearch.toLowerCase()) || 
+      l.action.toLowerCase().includes(logSearch.toLowerCase())
+  );
 
   const exportLogsToCSV = () => {
       if (filteredLogs.length === 0) return;
@@ -277,42 +264,24 @@ const UserManager: React.FC<UserManagerProps> = ({ users, roles, fieldDefinition
 
       {activeTab === 'LOGS' && (
           <div className="space-y-4">
-              <div className="flex flex-col md:flex-row justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm gap-4">
-                  <div className="flex gap-2 w-full md:w-auto">
-                      <div className="relative flex-1 md:w-80">
-                          <input 
-                              type="text" 
-                              className="w-full pl-3 pr-4 py-2 border border-slate-200 rounded-l-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 focus:z-10"
-                              placeholder="Tìm theo user, hành động..."
-                              value={searchInput}
-                              onChange={(e) => setSearchInput(e.target.value)}
-                              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                          />
-                      </div>
-                      <button 
-                          onClick={handleSearch}
-                          className="px-4 py-2 bg-indigo-600 text-white rounded-r-lg hover:bg-indigo-700 font-medium text-sm flex items-center gap-2"
-                      >
-                          <Search className="w-4 h-4" /> Tìm kiếm
-                      </button>
+              <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                  <div className="relative w-full max-w-sm">
+                      <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input 
+                          type="text" 
+                          className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                          placeholder="Tìm theo user, hành động..."
+                          value={logSearch}
+                          onChange={(e) => setLogSearch(e.target.value)}
+                      />
                   </div>
-
-                  <div className="flex gap-2">
-                        <button 
-                            onClick={fetchLogs}
-                            className="p-2 text-slate-600 hover:text-indigo-600 hover:bg-slate-50 rounded-lg border border-slate-200"
-                            title="Làm mới"
-                        >
-                            <RefreshCw className={`w-4 h-4 ${loadingLogs ? 'animate-spin' : ''}`} />
-                        </button>
-                        <button 
-                            onClick={exportLogsToCSV}
-                            disabled={filteredLogs.length === 0}
-                            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 font-medium text-sm transition-colors"
-                        >
-                            <Download className="w-4 h-4" /> Xuất Excel
-                        </button>
-                  </div>
+                  <button 
+                      onClick={exportLogsToCSV}
+                      disabled={filteredLogs.length === 0}
+                      className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 font-medium text-sm transition-colors"
+                  >
+                      <Download className="w-4 h-4" /> Xuất Excel
+                  </button>
               </div>
 
               <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
