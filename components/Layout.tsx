@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { LayoutDashboard, FolderKanban, LogOut, Menu, X, Settings, Signal, BarChart3, Download, Target, Award, CheckSquare, CalendarDays } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, LogOut, Menu, X, Settings, BarChart3, Download, Target, Award, CheckSquare, CalendarDays } from 'lucide-react';
 import { User, Role, UserRole, ResourceType } from '../types';
 
 interface LayoutProps {
@@ -106,11 +106,12 @@ const Layout: React.FC<LayoutProps> = ({ children, user, roles = [], onLogout, c
       >
         <div className="flex items-center justify-center h-20 border-b border-slate-200 px-4 bg-white">
           <div className="flex flex-col items-center">
-             <div className="flex items-center gap-2 text-[#EE0033]">
-                <Signal className="h-6 w-6" />
-                <span className="text-xl font-bold tracking-tight">VIETTEL</span>
-             </div>
-             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Hà Nội</span>
+             <img 
+               src="https://viettel.com.vn/static/images/logo-header.0ce71c2fd94a.png" 
+               alt="Viettel Logo" 
+               className="h-10 object-contain mb-1"
+             />
+             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Hà Nội</span>
           </div>
         </div>
 
@@ -183,9 +184,13 @@ const Layout: React.FC<LayoutProps> = ({ children, user, roles = [], onLogout, c
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top Header (Mobile only mainly) */}
         <header className="lg:hidden bg-white border-b border-slate-200 h-16 flex items-center px-4 justify-between sticky top-0 z-20">
-          <div className="flex items-center gap-2 font-semibold text-slate-800">
-            <Signal className="h-6 w-6 text-[#EE0033]" />
-            <span className="text-[#EE0033] font-bold">Viettel Hà Nội</span>
+          <div className="flex items-center gap-2">
+            <img 
+               src="https://viettel.com.vn/static/images/logo-header.0ce71c2fd94a.png" 
+               alt="Viettel" 
+               className="h-8 object-contain"
+             />
+             <span className="text-slate-500 font-bold text-sm uppercase border-l border-slate-300 pl-2 ml-1">Hà Nội</span>
           </div>
           <button onClick={toggleSidebar} className="p-2 rounded-md hover:bg-slate-100 text-slate-600">
             {isSidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}

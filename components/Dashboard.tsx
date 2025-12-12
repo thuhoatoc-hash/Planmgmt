@@ -41,9 +41,9 @@ const DEFAULT_CONFIG = {
 type WidgetType = 'sales' | 'cost' | 'profit' | 'revenue' | 'my_tasks' | 'due_tasks' | 'birthdays' | 'kpi' | 'task_am' | 'task_project' | 'eval' | 'fin_project' | 'fin_category';
 
 const DEFAULT_ORDER: WidgetType[] = [
+    'kpi', // KPI moved to top
     'sales', 'cost', 'profit', 'revenue',
     'my_tasks', 'due_tasks', 'birthdays',
-    'kpi',
     'task_am', 'task_project', 'eval',
     'fin_project', 'fin_category'
 ];
@@ -84,6 +84,9 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, projects, contracts,
           const validOrder = parsedOrder.filter((id: string) => DEFAULT_ORDER.includes(id as WidgetType));
           const missing = DEFAULT_ORDER.filter(id => !validOrder.includes(id));
           setWidgetOrder([...validOrder, ...missing]);
+      } else {
+          // Use default order if no saved order
+          setWidgetOrder(DEFAULT_ORDER);
       }
     } catch (e) {
       console.error('Failed to load dashboard settings', e);

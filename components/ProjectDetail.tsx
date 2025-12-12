@@ -160,7 +160,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
       .filter(c => c.type === ContractType.OUTPUT && c.status !== 'CANCELLED')
       .reduce((acc, c) => acc + c.value, 0);
 
-    // 2. Doanh thu (Revenue): Tổng HĐ đầu ra (Chỉ tính những item đã xuất HĐ hoặc đã Thanh toán trong installments)
+    // 2. Doanh thu (Revenue): Tổng HĐ đầu ra (Chỉ tính item đã xuất HĐ hoặc đã Thanh toán trong installments)
     const actualRevenue = projectContracts
       .filter(c => c.type === ContractType.OUTPUT && c.status !== 'CANCELLED')
       .reduce((acc, c) => {
@@ -199,6 +199,27 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
           .filter(item => item.value > 0)
           .sort((a, b) => b.value - a.value);
   }, [projectContracts, categories]);
+
+  // --- TIME PROGRESS CALCULATION ---
+  const timeProgress = useMemo(() => {
+      const start = new Date(project.startDate).getTime();
+      const end = new Date(project.endDate).getTime();
+      const now = new Date().getTime();
+      
+      if (end <= start) return 100;
+      
+      const total = end - start;
+      const elapsed = now - start;
+      const percent = (elapsed / total) * 100;
+      
+      return Math.min(100, Math.max(0, percent));
+  }, [project.startDate, project.endDate]);
+
+  const daysRemaining = useMemo(() => {
+      const end = new Date(project.endDate).getTime();
+      const now = new Date().getTime();
+      return Math.ceil((end - now) / (1000 * 60 * 60 * 24));
+  }, [project.endDate]);
 
   // --- HANDLERS ---
 
@@ -696,9 +717,20 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                                         </div>
                                         <div>
                                             <label className="text-xs text-slate-500 font-medium uppercase">Thời gian thực hiện</label>
-                                            <div className="flex items-center gap-2 mt-1">
+                                            <div className="flex items-center gap-2 mt-1 mb-3">
                                                 <Calendar className="w-4 h-4 text-slate-400" />
                                                 <span className="text-slate-800">{new Date(project.startDate).toLocaleDateString('vi-VN')} - {new Date(project.endDate).toLocaleDateString('vi-VN')}</span>
+                                            </div>
+                                            {/* Progress Bar */}
+                                            <div className="w-full bg-slate-100 rounded-full h-1.5 mb-1">
+                                                <div className="bg-indigo-500 h-1.5 rounded-full transition-all duration-500" style={{width: `${timeProgress}%`}}></div>
+                                            </div>
+                                            <div className="flex justify-between text-[10px] text-slate-400">
+                                                <span>Bắt đầu</span>
+                                                <span className={daysRemaining < 0 ? 'text-red-500 font-medium' : 'text-indigo-600 font-medium'}>
+                                                    {daysRemaining > 0 ? `Còn ${daysRemaining} ngày` : (daysRemaining === 0 ? 'Hôm nay' : `Quá hạn ${Math.abs(daysRemaining)} ngày`)}
+                                                </span>
+                                                <span>Kết thúc</span>
                                             </div>
                                         </div>
                                     </div>

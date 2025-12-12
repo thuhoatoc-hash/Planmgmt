@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { User } from '../types';
 import { api } from '../services/api';
-import { Signal, ArrowRight, Loader2, Eye, EyeOff, Lock, CheckCircle } from 'lucide-react';
+import { ArrowRight, Loader2, Eye, EyeOff, Lock, CheckCircle } from 'lucide-react';
 import { hashPassword } from '../lib/crypto';
 
 interface LoginProps {
@@ -119,11 +119,15 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         <div className="absolute top-0 left-0 w-full h-1 bg-[#EE0033]"></div>
 
         <div className="flex flex-col items-center mb-8 mt-2">
-          <div className="bg-red-50 p-4 rounded-full mb-4">
-            <Signal className="w-10 h-10 text-[#EE0033]" />
+          <div className="p-4 mb-2">
+            <img 
+               src="https://viettel.com.vn/static/images/logo-header.0ce71c2fd94a.png" 
+               alt="Viettel Logo" 
+               className="h-16 object-contain"
+            />
           </div>
           <h1 className="text-xl font-bold text-slate-900 text-center uppercase tracking-wide">PM Quản lý dự án kinh doanh</h1>
-          <h2 className="text-lg font-bold text-[#EE0033] mt-1">VIETTEL HÀ NỘI</h2>
+          <h2 className="text-sm font-bold text-slate-500 mt-1 uppercase tracking-widest">Viettel Hà Nội</h2>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">

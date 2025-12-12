@@ -113,7 +113,7 @@ const RoleManager: React.FC<RoleManagerProps> = ({ roles, onAddRole, onUpdateRol
                   <div className="border-t border-slate-100 pt-4">
                       <div className="text-xs font-semibold text-slate-500 uppercase mb-2">Quyền truy cập</div>
                       <div className="flex flex-wrap gap-2">
-                          {Object.entries(role.permissions).filter(([, p]) => p.view).slice(0, 4).map(([key]) => (
+                          {Object.entries(role.permissions).filter(([, p]) => (p as Permission).view).slice(0, 4).map(([key]) => (
                               <span key={key} className="px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded">
                                   {RESOURCES.find(r => r.id === key)?.label}
                               </span>
