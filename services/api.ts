@@ -1,6 +1,6 @@
 
 import { supabase } from '../lib/supabase';
-import { Project, Contract, Category, User, Partner, ProjectStatusItem, Task, KPIMonthlyData, EmployeeEvaluation, BirthdayEvent, Role, UserFieldDefinition } from '../types';
+import { Project, Contract, Category, User, Partner, ProjectStatusItem, Task, KPIMonthlyData, EmployeeEvaluation, BirthdayEvent, Role, UserFieldDefinition, BannerConfig } from '../types';
 
 // Generic helper to fetch data
 async function fetchAll<T>(table: string): Promise<T[]> {
@@ -129,5 +129,24 @@ export const api = {
     getAll: () => fetchAll<BirthdayEvent>('birthday_events'),
     save: (e: BirthdayEvent) => upsert<BirthdayEvent>('birthday_events', e),
     delete: (id: string) => remove('birthday_events', id),
+  },
+  settings: {
+      getBannerConfig: async (): Promise<BannerConfig | null> => {
+          const { data, error } = await supabase.from('system_settings').select('value').eq('id', 'BANNER_CONFIG').single();
+          if (error || !data) return null;
+          return data.value as BannerConfig;
+      },
+      saveBannerConfig: async (config: BannerConfig) => {
+          const { error } = await supabase.from('system_settings').upsert({ id: 'BANNER_CONFIG', value: config });
+          if (error) {
+              console.error('Error saving banner config:', error);
+              // Fallback alert if table missing
+              if (error.message.includes('relation "system_settings" does not exist')) {
+                  alert('Lỗi: Bảng "system_settings" chưa được tạo trong Database. Vui lòng chạy lệnh SQL tạo bảng.');
+              }
+              return false;
+          }
+          return true;
+      }
   }
 };

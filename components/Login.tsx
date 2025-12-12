@@ -124,8 +124,8 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 <Signal className="w-10 h-10" />
              </div>
           </div>
-          <h1 className="text-xl font-bold text-slate-900 text-center uppercase tracking-wide">PM Quản lý dự án kinh doanh</h1>
-          <h2 className="text-sm font-bold text-slate-500 mt-1 uppercase tracking-widest">Viettel Hà Nội</h2>
+          <h1 className="text-lg font-bold text-slate-900 text-center uppercase tracking-wide leading-tight">HỆ THỐNG QUẢN LÝ, ĐIỀU HÀNH</h1>
+          <h2 className="text-sm font-bold text-[#EE0033] mt-1 uppercase tracking-widest text-center">KHỐI GPCNTT- VIETTEL HÀ NỘI</h2>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">

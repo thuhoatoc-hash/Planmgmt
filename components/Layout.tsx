@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { LayoutDashboard, FolderKanban, LogOut, Menu, X, Settings, BarChart3, Download, Target, Award, CheckSquare, CalendarDays, Signal } from 'lucide-react';
 import { User, Role, UserRole, ResourceType } from '../types';
+import BannerSlider from './BannerSlider';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -104,13 +105,16 @@ const Layout: React.FC<LayoutProps> = ({ children, user, roles = [], onLogout, c
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         } flex flex-col`}
       >
-        <div className="flex items-center justify-center h-20 border-b border-slate-200 px-4 bg-white">
-          <div className="flex flex-col items-center">
-             <div className="w-10 h-10 bg-[#EE0033] rounded-lg flex items-center justify-center text-white mb-1 shadow-sm">
+        <div className="flex flex-col items-center justify-center py-6 border-b border-slate-200 px-4 bg-white text-center">
+             <div className="w-10 h-10 bg-[#EE0033] rounded-lg flex items-center justify-center text-white mb-2 shadow-sm">
                 <Signal className="w-6 h-6" />
              </div>
-             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Hà Nội</span>
-          </div>
+             <span className="text-[10px] font-bold text-slate-700 uppercase leading-relaxed">
+                HT QUẢN LÝ, ĐIỀU HÀNH GPCNTT
+             </span>
+             <span className="text-[10px] font-bold text-[#EE0033] uppercase tracking-wider mt-0.5">
+                VIETTEL HÀ NỘI
+             </span>
         </div>
 
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
@@ -178,24 +182,32 @@ const Layout: React.FC<LayoutProps> = ({ children, user, roles = [], onLogout, c
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top Header (Mobile only mainly) */}
         <header className="lg:hidden bg-white border-b border-slate-200 h-16 flex items-center px-4 justify-between sticky top-0 z-20">
-          <div className="flex items-center gap-2">
-             <div className="w-8 h-8 bg-[#EE0033] rounded-md flex items-center justify-center text-white shadow-sm">
+          <div className="flex items-center gap-3 overflow-hidden">
+             <div className="w-8 h-8 bg-[#EE0033] rounded-md flex items-center justify-center text-white shadow-sm shrink-0">
                 <Signal className="w-5 h-5" />
              </div>
-             <span className="text-slate-500 font-bold text-sm uppercase border-l border-slate-300 pl-2 ml-1">Hà Nội</span>
+             <div className="flex flex-col justify-center border-l border-slate-300 pl-3 min-w-0">
+                 <span className="text-slate-800 font-bold text-[10px] uppercase truncate leading-tight">HT QUẢN LÝ, ĐIỀU HÀNH GPCNTT</span>
+                 <span className="text-[#EE0033] font-bold text-[10px] uppercase truncate leading-tight">VIETTEL HÀ NỘI</span>
+             </div>
           </div>
-          <button onClick={toggleSidebar} className="p-2 rounded-md hover:bg-slate-100 text-slate-600">
+          <button onClick={toggleSidebar} className="p-2 rounded-md hover:bg-slate-100 text-slate-600 shrink-0">
             {isSidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
         </header>
 
-        <main className="flex-1 overflow-auto p-4 lg:p-8 flex flex-col">
-          <div className="max-w-7xl mx-auto w-full flex-1">
-            {children}
+        <main className="flex-1 overflow-auto flex flex-col">
+          {/* Banner Slider Area - Global for all pages */}
+          <BannerSlider />
+
+          <div className="flex-1 p-4 lg:p-8">
+            <div className="max-w-7xl mx-auto w-full h-full">
+              {children}
+            </div>
           </div>
           
           {/* Footer */}
-          <footer className="mt-8 py-6 text-center border-t border-slate-200 w-full">
+          <footer className="py-6 text-center border-t border-slate-200 w-full mt-auto">
              <div className="flex flex-col items-center justify-center gap-1">
                 <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">
                     © {new Date().getFullYear()} Khối Giải pháp Công nghệ thông tin - Viettel Hà Nội

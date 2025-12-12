@@ -271,3 +271,9 @@ export interface BirthdayEvent {
     phoneNumber?: string;
     type?: EventType;
 }
+
+export interface BannerConfig {
+    images: string[];
+    interval: number;
+    enabled?: boolean;
+}

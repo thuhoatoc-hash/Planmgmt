@@ -1,12 +1,13 @@
 
 import React, { useState } from 'react';
 import { ProjectStatusItem, User, Partner, Category, Project, Contract, UserRole, Role, UserFieldDefinition } from '../types';
-import { Edit, Trash2, List, Settings, Users, Tags, Briefcase, Shield, Settings2 } from 'lucide-react';
+import { Edit, Trash2, List, Settings, Users, Tags, Briefcase, Shield, Settings2, Image } from 'lucide-react';
 import UserManager from './UserManager';
 import PartnerManager from './PartnerManager';
 import CategoryManager from './CategoryManager';
 import RoleManager from './RoleManager';
 import UserFieldManager from './UserFieldManager';
+import BannerManager from './BannerManager';
 import { api } from '../services/api';
 
 interface ConfigurationManagerProps {
@@ -46,12 +47,7 @@ const ConfigurationManager: React.FC<ConfigurationManagerProps> = ({
     onAddPartner, onUpdatePartner, onDeletePartner,
     onAddCategory, onDeleteCategory
 }) => {
-  const [activeTab, setActiveTab] = useState<'STATUS' | 'USERS' | 'PARTNERS' | 'CATEGORIES' | 'ROLES' | 'FIELDS'>('STATUS');
-  
-  // Fetch these internally for now or lift state up (lifting state is better but for speed we can fetch here or assume App passed them. 
-  // NOTE: For better architecture, App.tsx should fetch Roles and Fields. I will assume App.tsx is updated to pass them, 
-  // OR I will fetch them here if props are missing. 
-  // For this implementation, I will add local state/fetch since App.tsx change is large)
+  const [activeTab, setActiveTab] = useState<'STATUS' | 'USERS' | 'PARTNERS' | 'CATEGORIES' | 'ROLES' | 'FIELDS' | 'BANNER'>('STATUS');
   
   const [roles, setRoles] = useState<Role[]>([]);
   const [fieldDefinitions, setFieldDefinitions] = useState<UserFieldDefinition[]>([]);
@@ -125,6 +121,7 @@ const ConfigurationManager: React.FC<ConfigurationManagerProps> = ({
           { id: 'USERS', label: 'Quản lý Người dùng', icon: Users },
           { id: 'ROLES', label: 'Vai trò & Phân quyền', icon: Shield },
           { id: 'FIELDS', label: 'Trường User Tùy chỉnh', icon: Settings2 },
+          { id: 'BANNER', label: 'Cấu hình Banner & Giao diện', icon: Image },
       ] : []),
   ];
 
@@ -246,9 +243,13 @@ const ConfigurationManager: React.FC<ConfigurationManagerProps> = ({
                   onDeleteField={handleDeleteField}
               />
           )}
+
+          {activeTab === 'BANNER' && currentUser.role === UserRole.ADMIN && (
+              <BannerManager />
+          )}
       </div>
 
-      {/* Status Modal (Kept local here as it's small) */}
+      {/* Status Modal */}
       {isStatusModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl max-w-lg w-full p-6">
