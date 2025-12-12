@@ -107,7 +107,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, roles = [], onLogout, c
         <div className="flex items-center justify-center h-20 border-b border-slate-200 px-4 bg-white">
           <div className="flex flex-col items-center">
              <img 
-               src="https://viettel.com.vn/static/images/logo-header.0ce71c2fd94a.png" 
+               src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Viettel_logo_2021.svg/1200px-Viettel_logo_2021.svg.png" 
                alt="Viettel Logo" 
                className="h-10 object-contain mb-1"
              />
@@ -173,10 +173,6 @@ const Layout: React.FC<LayoutProps> = ({ children, user, roles = [], onLogout, c
             <LogOut className="w-4 h-4 mr-2" />
             Đăng xuất
           </button>
-          
-          <div className="mt-4 pt-4 border-t border-slate-100 text-center">
-            <p className="text-[10px] text-slate-400">Copyright @ Dzung Nguyen</p>
-          </div>
         </div>
       </aside>
 
@@ -186,7 +182,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, roles = [], onLogout, c
         <header className="lg:hidden bg-white border-b border-slate-200 h-16 flex items-center px-4 justify-between sticky top-0 z-20">
           <div className="flex items-center gap-2">
             <img 
-               src="https://viettel.com.vn/static/images/logo-header.0ce71c2fd94a.png" 
+               src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Viettel_logo_2021.svg/1200px-Viettel_logo_2021.svg.png" 
                alt="Viettel" 
                className="h-8 object-contain"
              />
@@ -197,10 +193,22 @@ const Layout: React.FC<LayoutProps> = ({ children, user, roles = [], onLogout, c
           </button>
         </header>
 
-        <main className="flex-1 overflow-auto p-4 lg:p-8">
-          <div className="max-w-7xl mx-auto">
+        <main className="flex-1 overflow-auto p-4 lg:p-8 flex flex-col">
+          <div className="max-w-7xl mx-auto w-full flex-1">
             {children}
           </div>
+          
+          {/* Footer */}
+          <footer className="mt-8 py-6 text-center border-t border-slate-200 w-full">
+             <div className="flex flex-col items-center justify-center gap-1">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">
+                    © {new Date().getFullYear()} Ban Khách hàng Doanh nghiệp - Viettel Hà Nội
+                </p>
+                <p className="text-[10px] text-slate-400">
+                    Hệ thống Quản lý Phương án Kinh doanh & KPI • Version 1.2
+                </p>
+             </div>
+          </footer>
         </main>
       </div>
     </div>

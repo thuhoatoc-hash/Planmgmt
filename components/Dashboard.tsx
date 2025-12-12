@@ -41,10 +41,17 @@ const DEFAULT_CONFIG = {
 type WidgetType = 'sales' | 'cost' | 'profit' | 'revenue' | 'my_tasks' | 'due_tasks' | 'birthdays' | 'kpi' | 'task_am' | 'task_project' | 'eval' | 'fin_project' | 'fin_category';
 
 const DEFAULT_ORDER: WidgetType[] = [
-    'kpi', // KPI moved to top
-    'sales', 'cost', 'profit', 'revenue',
-    'my_tasks', 'due_tasks', 'birthdays',
-    'task_am', 'task_project', 'eval',
+    // 1. Chỉ tiêu điều hành (KPI)
+    'kpi', 
+    // 2. Việc cần làm (My Tasks) & Sinh nhật
+    'my_tasks', 'birthdays', 'due_tasks',
+    // 3. Doanh thu, doanh số, chi phí, lợi nhuận (Finance)
+    'sales', 'revenue', 'cost', 'profit', 
+    // 4. Đánh giá nhân viên
+    'eval',
+    // 5. Nhiệm vụ nhân viên, nhiệm vụ dự án
+    'task_am', 'task_project',
+    // 6. Others
     'fin_project', 'fin_category'
 ];
 
@@ -384,6 +391,9 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, projects, contracts,
           case 'my_tasks': return 'col-span-1 md:col-span-2 lg:col-span-2';
           case 'due_tasks': return 'col-span-1 md:col-span-2 lg:col-span-1';
           case 'birthdays': return 'col-span-1 md:col-span-2 lg:col-span-1';
+          case 'eval': return 'col-span-1 md:col-span-2 lg:col-span-4'; // Eval full width or 2/3
+          case 'task_am': return 'col-span-1 md:col-span-2';
+          case 'task_project': return 'col-span-1 md:col-span-2';
           default: return 'col-span-1';
       }
   };

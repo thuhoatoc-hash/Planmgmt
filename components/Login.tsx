@@ -121,7 +121,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         <div className="flex flex-col items-center mb-8 mt-2">
           <div className="p-4 mb-2">
             <img 
-               src="https://viettel.com.vn/static/images/logo-header.0ce71c2fd94a.png" 
+               src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Viettel_logo_2021.svg/1200px-Viettel_logo_2021.svg.png" 
                alt="Viettel Logo" 
                className="h-16 object-contain"
             />
