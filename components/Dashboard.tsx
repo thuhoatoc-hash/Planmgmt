@@ -120,7 +120,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, projects, contracts,
       // Optional: Set a drag image if needed
   };
 
-  const onDragOver = (e: React.DragEvent, index: number) => {
+  const onDragOver = (e: React.DragEvent) => {
       e.preventDefault(); // Necessary to allow dropping
   };
 
@@ -526,6 +526,11 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, projects, contracts,
                                           <div className="text-xs text-slate-500 truncate">{evt.title}</div>
                                       </div>
                                   </div>
+                                  {evt.phoneNumber && (
+                                      <a href={`tel:${evt.phoneNumber}`} className="text-pink-400 hover:text-pink-600 p-1" onClick={(e) => e.stopPropagation()}>
+                                          <Phone className="w-4 h-4" />
+                                      </a>
+                                  )}
                               </div>
                           ))}
                       </div>
@@ -842,7 +847,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, projects, contracts,
                     className={`${getWidgetSpan(id)} relative transition-all duration-200 ${isDragMode ? 'cursor-move ring-2 ring-dashed ring-indigo-300 rounded-xl hover:bg-slate-50' : ''} ${draggedItem === index ? 'opacity-40 scale-95' : ''}`}
                     draggable={isDragMode}
                     onDragStart={(e) => onDragStart(e, index)}
-                    onDragOver={(e) => onDragOver(e, index)}
+                    onDragOver={(e) => onDragOver(e)}
                     onDrop={(e) => onDrop(e, index)}
                   >
                       {isDragMode && (
