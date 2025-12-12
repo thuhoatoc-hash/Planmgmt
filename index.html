@@ -1,9 +1,8 @@
-
 <!DOCTYPE html>
 <html lang="vi">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="theme-color" content="#EE0033" />
     <meta name="description" content="Hệ thống quản lý phương án kinh doanh dự án Viettel Hà Nội">
     
@@ -12,60 +11,29 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="PM Viettel">
     
-    <!-- Android support -->
-    <meta name="mobile-web-app-capable" content="yes">
-    
     <title>PM Quản lý dự án kinh doanh - Viettel Hà Nội</title>
     
-    <!-- PWA Manifest (Updated to relative path) -->
-    <link rel="manifest" href="manifest.json" />
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
     <link rel="apple-touch-icon" href="https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Viettel_logo_2021.svg/192px-Viettel_logo_2021.svg.png">
 
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-      /* Disable pull-to-refresh and elastic scrolling for native feel */
-      body { 
-        font-family: 'Inter', sans-serif; 
-        background-color: #f8fafc; 
-        overscroll-behavior-y: none; 
-        user-select: none; /* Prevent text selection like an app */
-        -webkit-tap-highlight-color: transparent;
-      }
-      /* Allow text selection in inputs */
-      input, textarea {
-        user-select: text;
-      }
-      /* Custom Scrollbar for Chat */
-      .chat-scroll::-webkit-scrollbar {
-        width: 6px;
-      }
-      .chat-scroll::-webkit-scrollbar-track {
-        background: #f1f5f9;
-      }
-      .chat-scroll::-webkit-scrollbar-thumb {
-        background: #cbd5e1;
-        border-radius: 3px;
-      }
-      .chat-scroll::-webkit-scrollbar-thumb:hover {
-        background: #94a3b8;
-      }
+      body { font-family: 'Inter', sans-serif; background-color: #f8fafc; overscroll-behavior-y: none; }
     </style>
-<script type="importmap">
+  <script type="importmap">
 {
   "imports": {
-    "@capacitor/cli": "https://esm.sh/@capacitor/cli@^8.0.0",
-    "react/": "https://esm.sh/react@^19.2.2/",
-    "react": "https://esm.sh/react@^19.2.2",
-    "lucide-react": "https://esm.sh/lucide-react@^0.560.0",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.2/",
-    "vite": "https://esm.sh/vite@^7.2.7",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
-    "recharts": "https://esm.sh/recharts@^3.5.1",
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.87.1",
-    "@google/genai": "https://esm.sh/@google/genai@0.1.1",
-    "react-markdown": "https://esm.sh/react-markdown@9.0.1"
+    "vite": "https://aistudiocdn.com/vite@^7.2.7",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.556.0",
+    "react/": "https://aistudiocdn.com/react@^19.2.1/",
+    "react": "https://aistudiocdn.com/react@^19.2.1",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.2",
+    "recharts": "https://aistudiocdn.com/recharts@^3.5.1",
+    "@supabase/supabase-js": "https://aistudiocdn.com/@supabase/supabase-js@^2.87.1"
   }
 }
 </script>
@@ -79,9 +47,9 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./sw.js')
+          navigator.serviceWorker.register('/sw.js')
             .then((registration) => {
-              console.log('SW registered with scope:', registration.scope);
+              console.log('SW registered:', registration);
             })
             .catch((error) => {
               console.log('SW registration failed:', error);

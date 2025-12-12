@@ -1,64 +1,17 @@
 
 export enum UserRole {
   ADMIN = 'ADMIN',
-  USER = 'USER', // General User (fallback)
-  AM = 'AM',     // Nhân viên Kinh doanh
-  PM = 'PM',     // Tư vấn Giải pháp
-}
-
-// --- NEW PERMISSION TYPES ---
-export type ResourceType = 'PROJECTS' | 'CONTRACTS' | 'TASKS' | 'KPI' | 'EVALUATION' | 'EVENTS' | 'USERS' | 'CONFIG' | 'REPORTS' | 'NOTIFICATIONS';
-export type ActionType = 'view' | 'edit' | 'delete';
-
-export interface Permission {
-    view: boolean;
-    edit: boolean;
-    delete: boolean;
-}
-
-export interface Role {
-    id: string;
-    name: string;
-    description?: string;
-    permissions: Record<string, Permission>; // Key is ResourceType
-}
-
-// --- NEW CUSTOM FIELD TYPES ---
-export type FieldType = 'text' | 'number' | 'date' | 'select' | 'image';
-
-export interface UserFieldDefinition {
-    id: string;
-    key: string; // e.g. "gender"
-    label: string; // e.g. "Giới tính"
-    type: FieldType;
-    options?: string; // Comma separated for select
-    required?: boolean;
-    order?: number;
+  USER = 'USER',
 }
 
 export interface User {
   id: string;
   username: string;
   fullName: string;
-  role: UserRole; // Legacy role enum (kept for fallback)
-  roleId?: string; // New Dynamic Role ID
+  role: UserRole;
   password?: string;
   phoneNumber?: string;
-  email?: string;
   avatarUrl?: string;
-  extendedInfo?: Record<string, any>; // Stores values for custom fields
-}
-
-// --- ACTIVITY LOG TYPES ---
-export interface ActivityLog {
-    id: string;
-    userId: string;
-    userName: string;
-    action: string; // 'LOGIN', 'CREATE_PROJECT', etc.
-    target: string; // Object being acted upon
-    timestamp: string;
-    device: string;
-    details?: string;
 }
 
 export enum CategoryType {
@@ -81,17 +34,11 @@ export interface ProjectStatusItem {
   order: number;
 }
 
-export enum PartnerType {
-  CUSTOMER = 'CUSTOMER', // Khách hàng (Đầu ra)
-  SUPPLIER = 'SUPPLIER'  // Đối tác/Nhà thầu (Đầu vào)
-}
-
 export interface Partner {
   id: string;
   name: string;
   code: string;
   contactInfo: string;
-  type: PartnerType; 
 }
 
 export enum ProjectType {
@@ -103,34 +50,6 @@ export enum ProductType {
   HARDWARE = 'HARDWARE', // Phần cứng
   INTERNAL_SOFTWARE = 'INTERNAL_SOFTWARE', // Phần mềm nội bộ
   HYBRID = 'HYBRID', // Hỗn hợp
-}
-
-// --- Customer Obligation Types ---
-export enum ObligationStatus {
-  NO_SOURCE = 'NO_SOURCE',         // Chưa có nguồn
-  SOURCE_RECEIVED = 'SOURCE_RECEIVED', // Nguồn đã về
-  PAID = 'PAID',                   // Đã chi
-  NOT_PAID = 'NOT_PAID',           // Không chi
-}
-
-export enum FundingSourceStatus {
-  RECEIVED = 'RECEIVED', // Đã về
-  PENDING = 'PENDING',   // Chưa về
-}
-
-export interface FundingSource {
-  id: string;
-  name: string; // Tên nguồn (VD: Từ đối tác A)
-  value: number; // Số tiền
-  status: FundingSourceStatus;
-}
-
-export interface CustomerObligation {
-  percentage: number; // Tỷ lệ % / Doanh thu
-  value: number;      // Giá trị tiền
-  status: ObligationStatus; // Hiện trạng
-  deadline?: string; // Thời gian thực hiện (YYYY-MM-DD)
-  sources: FundingSource[]; // Danh sách nguồn tiền
 }
 
 export interface Project {
@@ -149,7 +68,6 @@ export interface Project {
   amId?: string;
   pmId?: string;
   partnerId?: string;
-  customerObligation?: CustomerObligation; 
 }
 
 export enum ContractType {
@@ -170,7 +88,6 @@ export interface ContractInstallment {
   value: number;      // Giá trị
   status: InstallmentStatus;
   date: string;       // Ngày dự kiến hoặc thực tế
-  revenueMonth?: string; // UPDATE: Tháng ghi nhận doanh thu (YYYY-MM)
   note?: string;
 }
 
@@ -197,112 +114,45 @@ export interface Contract {
 }
 
 export enum TaskStatus {
-  NOT_STARTED = 'NOT_STARTED', // Chưa bắt đầu
-  IN_PROGRESS = 'IN_PROGRESS', // Đang thực hiện
-  COMPLETED = 'COMPLETED',     // Hoàn thành
-  EXTENSION_REQUESTED = 'EXTENSION_REQUESTED', // Đề xuất gia hạn
-  CANCELLED = 'CANCELLED'      // Hủy
-}
-
-export enum TaskType {
-  PROJECT = 'PROJECT', // Nhiệm vụ thuộc dự án
-  ADHOC = 'ADHOC',     // Giao việc / Sự vụ
+  NEW = 'NEW',
+  IN_PROGRESS = 'IN_PROGRESS',
+  COMPLETED = 'COMPLETED',
+  LATE = 'LATE'
 }
 
 export interface Task {
     id: string;
-    projectId?: string; // Optional: only if type is PROJECT
-    taskType: TaskType;
+    projectId: string;
     name: string;
-    description?: string; // Nội dung, mô tả
-    outputStandard?: string; // Kết quả đầu ra
-    assignerId: string; // Người giao
-    assigneeId: string; // Người chủ trì
-    collaboratorIds?: string[]; // Người phối
+    assigneeId: string;
     status: TaskStatus;
     deadline: string;
+}
+
+// --- KPI Types ---
+
+export interface KPIItem {
+  id: string;
+  name: string;
+  unit: string; // Đơn vị tính (Tr.đồng, %, DA...)
+  target: number; // Mục tiêu
+  weight: number; // Tỷ trọng (%)
+  actual: number; // Kết quả thực hiện
 }
 
 export interface KPIGroup {
   id: string;
   name: string;
-  unit: string;
-  weight: number; // Tỷ trọng nhóm
-  autoCalculate?: boolean; // Tự động cộng tổng từ items
-  target?: number; // Mục tiêu nhóm (nếu không auto)
-  actual?: number; // Thực hiện nhóm (nếu không auto)
+  unit?: string;
+  target?: number; // Optional: for groups that act as summary rows
+  weight?: number; // Optional: for groups that have a weight
+  actual?: number; // Optional: calculated actual for group
+  autoCalculate?: boolean; // If true, target/actual is sum of children
   items: KPIItem[];
-}
-
-export interface KPIItem {
-  id: string;
-  name: string;
-  unit: string;
-  target: number;
-  weight: number; // Tỷ trọng trong nhóm
-  actual: number;
 }
 
 export interface KPIMonthlyData {
   id: string;
   month: string; // YYYY-MM
   groups: KPIGroup[];
-}
-
-export interface KICriterium {
-    id: string;
-    name: string;
-    unit: string;
-    weight: number;
-    target: number;
-    actual: number;
-    score: number;
-}
-
-export interface EmployeeEvaluation {
-    id: string;
-    userId: string;
-    month: string; // YYYY-MM
-    role: string; // AM or PM
-    criteria: KICriterium[];
-    totalScore: number;
-    grade: string; // A, B, C...
-    note?: string;
-}
-
-export enum EventType {
-  INTERNAL = 'INTERNAL', // Nội bộ
-  CUSTOMER = 'CUSTOMER'  // Khách hàng
-}
-
-export interface BirthdayEvent {
-    id: string;
-    fullName: string;
-    title: string;
-    date: string; // YYYY-MM-DD
-    phoneNumber?: string;
-    type?: EventType;
-}
-
-export interface BannerConfig {
-    images: string[];
-    interval: number;
-    enabled?: boolean;
-}
-
-// --- NOTIFICATION TYPES ---
-export enum NotificationPriority {
-    URGENT = 'URGENT',     // Khẩn
-    IMPORTANT = 'IMPORTANT', // Quan trọng
-    NORMAL = 'NORMAL'      // Bình thường
-}
-
-export interface Notification {
-    id: string;
-    title: string;
-    content: string;
-    priority: NotificationPriority;
-    createdAt: string; // ISO Date
-    authorId: string; // User ID
-    isRead?: boolean; // Local state for user
 }

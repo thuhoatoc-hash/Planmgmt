@@ -1,24 +1,22 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import Layout from './components/Layout';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import ProjectList from './components/ProjectList';
 import ProjectDetail from './components/ProjectDetail';
+import CategoryManager from './components/CategoryManager';
+import UserManager from './components/UserManager';
+import PartnerManager from './components/PartnerManager';
 import ConfigurationManager from './components/ConfigurationManager';
 import UserProfile from './components/UserProfile';
 import Reports from './components/Reports';
 import KPIManagement from './components/KPIManagement';
-import EmployeeEvaluationManager from './components/EmployeeEvaluation';
-import TaskManagement from './components/TaskManagement';
-import EventManager from './components/EventManager';
-import NotificationManager from './components/NotificationManager';
-import { User, Project, Contract, Category, Partner, ProjectStatusItem, Task, KPIMonthlyData, EmployeeEvaluation, TaskStatus, BirthdayEvent, Role, UserRole, ResourceType, Notification } from './types';
+import { User, Project, Contract, Category, Partner, ProjectStatusItem, Task, KPIMonthlyData } from './types';
 import { api } from './services/api';
 import { Loader2 } from 'lucide-react';
 
-const SHORT_SESSION = 60 * 60 * 1000; // 60 minutes
-const LONG_SESSION = 7 * 24 * 60 * 60 * 1000; // 7 days
+const SESSION_DURATION = 60 * 60 * 1000; // 60 minutes in ms
 
 const App: React.FC = () => {
   // Global State with Persistence for Session
@@ -26,18 +24,13 @@ const App: React.FC = () => {
     try {
       const savedUser = localStorage.getItem('currentUser');
       const loginTime = localStorage.getItem('loginTime');
-      const rememberMe = localStorage.getItem('rememberMe') === 'true';
-      
       if (savedUser && loginTime) {
         const now = Date.now();
-        const duration = rememberMe ? LONG_SESSION : SHORT_SESSION;
-        
-        if (now - parseInt(loginTime) < duration) {
+        if (now - parseInt(loginTime) < SESSION_DURATION) {
           return JSON.parse(savedUser);
         } else {
           localStorage.removeItem('currentUser');
           localStorage.removeItem('loginTime');
-          localStorage.removeItem('rememberMe');
         }
       }
     } catch (e) {
@@ -59,21 +52,16 @@ const App: React.FC = () => {
   const [statuses, setStatuses] = useState<ProjectStatusItem[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [kpiData, setKpiData] = useState<KPIMonthlyData[]>([]);
-  const [evaluations, setEvaluations] = useState<EmployeeEvaluation[]>([]);
-  const [events, setEvents] = useState<BirthdayEvent[]>([]);
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
 
   // View State
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
-  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
 
   // --- FETCH DATA FROM SUPABASE ---
   const fetchAllData = async () => {
     setIsAppLoading(true);
     try {
         const [
-            pData, cData, catData, uData, partData, sData, tData, kData, eData, evtData, roleData, notifData
+            pData, cData, catData, uData, partData, sData, tData, kData
         ] = await Promise.all([
             api.projects.getAll(),
             api.contracts.getAll(),
@@ -82,11 +70,7 @@ const App: React.FC = () => {
             api.partners.getAll(),
             api.statuses.getAll(),
             api.tasks.getAll(),
-            api.kpi.getAll(),
-            api.evaluations.getAll(),
-            api.events.getAll(),
-            api.roles.getAll(),
-            api.notifications.getAll()
+            api.kpi.getAll()
         ]);
 
         setProjects(pData);
@@ -97,45 +81,11 @@ const App: React.FC = () => {
         setStatuses(sData.sort((a,b) => a.order - b.order));
         setTasks(tData);
         setKpiData(kData);
-        setEvaluations(eData);
-        setEvents(evtData);
-        setRoles(roleData);
-        setNotifications(notifData);
-
-        // Check for task reminders after loading
-        checkTaskReminders(tData, uData);
     } catch (error) {
         console.error("Failed to fetch initial data", error);
     } finally {
         setIsAppLoading(false);
     }
-  };
-
-  const checkTaskReminders = (tasksToCheck: Task[], usersList: User[]) => {
-      // Simulate Backend Email Cron Job
-      const today = new Date();
-      today.setHours(0,0,0,0);
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-
-      const dueTomorrow = tasksToCheck.filter(t => {
-          if (t.status === TaskStatus.COMPLETED || t.status === TaskStatus.CANCELLED) return false;
-          const deadline = new Date(t.deadline);
-          deadline.setHours(0,0,0,0);
-          return deadline.getTime() === tomorrow.getTime();
-      });
-
-      if (dueTomorrow.length > 0) {
-          console.group('📧 EMAIL REMINDER SYSTEM SIMULATION');
-          console.log(`Found ${dueTomorrow.length} tasks due tomorrow (${tomorrow.toLocaleDateString()}). Sending reminders...`);
-          dueTomorrow.forEach(task => {
-              const assignee = usersList.find(u => u.id === task.assigneeId);
-              if (assignee) {
-                  console.log(`-> Sending email to ${assignee.email || assignee.username} for task "${task.name}"`);
-              }
-          });
-          console.groupEnd();
-      }
   };
 
   useEffect(() => {
@@ -149,56 +99,16 @@ const App: React.FC = () => {
     setUser(u);
     localStorage.setItem('currentUser', JSON.stringify(u));
     localStorage.setItem('loginTime', Date.now().toString());
-    // rememberMe is handled inside Login.tsx component before calling onLogin
   };
 
   const handleLogout = () => {
     setUser(null);
     localStorage.removeItem('currentUser');
     localStorage.removeItem('loginTime');
-    localStorage.removeItem('rememberMe');
     // Clear data
     setProjects([]);
     setContracts([]);
   };
-
-  // Helper to check permission
-  const checkPermission = (resource: ResourceType, action: 'view' | 'edit' | 'delete' = 'view') => {
-      if (!user) return false;
-      if (user.role === UserRole.ADMIN) return true; // Super Admin bypass
-      if (!user.roleId) return true; // Legacy user fallback (optional)
-      
-      const userRole = roles.find(r => r.id === user.roleId);
-      return userRole?.permissions?.[resource]?.[action] || false;
-  };
-
-  // --- PREPARE DATA CONTEXT FOR AI ---
-  const contextData = useMemo(() => {
-      if (!user) return null;
-      return {
-          currentUser: { name: user.fullName, role: user.role },
-          stats: {
-              totalProjects: projects.length,
-              totalContracts: contracts.length,
-              totalTasks: tasks.length
-          },
-          projects: projects.map(p => ({
-              code: p.code,
-              name: p.name,
-              status: statuses.find(s => s.id === p.statusId)?.name,
-              am: users.find(u => u.id === p.amId)?.fullName,
-              pm: users.find(u => u.id === p.pmId)?.fullName,
-              revenue: p.plannedRevenue,
-              cost: p.plannedCost
-          })),
-          recentNotifications: notifications.slice(0, 3).map(n => ({ title: n.title, content: n.content })),
-          tasksDueSoon: tasks.filter(t => t.status !== TaskStatus.COMPLETED && t.status !== TaskStatus.CANCELLED).map(t => ({
-              name: t.name,
-              deadline: t.deadline,
-              assignee: users.find(u => u.id === t.assigneeId)?.fullName
-          }))
-      };
-  }, [user, projects, contracts, tasks, statuses, users, notifications]);
 
   if (!user) {
     return <Login onLogin={handleLogin} />;
@@ -267,23 +177,13 @@ const App: React.FC = () => {
 
   // User Handlers
   const handleAddUser = async (u: User) => {
-      try {
-          const saved = await api.users.save(u);
-          if (saved) {
-              setUsers(prevUsers => [...prevUsers, saved]);
-          } else {
-              console.warn("User insert returned null, falling back to local state.");
-              setUsers(prevUsers => [...prevUsers, u]);
-          }
-      } catch (error) {
-          console.error("Add user failed:", error);
-          setUsers(prevUsers => [...prevUsers, u]);
-      }
+      const saved = await api.users.save(u);
+      if (saved) setUsers([...users, saved]);
   };
   const handleUpdateUser = async (u: User) => {
       const saved = await api.users.save(u);
       if (saved) {
-          setUsers(prevUsers => prevUsers.map(existing => existing.id === saved.id ? saved : existing));
+          setUsers(users.map(existing => existing.id === saved.id ? saved : existing));
           if (user.id === saved.id) {
               setUser(saved);
               localStorage.setItem('currentUser', JSON.stringify(saved));
@@ -350,46 +250,11 @@ const App: React.FC = () => {
       }
   };
 
-  // Event Handlers
-  const handleAddEvent = async (e: BirthdayEvent) => {
-      const saved = await api.events.save(e);
-      if (saved) setEvents([...events, saved]);
-  };
-  const handleUpdateEvent = async (e: BirthdayEvent) => {
-      const saved = await api.events.save(e);
-      if (saved) setEvents(events.map(existing => existing.id === saved.id ? saved : existing));
-  };
-  const handleDeleteEvent = async (id: string) => {
-      const success = await api.events.delete(id);
-      if (success) setEvents(events.filter(e => e.id !== id));
-  };
-
-  // Notification Handlers
-  const handleAddNotification = async (n: Notification) => {
-      const saved = await api.notifications.save(n);
-      if (saved) setNotifications([...notifications, saved]);
-  };
-  const handleUpdateNotification = async (n: Notification) => {
-      const saved = await api.notifications.save(n);
-      if (saved) setNotifications(notifications.map(existing => existing.id === saved.id ? saved : existing));
-  };
-  const handleDeleteNotification = async (id: string) => {
-      const success = await api.notifications.delete(id);
-      if (success) setNotifications(notifications.filter(n => n.id !== id));
-  };
-
   // Navigation Logic
-  const handleNavigate = (path: string, id?: string) => {
+  const handleNavigate = (path: string) => {
     setCurrentPath(path);
     if (path !== 'projects') {
       setSelectedProject(null);
-    }
-    
-    // Handle Event Selection
-    if (path === 'events' && id) {
-        setSelectedEventId(id);
-    } else {
-        setSelectedEventId(null);
     }
   };
 
@@ -420,62 +285,18 @@ const App: React.FC = () => {
       );
     }
 
-    // Permission Guard for Routes
-    if (currentPath === 'kpi' && !checkPermission('KPI')) return <div className="p-8 text-center text-slate-500">Bạn không có quyền truy cập module này.</div>;
-    if (currentPath === 'evaluation' && !checkPermission('EVALUATION')) return <div className="p-8 text-center text-slate-500">Bạn không có quyền truy cập module này.</div>;
-    if (currentPath === 'reports' && !checkPermission('REPORTS')) return <div className="p-8 text-center text-slate-500">Bạn không có quyền truy cập module này.</div>;
-    if (currentPath === 'settings' && !checkPermission('CONFIG')) return <div className="p-8 text-center text-slate-500">Bạn không có quyền truy cập module này.</div>;
-    if (currentPath === 'tasks' && !checkPermission('TASKS')) return <div className="p-8 text-center text-slate-500">Bạn không có quyền truy cập module này.</div>;
-    if (currentPath === 'events' && !checkPermission('EVENTS')) return <div className="p-8 text-center text-slate-500">Bạn không có quyền truy cập module này.</div>;
-    if (currentPath === 'notifications' && !checkPermission('NOTIFICATIONS')) return <div className="p-8 text-center text-slate-500">Bạn không có quyền truy cập module này.</div>;
-
     switch (currentPath) {
       case 'dashboard':
         return <Dashboard 
-                  currentUser={user}
                   projects={projects} 
                   contracts={contracts} 
                   categories={categories} 
                   kpiData={kpiData} 
                   tasks={tasks}
                   users={users}
-                  evaluations={evaluations}
-                  events={events}
-                  notifications={notifications}
-                  roles={roles} // Pass roles to Dashboard for widget permission check
-                  onNavigate={handleNavigate} // Pass handleNavigate here
                />;
       case 'kpi':
         return <KPIManagement kpiData={kpiData} onUpdateKPI={handleUpdateKPI} user={user} />;
-      case 'evaluation':
-        return <EmployeeEvaluationManager users={users} currentUser={user} />;
-      case 'tasks':
-        return <TaskManagement 
-                  tasks={tasks}
-                  projects={projects}
-                  users={users}
-                  currentUser={user}
-                  onAddTask={handleAddTask}
-                  onUpdateTask={handleUpdateTask}
-                  onDeleteTask={handleDeleteTask}
-               />;
-      case 'events':
-        return <EventManager 
-                  events={events}
-                  initialSelectedId={selectedEventId}
-                  onClearSelection={() => setSelectedEventId(null)}
-                  onAddEvent={handleAddEvent}
-                  onUpdateEvent={handleUpdateEvent}
-                  onDeleteEvent={handleDeleteEvent}
-               />;
-      case 'notifications':
-        return <NotificationManager 
-                  notifications={notifications}
-                  currentUser={user}
-                  onAdd={handleAddNotification}
-                  onUpdate={handleUpdateNotification}
-                  onDelete={handleDeleteNotification}
-               />;
       case 'reports':
         return <Reports projects={projects} contracts={contracts} categories={categories} users={users} />;
       case 'projects':
@@ -490,28 +311,14 @@ const App: React.FC = () => {
                   onDeleteProject={handleDeleteProject}
                   onSelectProject={setSelectedProject} 
                />;
-      // Consolidated Settings Route
+      case 'categories':
+        return <CategoryManager categories={categories} onAddCategory={handleAddCategory} onDeleteCategory={handleDeleteCategory} />;
+      case 'users':
+        return <UserManager users={users} onAddUser={handleAddUser} onUpdateUser={handleUpdateUser} onDeleteUser={handleDeleteUser} />;
+      case 'partners':
+        return <PartnerManager partners={partners} onAdd={handleAddPartner} onUpdate={handleUpdatePartner} onDelete={handleDeletePartner} />;
       case 'settings':
-        return <ConfigurationManager 
-                  currentUser={user}
-                  statuses={statuses}
-                  users={users}
-                  partners={partners}
-                  categories={categories}
-                  projects={projects}
-                  contracts={contracts}
-                  onAddStatus={handleAddStatus}
-                  onUpdateStatus={handleUpdateStatus}
-                  onDeleteStatus={handleDeleteStatus}
-                  onAddUser={handleAddUser}
-                  onUpdateUser={handleUpdateUser}
-                  onDeleteUser={handleDeleteUser}
-                  onAddPartner={handleAddPartner}
-                  onUpdatePartner={handleUpdatePartner}
-                  onDeletePartner={handleDeletePartner}
-                  onAddCategory={handleAddCategory}
-                  onDeleteCategory={handleDeleteCategory}
-               />;
+        return <ConfigurationManager statuses={statuses} onAddStatus={handleAddStatus} onUpdateStatus={handleUpdateStatus} onDeleteStatus={handleDeleteStatus} />;
       default:
         return <div>Not found</div>;
     }
@@ -524,8 +331,6 @@ const App: React.FC = () => {
       currentPath={currentPath} 
       onNavigate={handleNavigate}
       onOpenProfile={() => setIsProfileOpen(true)}
-      roles={roles} // Pass roles to Layout
-      contextData={contextData} // Pass Gemini Data Context
     >
       {renderContent()}
       {isProfileOpen && (

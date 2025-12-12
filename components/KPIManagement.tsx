@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { KPIMonthlyData, KPIGroup, KPIItem, UserRole, User } from '../types';
-import { TrendingUp, AlertCircle, CheckCircle, Lock, Unlock, Plus, Trash2, PlusCircle, Copy, CheckSquare, Square, BarChart3, List, FileBarChart, Bell } from 'lucide-react';
+import { Calendar, TrendingUp, AlertCircle, CheckCircle, Lock, Unlock, Plus, Trash2, PlusCircle, Copy, CheckSquare, Square, BarChart3 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 interface KPIManagementProps {
@@ -32,10 +32,7 @@ interface CalculatedData {
 }
 
 const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, user }) => {
-  const [activeTab, setActiveTab] = useState<'MONTHLY' | 'REPORT'>('MONTHLY');
   const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().slice(0, 7));
-  const [reportStartMonth, setReportStartMonth] = useState<string>(new Date().toISOString().slice(0, 7));
-  const [reportEndMonth, setReportEndMonth] = useState<string>(new Date().toISOString().slice(0, 7));
   const [isEditMode, setIsEditMode] = useState(false);
   const [showTrend, setShowTrend] = useState(true);
 
@@ -45,84 +42,7 @@ const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, use
     return kpiData.find(d => d.month === selectedMonth) || null;
   }, [kpiData, selectedMonth]);
 
-  // --- REPORT AGGREGATION LOGIC ---
-  const reportData = useMemo(() => {
-    if (activeTab !== 'REPORT') return null;
-    
-    // Filter data in range
-    const rangeData = kpiData.filter(d => d.month >= reportStartMonth && d.month <= reportEndMonth);
-    
-    if (rangeData.length === 0) return null;
-
-    // Structure: Group Name -> { Group Totals, Items Map }
-    const aggregation: Record<string, { 
-        name: string, 
-        unit: string,
-        groupTarget: number,
-        groupActual: number,
-        items: Record<string, { name: string, unit: string, target: number, actual: number, count: number }> 
-    }> = {};
-
-    rangeData.forEach(monthData => {
-        monthData.groups.forEach(group => {
-            if (!aggregation[group.name]) {
-                aggregation[group.name] = { 
-                    name: group.name, 
-                    unit: group.unit || '',
-                    groupTarget: 0,
-                    groupActual: 0,
-                    items: {} 
-                };
-            }
-            
-            // Calculate Monthly Group Totals
-            let monthGroupTarget = group.target || 0;
-            let monthGroupActual = group.actual || 0;
-
-            // Recalculate sums if autoCalculate is true (to ensure accuracy)
-            if (group.autoCalculate) {
-                monthGroupTarget = group.items.reduce((s, i) => s + (i.target || 0), 0);
-                monthGroupActual = group.items.reduce((s, i) => s + (i.actual || 0), 0);
-            }
-
-            aggregation[group.name].groupTarget += monthGroupTarget;
-            aggregation[group.name].groupActual += monthGroupActual;
-            // Update unit if found later
-            if (group.unit) aggregation[group.name].unit = group.unit;
-            
-            group.items.forEach(item => {
-                // Key by name to aggregate across months
-                if (!aggregation[group.name].items[item.name]) {
-                    aggregation[group.name].items[item.name] = { 
-                        name: item.name, 
-                        unit: item.unit, 
-                        target: 0, 
-                        actual: 0,
-                        count: 0
-                    };
-                }
-                aggregation[group.name].items[item.name].target += (item.target || 0);
-                aggregation[group.name].items[item.name].actual += (item.actual || 0);
-                aggregation[group.name].items[item.name].count += 1;
-            });
-        });
-    });
-
-    return Object.values(aggregation).map(group => ({
-        name: group.name,
-        unit: group.unit,
-        target: group.groupTarget,
-        actual: group.groupActual,
-        percent: group.groupTarget > 0 ? (group.groupActual / group.groupTarget) * 100 : 0,
-        items: Object.values(group.items).map(item => ({
-            ...item,
-            percent: item.target > 0 ? (item.actual / item.target) * 100 : 0
-        }))
-    }));
-
-  }, [kpiData, reportStartMonth, reportEndMonth, activeTab]);
-
-  // --- CALCULATION HELPER ---
+  // --- CALCULATION HELPER (Used for both Trend and Detail view) ---
   const calculateScoreForMonth = (data: KPIMonthlyData) => {
       let totalScore = 0;
       data.groups.forEach(group => {
@@ -134,16 +54,18 @@ const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, use
               groupActual = group.items.reduce((sum, item) => sum + (item.actual || 0), 0);
           }
 
+          // Group Level Score
           if (group.weight && group.weight > 0) {
               const groupPercent = groupTarget > 0 ? (groupActual / groupTarget) * 100 : 0;
-              const cappedPercent = Math.min(groupPercent, 120);
+              const cappedPercent = Math.min(groupPercent, 120); // Cap at 120%
               totalScore += (cappedPercent * group.weight) / 100;
           }
 
+          // Item Level Score
           group.items.forEach(item => {
               const percent = item.target > 0 ? (item.actual / item.target) * 100 : 0;
               if (item.weight && item.weight > 0) {
-                  const cappedPercent = Math.min(percent, 120);
+                  const cappedPercent = Math.min(percent, 120); // Cap at 120%
                   totalScore += (cappedPercent * item.weight) / 100;
               }
           });
@@ -151,13 +73,15 @@ const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, use
       return totalScore;
   };
 
+  // --- TREND DATA ---
   const trendData = useMemo(() => {
       return kpiData.map(d => ({
           month: d.month,
           score: calculateScoreForMonth(d)
-      })).sort((a, b) => a.month.localeCompare(b.month));
+      })).sort((a, b) => a.month.localeCompare(b.month)); // Sort chronological
   }, [kpiData]);
 
+  // --- DETAIL DATA FOR SELECTED MONTH ---
   const calculatedData: CalculatedData | null = useMemo(() => {
     if (!currentData) return null;
 
@@ -214,29 +138,6 @@ const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, use
     return { groups: processedGroups, totalScore: grandTotalScore, completed: completedCount, total: totalItemsCount };
   }, [currentData]);
 
-  // --- AT RISK ITEMS MEMO ---
-  const atRiskItems = useMemo(() => {
-      if (!calculatedData) return [];
-      const riskList: { groupName: string; name: string; target: number; actual: number; percent: number }[] = [];
-      
-      calculatedData.groups.forEach(g => {
-          g.items.forEach(i => {
-              // Consider item at risk if it has a target, weight, and completion is less than 100%
-              if (i.target > 0 && i.weight > 0 && i.percent < 100) {
-                  riskList.push({
-                      groupName: g.name,
-                      name: i.name,
-                      target: i.target,
-                      actual: i.actual,
-                      percent: i.percent
-                  });
-              }
-          });
-      });
-      // Sort by lowest percentage first
-      return riskList.sort((a,b) => a.percent - b.percent);
-  }, [calculatedData]);
-
   const handleInitMonth = () => {
       const sortedMonths = [...kpiData].sort((a,b) => b.month.localeCompare(a.month));
       const latest = sortedMonths[0];
@@ -244,6 +145,7 @@ const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, use
       let newGroups: KPIGroup[] = [];
       
       if (latest) {
+          // Deep copy groups to avoid reference issues, reset actuals
           newGroups = latest.groups.map(g => ({
               ...g,
               actual: 0,
@@ -268,6 +170,7 @@ const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, use
       onUpdateKPI(newData); 
   };
 
+  // --- CRUD HANDLERS (Same as before) ---
   const handleUpdateGroup = (groupId: string, field: keyof KPIGroup, value: any) => {
       if (!currentData) return;
       const newGroups = currentData.groups.map(g => 
@@ -335,6 +238,37 @@ const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, use
 
   const formatNumber = (num: number) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(num);
 
+  if (!currentData) {
+      return (
+          <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h1 className="text-2xl font-bold text-slate-800">Điều hành chỉ tiêu Kinh doanh</h1>
+                 <div className="flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-slate-500" />
+                    <input 
+                        type="month" 
+                        className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#EE0033] outline-none"
+                        value={selectedMonth}
+                        onChange={(e) => setSelectedMonth(e.target.value)}
+                    />
+                </div>
+              </div>
+              <div className="p-12 flex flex-col items-center justify-center bg-white rounded-xl border border-dashed border-slate-300 text-slate-500 gap-4">
+                  <p>Chưa có dữ liệu chỉ tiêu cho tháng {selectedMonth}</p>
+                  {isAdmin && (
+                      <button 
+                        onClick={handleInitMonth}
+                        className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
+                      >
+                          <Copy className="w-4 h-4" />
+                          Khởi tạo dữ liệu (Copy tháng trước)
+                      </button>
+                  )}
+              </div>
+          </div>
+      );
+  }
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-20">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -343,25 +277,6 @@ const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, use
            <p className="text-slate-500">Quản lý và theo dõi kết quả thực hiện KPI</p>
         </div>
         
-        <div className="flex items-center bg-slate-100 p-1 rounded-lg">
-             <button
-                onClick={() => setActiveTab('MONTHLY')}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${activeTab === 'MONTHLY' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-             >
-                <List className="w-4 h-4" /> Chi tiết tháng
-             </button>
-             <button
-                onClick={() => setActiveTab('REPORT')}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${activeTab === 'REPORT' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-             >
-                <FileBarChart className="w-4 h-4" /> Báo cáo Tổng hợp
-             </button>
-        </div>
-      </div>
-
-      {activeTab === 'MONTHLY' && (
-      <>
-      <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
         <div className="flex items-center gap-4">
              {isAdmin && (
                 <button 
@@ -384,50 +299,18 @@ const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, use
                 <BarChart3 className="w-4 h-4" />
                 {showTrend ? 'Ẩn Biểu đồ' : 'Hiện Xu hướng'}
             </button>
-        </div>
              
-         <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-slate-600">Chọn tháng:</span>
-            <input 
-                type="month" 
-                className="border border-slate-300 rounded px-2 py-1 text-sm font-bold text-slate-800 focus:ring-2 focus:ring-[#EE0033] cursor-pointer outline-none"
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-            />
+             <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-slate-200 shadow-sm">
+                <span className="text-sm font-semibold text-slate-600">Tháng:</span>
+                <input 
+                    type="month" 
+                    className="bg-transparent border-none text-sm font-bold text-slate-800 focus:ring-0 cursor-pointer outline-none p-0"
+                    value={selectedMonth}
+                    onChange={(e) => setSelectedMonth(e.target.value)}
+                />
+            </div>
         </div>
       </div>
-
-      {/* --- ALERTS SECTION (NEW) --- */}
-      {atRiskItems.length > 0 && (
-          <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 animate-in slide-in-from-top-4 duration-300 mb-6">
-              <h3 className="flex items-center gap-2 text-orange-800 font-bold mb-3">
-                  <Bell className="w-5 h-5" /> 
-                  Nhắc nhở: {atRiskItems.length} Chỉ tiêu rủi ro chưa hoàn thành
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-60 overflow-y-auto pr-2">
-                  {atRiskItems.map((item, idx) => (
-                      <div key={idx} className="bg-white p-3 rounded-lg border border-orange-100 shadow-sm flex flex-col justify-between hover:border-orange-300 transition-colors">
-                          <div>
-                              <div className="text-[10px] text-slate-500 uppercase font-bold mb-1 line-clamp-1 flex items-center gap-1">
-                                  <AlertCircle className="w-3 h-3 text-orange-500" />
-                                  {item.groupName}
-                              </div>
-                              <div className="font-medium text-slate-800 text-sm mb-1">{item.name}</div>
-                          </div>
-                          <div className="mt-2">
-                              <div className="flex justify-between text-xs text-slate-600 mb-1">
-                                  <span>Tiến độ: <span className="font-bold text-orange-600">{item.percent.toFixed(1)}%</span></span>
-                                  <span className="font-mono">{formatNumber(item.actual)} / {formatNumber(item.target)}</span>
-                              </div>
-                              <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                                  <div className="bg-orange-500 h-full rounded-full" style={{width: `${Math.min(item.percent, 100)}%`}}></div>
-                              </div>
-                          </div>
-                      </div>
-                  ))}
-              </div>
-          </div>
-      )}
 
       {/* --- TREND CHART --- */}
       {showTrend && trendData.length > 0 && (
@@ -469,7 +352,7 @@ const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, use
       )}
 
       {/* --- SCORE SUMMARY CARDS --- */}
-      {calculatedData ? (
+      {calculatedData && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl p-6 text-white shadow-lg relative overflow-hidden">
                 <div className="flex justify-between items-start mb-4 relative z-10">
@@ -515,19 +398,6 @@ const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, use
                     <span className="w-2 h-2 rounded-full bg-orange-500"></span> Cần đẩy mạnh thực hiện
                 </div>
             </div>
-        </div>
-      ) : (
-          <div className="p-12 flex flex-col items-center justify-center bg-white rounded-xl border border-dashed border-slate-300 text-slate-500 gap-4">
-            <p>Chưa có dữ liệu chỉ tiêu cho tháng {selectedMonth}</p>
-            {isAdmin && (
-                <button 
-                  onClick={handleInitMonth}
-                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
-                >
-                    <Copy className="w-4 h-4" />
-                    Khởi tạo dữ liệu (Copy tháng trước)
-                </button>
-            )}
         </div>
       )}
 
@@ -783,85 +653,6 @@ const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, use
               </div>
           )}
       </div>
-      )}
-      </>
-      )}
-
-      {/* --- REPORT VIEW --- */}
-      {activeTab === 'REPORT' && (
-          <div className="space-y-6 animate-in fade-in">
-              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-slate-600">Từ tháng:</span>
-                    <input 
-                        type="month" 
-                        className="border border-slate-300 rounded px-2 py-1 text-sm font-bold text-slate-800 focus:ring-2 focus:ring-[#EE0033] outline-none"
-                        value={reportStartMonth}
-                        onChange={(e) => setReportStartMonth(e.target.value)}
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-slate-600">Đến tháng:</span>
-                    <input 
-                        type="month" 
-                        className="border border-slate-300 rounded px-2 py-1 text-sm font-bold text-slate-800 focus:ring-2 focus:ring-[#EE0033] outline-none"
-                        value={reportEndMonth}
-                        onChange={(e) => setReportEndMonth(e.target.value)}
-                    />
-                  </div>
-              </div>
-
-              {reportData ? (
-                  <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-                       <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
-                           <h3 className="font-bold text-slate-800 uppercase text-center">Báo cáo Tổng hợp KPI ({reportStartMonth} - {reportEndMonth})</h3>
-                       </div>
-                       <table className="w-full text-sm text-left border-collapse">
-                            <thead className="bg-[#5B9BD5] text-white font-bold uppercase text-xs">
-                                <tr>
-                                    <th className="px-4 py-3 border-r border-blue-400">Nhóm / Chỉ tiêu</th>
-                                    <th className="px-4 py-3 border-r border-blue-400 text-center w-24">Đơn vị</th>
-                                    <th className="px-4 py-3 border-r border-blue-400 text-right w-32">Tổng Mục tiêu</th>
-                                    <th className="px-4 py-3 border-r border-blue-400 text-right w-32">Tổng Thực hiện</th>
-                                    <th className="px-4 py-3 text-right w-24">Tỷ lệ HT</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-200">
-                                {reportData.map((group, gIdx) => (
-                                    <React.Fragment key={gIdx}>
-                                        <tr className="bg-slate-100 font-bold text-slate-800">
-                                            <td className="px-4 py-2 border-b border-slate-300">{group.name}</td>
-                                            <td className="px-4 py-2 border-b border-slate-300 text-center text-slate-600">{group.unit}</td>
-                                            <td className="px-4 py-2 border-b border-slate-300 text-right text-indigo-700">
-                                                {group.target > 0 ? formatNumber(group.target) : ''}
-                                            </td>
-                                            <td className="px-4 py-2 border-b border-slate-300 text-right text-emerald-700">
-                                                {group.actual > 0 ? formatNumber(group.actual) : ''}
-                                            </td>
-                                            <td className={`px-4 py-2 border-b border-slate-300 text-right ${group.percent >= 100 ? 'text-emerald-600' : 'text-orange-600'}`}>
-                                                 {group.target > 0 ? `${group.percent.toFixed(1)}%` : ''}
-                                            </td>
-                                        </tr>
-                                        {group.items.map((item, iIdx) => (
-                                            <tr key={iIdx} className="hover:bg-slate-50 bg-white">
-                                                <td className="px-4 py-2 border-r border-slate-200 pl-8 text-slate-700 font-medium">{item.name || '---'}</td>
-                                                <td className="px-4 py-2 border-r border-slate-200 text-center text-slate-500 text-xs">{item.unit}</td>
-                                                <td className="px-4 py-2 border-r border-slate-200 text-right font-medium text-slate-600">{formatNumber(item.target)}</td>
-                                                <td className="px-4 py-2 border-r border-slate-200 text-right font-bold text-slate-700">{formatNumber(item.actual)}</td>
-                                                <td className={`px-4 py-2 text-right font-bold text-xs ${item.percent >= 100 ? 'text-emerald-600' : 'text-orange-600'}`}>
-                                                    {item.percent.toFixed(1)}%
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </React.Fragment>
-                                ))}
-                            </tbody>
-                       </table>
-                  </div>
-              ) : (
-                  <div className="p-12 text-center text-slate-400 border border-dashed rounded-xl">Không có dữ liệu cho giai đoạn này.</div>
-              )}
-          </div>
       )}
     </div>
   );

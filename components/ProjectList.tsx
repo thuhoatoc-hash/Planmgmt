@@ -1,6 +1,5 @@
-
 import React, { useState } from 'react';
-import { Project, ProjectStatusItem, User, Partner, ProjectType, ProductType, Contract, ContractType, PartnerType } from '../types';
+import { Project, ProjectStatusItem, User, Partner, ProjectType, ProductType, Contract, ContractType } from '../types';
 import { Plus, Search, Calendar, ChevronRight, User as UserIcon, Building2, Edit, Trash2, Tag, Box, Filter } from 'lucide-react';
 import CurrencyInput from './CurrencyInput';
 
@@ -340,8 +339,8 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, contracts, users, p
                  <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Đối tác / Khách hàng</label>
                     <select className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-[#EE0033] outline-none" value={formData.partnerId || ''} onChange={e => setFormData({...formData, partnerId: e.target.value})}>
-                        <option value="">-- Chọn Khách hàng --</option>
-                        {partners.filter(p => p.type === PartnerType.CUSTOMER || !p.type).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        <option value="">-- Chọn đối tác --</option>
+                        {partners.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </select>
                  </div>
                  <div>

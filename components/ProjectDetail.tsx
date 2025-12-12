@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Project, Contract, Category, ContractType, CategoryType, ProjectType, ProductType, User, Partner, ProjectStatusItem, UserRole, Task, TaskStatus, ContractInstallment, InstallmentStatus, TaskType, CustomerObligation, ObligationStatus, FundingSource, FundingSourceStatus, PartnerType } from '../types';
-import { ArrowLeft, Plus, Calendar, User as UserIcon, Building2, Edit, Trash2, Tag, Box, ListTodo, PlusCircle, MinusCircle, Clock, CheckSquare, Users, Target, AlertCircle, Shield, Coins, Landmark, RefreshCcw } from 'lucide-react';
+import { Project, Contract, Category, ContractType, CategoryType, ProjectType, ProductType, User, Partner, ProjectStatusItem, UserRole, Task, TaskStatus, ContractInstallment, InstallmentStatus } from '../types';
+import { ArrowLeft, Plus, Calendar, User as UserIcon, Building2, Edit, Trash2, Tag, Box, ListTodo, PlusCircle, MinusCircle, Clock } from 'lucide-react';
 import CurrencyInput from './CurrencyInput';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
@@ -33,14 +33,13 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
   onBack, onAddContract, onUpdateContract, onDeleteContract, onUpdateContractStatus,
   onUpdateProject, onDeleteProject, onAddTask, onUpdateTask, onDeleteTask
 }) => {
-  const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'INPUT' | 'OUTPUT' | 'TASKS' | 'OBLIGATION'>('OVERVIEW');
+  const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'INPUT' | 'OUTPUT' | 'TASKS'>('OVERVIEW');
   const [isContractModalOpen, setIsContractModalOpen] = useState(false);
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   
   const status = statuses.find(s => s.id === project.statusId);
   const partner = partners.find(p => p.id === project.partnerId);
-  const isAdmin = user.role === UserRole.ADMIN;
 
   // Labels
   const projectTypeLabels: Record<string, string> = {
@@ -51,21 +50,6 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
     [ProductType.HARDWARE]: 'Phần cứng',
     [ProductType.INTERNAL_SOFTWARE]: 'Phần mềm nội bộ',
     [ProductType.HYBRID]: 'Hỗn hợp',
-  };
-
-  const taskStatusLabels: Record<string, { label: string, color: string }> = {
-    [TaskStatus.NOT_STARTED]: { label: 'Chưa bắt đầu', color: 'bg-slate-100 text-slate-700' },
-    [TaskStatus.IN_PROGRESS]: { label: 'Đang thực hiện', color: 'bg-blue-100 text-blue-700' },
-    [TaskStatus.COMPLETED]: { label: 'Hoàn thành', color: 'bg-emerald-100 text-emerald-700' },
-    [TaskStatus.EXTENSION_REQUESTED]: { label: 'Đề xuất gia hạn', color: 'bg-orange-100 text-orange-700' },
-    [TaskStatus.CANCELLED]: { label: 'Đã hủy', color: 'bg-red-100 text-red-700' },
-  };
-
-  const obligationStatusLabels: Record<string, { label: string, color: string }> = {
-      [ObligationStatus.NO_SOURCE]: { label: 'Chưa có nguồn', color: 'bg-slate-100 text-slate-600' },
-      [ObligationStatus.SOURCE_RECEIVED]: { label: 'Nguồn đã về', color: 'bg-blue-100 text-blue-700' },
-      [ObligationStatus.PAID]: { label: 'Đã chi', color: 'bg-emerald-100 text-emerald-700' },
-      [ObligationStatus.NOT_PAID]: { label: 'Không chi', color: 'bg-red-100 text-red-700' },
   };
 
   // --- CONTRACT FORM STATE ---
@@ -89,8 +73,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
       name: '',
       value: 0,
       status: InstallmentStatus.PLANNING,
-      date: new Date().toISOString().split('T')[0],
-      revenueMonth: new Date().toISOString().slice(0, 7) // Default to current month YYYY-MM
+      date: new Date().toISOString().split('T')[0]
   });
 
   // --- PROJECT EDIT FORM STATE ---
@@ -99,60 +82,14 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
   // --- TASK FORM STATE ---
   const initialTaskState: Partial<Task> = {
     name: '',
-    description: '',
-    outputStandard: '',
-    status: TaskStatus.NOT_STARTED,
+    status: TaskStatus.NEW,
     deadline: new Date().toISOString().split('T')[0],
-    assignerId: user.id, // Defaults to current user
-    assigneeId: '',
-    collaboratorIds: [],
-    taskType: TaskType.PROJECT // Default to Project type in this view
+    assigneeId: user.id
   };
   const [taskForm, setTaskForm] = useState<Partial<Task>>(initialTaskState);
 
-  // --- CUSTOMER OBLIGATION STATE (Local) ---
-  const defaultObligation: CustomerObligation = {
-      percentage: 0,
-      value: 0,
-      status: ObligationStatus.NO_SOURCE,
-      deadline: '',
-      sources: []
-  };
-  const [obligationForm, setObligationForm] = useState<CustomerObligation>(defaultObligation);
-
-  useEffect(() => {
-      // Re-sync local state when project prop updates
-      if (project.customerObligation) {
-          setObligationForm({
-              ...defaultObligation,
-              ...project.customerObligation,
-              sources: Array.isArray(project.customerObligation.sources) ? project.customerObligation.sources : []
-          });
-      } else {
-          setObligationForm(defaultObligation);
-      }
-  }, [project]);
-
   const projectContracts = contracts.filter(c => c.projectId === project.id);
-  
-  // Filter only PROJECT tasks for this project
-  const projectTasks = useMemo(() => {
-      return tasks
-        .filter(t => t.projectId === project.id) // Simply filter by project ID, assuming if it has project ID it belongs here
-        .sort((a, b) => {
-             const priority = { 
-                 [TaskStatus.EXTENSION_REQUESTED]: 0, 
-                 [TaskStatus.IN_PROGRESS]: 1, 
-                 [TaskStatus.NOT_STARTED]: 2, 
-                 [TaskStatus.CANCELLED]: 3,
-                 [TaskStatus.COMPLETED]: 4 
-             };
-             if (priority[a.status] !== priority[b.status]) {
-                 return priority[a.status] - priority[b.status];
-             }
-             return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
-        });
-  }, [tasks, project.id]);
+  const projectTasks = tasks.filter(t => t.projectId === project.id);
   
   const stats = useMemo(() => {
     // 1. Doanh số (Sales): Tổng HĐ đầu ra (trừ Hủy)
@@ -160,7 +97,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
       .filter(c => c.type === ContractType.OUTPUT && c.status !== 'CANCELLED')
       .reduce((acc, c) => acc + c.value, 0);
 
-    // 2. Doanh thu (Revenue): Tổng HĐ đầu ra (Chỉ tính item đã xuất HĐ hoặc đã Thanh toán trong installments)
+    // 2. Doanh thu (Revenue): Tổng HĐ đầu ra (Chỉ tính những item đã xuất HĐ hoặc đã Thanh toán trong installments)
     const actualRevenue = projectContracts
       .filter(c => c.type === ContractType.OUTPUT && c.status !== 'CANCELLED')
       .reduce((acc, c) => {
@@ -200,27 +137,6 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
           .sort((a, b) => b.value - a.value);
   }, [projectContracts, categories]);
 
-  // --- TIME PROGRESS CALCULATION ---
-  const timeProgress = useMemo(() => {
-      const start = new Date(project.startDate).getTime();
-      const end = new Date(project.endDate).getTime();
-      const now = new Date().getTime();
-      
-      if (end <= start) return 100;
-      
-      const total = end - start;
-      const elapsed = now - start;
-      const percent = (elapsed / total) * 100;
-      
-      return Math.min(100, Math.max(0, percent));
-  }, [project.startDate, project.endDate]);
-
-  const daysRemaining = useMemo(() => {
-      const end = new Date(project.endDate).getTime();
-      const now = new Date().getTime();
-      return Math.ceil((end - now) / (1000 * 60 * 60 * 24));
-  }, [project.endDate]);
-
   // --- HANDLERS ---
 
   // Auto-calculate Contract Value when installments change
@@ -238,8 +154,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
         name: '',
         value: 0,
         status: InstallmentStatus.PLANNING,
-        date: new Date().toISOString().split('T')[0],
-        revenueMonth: new Date().toISOString().slice(0, 7)
+        date: new Date().toISOString().split('T')[0]
     });
 
     if (contract) {
@@ -271,8 +186,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
         name: '',
         value: 0,
         status: InstallmentStatus.PLANNING,
-        date: new Date().toISOString().split('T')[0],
-        revenueMonth: new Date().toISOString().slice(0, 7)
+        date: new Date().toISOString().split('T')[0]
       });
   };
 
@@ -334,16 +248,11 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
 
   const handleOpenTaskModal = (task?: Task) => {
       if(task) {
-          setTaskForm({
-              ...task,
-              collaboratorIds: task.collaboratorIds || []
-          });
+          setTaskForm({...task});
       } else {
           setTaskForm({
               ...initialTaskState,
-              projectId: project.id,
-              assignerId: user.id,
-              taskType: TaskType.PROJECT // Enforce Project type
+              projectId: project.id
           });
       }
       setIsTaskModalOpen(true);
@@ -351,19 +260,13 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
 
   const handleSaveTask = (e: React.FormEvent) => {
       e.preventDefault();
-      
-      const finalTask = {
-          ...taskForm,
-          projectId: project.id, // Ensure correct project ID
-          taskType: TaskType.PROJECT, // Ensure type is PROJECT
-          collaboratorIds: taskForm.collaboratorIds || []
-      } as Task;
-
-      if(finalTask.id) {
-          onUpdateTask(finalTask);
+      if(taskForm.id) {
+          onUpdateTask(taskForm as Task);
       } else {
-          // Allow API to generate ID
-          onAddTask(finalTask);
+          onAddTask({
+              ...taskForm,
+              id: `task_${Date.now()}`
+          } as Task);
       }
       setIsTaskModalOpen(false);
   }
@@ -374,89 +277,9 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
       }
   }
 
-  const toggleCollaborator = (userId: string) => {
-      const currentIds = taskForm.collaboratorIds || [];
-      if (currentIds.includes(userId)) {
-          setTaskForm({ ...taskForm, collaboratorIds: currentIds.filter(id => id !== userId) });
-      } else {
-          setTaskForm({ ...taskForm, collaboratorIds: [...currentIds, userId] });
-      }
-  }
-
-  // --- OBLIGATION HANDLERS ---
-  const handleAddFundingSource = () => {
-      const newSource: FundingSource = {
-          id: `fs_${Date.now()}`,
-          name: '',
-          value: 0,
-          status: FundingSourceStatus.PENDING
-      };
-      setObligationForm(prev => ({
-          ...prev,
-          sources: [...(prev.sources || []), newSource]
-      }));
-  };
-
-  const handleUpdateFundingSource = (id: string, field: keyof FundingSource, value: any) => {
-      setObligationForm(prev => ({
-          ...prev,
-          sources: prev.sources.map(s => s.id === id ? { ...s, [field]: value } : s)
-      }));
-  };
-
-  const handleDeleteFundingSource = (id: string) => {
-      setObligationForm(prev => ({
-          ...prev,
-          sources: prev.sources.filter(s => s.id !== id)
-      }));
-  };
-
-  const handlePercentageChange = (newPercentage: number) => {
-      // Logic: Value = (Signed Sales * % / 100) / 1.1
-      // Signed Sales comes from stats.sales
-      const calculatedValue = (stats.sales * newPercentage / 100) / 1.1;
-      setObligationForm(prev => ({
-          ...prev,
-          percentage: newPercentage,
-          value: Math.round(calculatedValue) // Round to nearest integer
-      }));
-  };
-
-  const handleSaveObligation = () => {
-      // Ensure the object is clean
-      const cleanObligation: CustomerObligation = {
-          percentage: Number(obligationForm.percentage),
-          value: Number(obligationForm.value),
-          status: obligationForm.status,
-          deadline: obligationForm.deadline || '',
-          sources: Array.isArray(obligationForm.sources) ? obligationForm.sources : []
-      };
-
-      if (window.confirm('Bạn có chắc chắn muốn cập nhật thông tin Nghĩa vụ khách hàng?')) {
-          const updatedProject: Project = {
-              ...project,
-              customerObligation: cleanObligation
-          };
-          onUpdateProject(updatedProject);
-          alert('Đã gửi yêu cầu lưu dữ liệu.');
-      }
-  };
-
-  const handleResetObligation = () => {
-      if (window.confirm('CẢNH BÁO: Thao tác này sẽ xóa trắng dữ liệu Nghĩa vụ khách hàng hiện tại của dự án này. Bạn có chắc không?')) {
-          // Reset Local State
-          setObligationForm(defaultObligation);
-          // Save to DB
-          onUpdateProject({
-              ...project,
-              customerObligation: defaultObligation // Send empty default to clear DB JSON
-          });
-      }
-  };
-
   const formatCurrency = (val: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(val);
 
-  const getAssigneeName = (id: string) => users.find(u => u.id === id)?.fullName || 'Chưa gán';
+  const getAssigneeName = (id: string) => users.find(u => u.id === id)?.fullName || 'Unassigned';
 
   // --- SUB COMPONENTS ---
 
@@ -572,12 +395,6 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
     );
   };
 
-  // Determine contract category type for modal (Revenue/Cost) to filter partners
-  const currentCategoryType = useMemo(() => {
-      const category = categories.find(c => c.id === contractForm.categoryId);
-      return category?.type;
-  }, [contractForm.categoryId, categories]);
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -637,22 +454,19 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
 
         {/* Tabs */}
         <div className="border-b border-slate-200">
-           <nav className="flex gap-6 overflow-x-auto">
+           <nav className="flex gap-6">
                 {[
                     { id: 'OVERVIEW', label: 'Tổng quan' },
                     { id: 'OUTPUT', label: 'Doanh thu (Đầu ra)' },
                     { id: 'INPUT', label: 'Chi phí (Đầu vào)' },
-                    { id: 'TASKS', label: 'Công việc (Project Task)' },
-                    // Show Obligation tab only for Admin
-                    ...(isAdmin ? [{ id: 'OBLIGATION', label: 'Nghĩa vụ Khách hàng' }] : []),
+                    { id: 'TASKS', label: 'Công việc' },
                 ].map(tab => (
                     <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id as any)}
-                        className={`py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === tab.id ? 'border-[#EE0033] text-[#EE0033]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                        className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === tab.id ? 'border-[#EE0033] text-[#EE0033]' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
                     >
                         {tab.label}
-                        {tab.id === 'OBLIGATION' && <span className="ml-1 text-[10px] bg-red-100 text-red-600 px-1 rounded-full"><Shield className="w-2 h-2 inline" /></span>}
                     </button>
                 ))}
            </nav>
@@ -717,20 +531,9 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                                         </div>
                                         <div>
                                             <label className="text-xs text-slate-500 font-medium uppercase">Thời gian thực hiện</label>
-                                            <div className="flex items-center gap-2 mt-1 mb-3">
+                                            <div className="flex items-center gap-2 mt-1">
                                                 <Calendar className="w-4 h-4 text-slate-400" />
                                                 <span className="text-slate-800">{new Date(project.startDate).toLocaleDateString('vi-VN')} - {new Date(project.endDate).toLocaleDateString('vi-VN')}</span>
-                                            </div>
-                                            {/* Progress Bar */}
-                                            <div className="w-full bg-slate-100 rounded-full h-1.5 mb-1">
-                                                <div className="bg-indigo-500 h-1.5 rounded-full transition-all duration-500" style={{width: `${timeProgress}%`}}></div>
-                                            </div>
-                                            <div className="flex justify-between text-[10px] text-slate-400">
-                                                <span>Bắt đầu</span>
-                                                <span className={daysRemaining < 0 ? 'text-red-500 font-medium' : 'text-indigo-600 font-medium'}>
-                                                    {daysRemaining > 0 ? `Còn ${daysRemaining} ngày` : (daysRemaining === 0 ? 'Hôm nay' : `Quá hạn ${Math.abs(daysRemaining)} ngày`)}
-                                                </span>
-                                                <span>Kết thúc</span>
                                             </div>
                                         </div>
                                     </div>
@@ -814,243 +617,57 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
             <div className="animate-in slide-in-from-bottom-2 duration-300">
                 <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
                     <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
-                        <h3 className="font-bold text-slate-700">Danh sách công việc dự án</h3>
-                        <span className="text-xs text-slate-500">{projectTasks.length} nhiệm vụ</span>
+                        <h3 className="font-bold text-slate-700">Danh sách công việc</h3>
+                        <span className="text-xs text-slate-500">{projectTasks.length} công việc</span>
                     </div>
                     <div className="divide-y divide-slate-100">
                         {projectTasks.length === 0 ? (
-                             <div className="p-8 text-center text-slate-400">Chưa có công việc nào trong dự án này.</div>
+                             <div className="p-8 text-center text-slate-400">Chưa có công việc nào.</div>
                         ) : (
                             projectTasks.map(task => {
-                                const isLate = task.deadline < new Date().toISOString().split('T')[0] && task.status !== TaskStatus.COMPLETED && task.status !== TaskStatus.CANCELLED;
-                                const statusInfo = taskStatusLabels[task.status] || taskStatusLabels[TaskStatus.NOT_STARTED];
-                                
+                                const isLate = task.deadline < new Date().toISOString().split('T')[0] && task.status !== TaskStatus.COMPLETED;
                                 return (
-                                    <div key={task.id} className="p-4 hover:bg-slate-50 flex items-start justify-between group flex-col md:flex-row gap-4">
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <h4 className="font-bold text-slate-800">{task.name}</h4>
-                                                {isLate && <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold border border-red-200 flex items-center gap-0.5"><AlertCircle className="w-3 h-3"/> Trễ hạn</span>}
-                                            </div>
-                                            {task.description && <p className="text-sm text-slate-600 mb-2 line-clamp-2">{task.description}</p>}
-                                            
-                                            <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500 mt-2">
-                                                <span className="flex items-center gap-1 bg-slate-100 px-2 py-1 rounded">
-                                                    <UserIcon className="w-3 h-3 text-slate-400" /> 
-                                                    Chủ trì: <span className="font-medium text-slate-700">{getAssigneeName(task.assigneeId)}</span>
-                                                </span>
-                                                <span className="flex items-center gap-1 bg-slate-100 px-2 py-1 rounded">
-                                                    <Clock className="w-3 h-3 text-slate-400" /> 
-                                                    Deadline: <span className={`font-medium ${isLate ? 'text-red-600' : 'text-slate-700'}`}>{new Date(task.deadline).toLocaleDateString('vi-VN')}</span>
-                                                </span>
-                                                {task.outputStandard && (
-                                                    <span className="flex items-center gap-1 bg-indigo-50 px-2 py-1 rounded border border-indigo-100 text-indigo-700">
-                                                        <Target className="w-3 h-3" /> Output: {task.outputStandard}
+                                    <div key={task.id} className="p-4 hover:bg-slate-50 flex items-center justify-between group">
+                                        <div className="flex items-start gap-3">
+                                            <div className={`mt-1 w-2 h-2 rounded-full ${
+                                                task.status === TaskStatus.COMPLETED ? 'bg-green-500' : 
+                                                task.status === TaskStatus.IN_PROGRESS ? 'bg-blue-500' :
+                                                task.status === TaskStatus.LATE ? 'bg-red-500' : 'bg-slate-300'
+                                            }`} />
+                                            <div>
+                                                <div className="font-medium text-slate-800">{task.name}</div>
+                                                <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
+                                                    <span className="flex items-center gap-1">
+                                                        <UserIcon className="w-3 h-3" /> {getAssigneeName(task.assigneeId)}
                                                     </span>
-                                                )}
+                                                    <span className={`flex items-center gap-1 ${isLate ? 'text-red-500 font-bold' : ''}`}>
+                                                        <Clock className="w-3 h-3" /> {new Date(task.deadline).toLocaleDateString('vi-VN')}
+                                                    </span>
+                                                </div>
                                             </div>
                                         </div>
-
-                                        <div className="flex items-center gap-3 self-end md:self-center">
+                                        <div className="flex items-center gap-2">
                                             <select 
                                                 value={task.status}
                                                 onChange={(e) => onUpdateTask({...task, status: e.target.value as TaskStatus})}
-                                                className={`text-xs border rounded px-2 py-1.5 outline-none font-medium cursor-pointer ${statusInfo.color.replace('text-', 'border-').replace('bg-', 'focus:ring-')}`}
+                                                className="text-xs border border-slate-200 rounded px-2 py-1 outline-none focus:border-indigo-500"
                                             >
-                                                {Object.entries(taskStatusLabels).map(([key, val]) => (
-                                                    <option key={key} value={key}>{val.label}</option>
-                                                ))}
+                                                <option value={TaskStatus.NEW}>Mới tạo</option>
+                                                <option value={TaskStatus.IN_PROGRESS}>Đang thực hiện</option>
+                                                <option value={TaskStatus.COMPLETED}>Hoàn thành</option>
+                                                <option value={TaskStatus.LATE}>Trễ hạn</option>
                                             </select>
-                                            <div className="flex gap-1">
-                                                <button onClick={() => handleOpenTaskModal(task)} className="p-1.5 text-slate-400 hover:text-indigo-600 rounded bg-slate-50 hover:bg-indigo-50 border border-slate-200">
-                                                    <Edit className="w-4 h-4" />
-                                                </button>
-                                                <button onClick={() => handleDeleteTaskItem(task.id)} className="p-1.5 text-slate-400 hover:text-red-600 rounded bg-slate-50 hover:bg-red-50 border border-slate-200">
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
-                                            </div>
+                                            <button onClick={() => handleOpenTaskModal(task)} className="p-1.5 text-slate-400 hover:text-indigo-600 rounded">
+                                                <Edit className="w-4 h-4" />
+                                            </button>
+                                            <button onClick={() => handleDeleteTaskItem(task.id)} className="p-1.5 text-slate-400 hover:text-red-600 rounded">
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
                                         </div>
                                     </div>
                                 )
                             })
                         )}
-                    </div>
-                </div>
-            </div>
-        )}
-
-        {/* --- CUSTOMER OBLIGATION TAB (ADMIN ONLY) --- */}
-        {activeTab === 'OBLIGATION' && isAdmin && (
-            <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-300">
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-                    <div className="flex items-center justify-between mb-6">
-                        <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                            <Coins className="w-5 h-5 text-indigo-600" />
-                            Quản lý Nghĩa vụ Khách hàng
-                        </h3>
-                        <div className="flex items-center gap-4">
-                            <div className="text-sm text-slate-500">
-                                Doanh số ký (đã chốt): <span className="font-bold text-indigo-600">{formatCurrency(stats.sales)}</span>
-                            </div>
-                            <button 
-                                onClick={handleResetObligation}
-                                className="text-xs bg-red-50 text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-100 font-medium flex items-center gap-1 border border-red-200"
-                                title="Xóa toàn bộ dữ liệu nghĩa vụ để nhập lại"
-                            >
-                                <RefreshCcw className="w-3 h-3" /> Reset dữ liệu
-                            </button>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                        <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Tỷ lệ % / Doanh thu</label>
-                                <div className="flex items-center">
-                                    <input 
-                                        type="number" 
-                                        className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-right font-bold text-indigo-600" 
-                                        value={obligationForm.percentage} 
-                                        onChange={e => handlePercentageChange(parseFloat(e.target.value))}
-                                        placeholder="0"
-                                    />
-                                    <span className="ml-2 font-bold text-slate-500">%</span>
-                                </div>
-                            </div>
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Giá trị Nghĩa vụ (VNĐ)</label>
-                                <CurrencyInput 
-                                    className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-800 text-lg"
-                                    value={obligationForm.value}
-                                    onChange={(val) => setObligationForm({...obligationForm, value: val})}
-                                    placeholder="0"
-                                />
-                                <p className="text-xs text-slate-400 mt-1 italic">
-                                    * Tự động tính = (Doanh số ký x % / 100) / 1.1
-                                </p>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Thời gian thực hiện</label>
-                                <input 
-                                    type="date"
-                                    className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
-                                    value={obligationForm.deadline || ''}
-                                    onChange={e => setObligationForm({...obligationForm, deadline: e.target.value})}
-                                />
-                            </div>
-                        </div>
-
-                        <div className="bg-slate-50 p-4 rounded-lg border border-slate-100 flex flex-col justify-between">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">Hiện trạng Tổng thể</label>
-                                <select 
-                                    className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white font-medium"
-                                    value={obligationForm.status}
-                                    onChange={e => setObligationForm({...obligationForm, status: e.target.value as ObligationStatus})}
-                                >
-                                    {Object.entries(obligationStatusLabels).map(([key, val]) => (
-                                        <option key={key} value={key}>{val.label}</option>
-                                    ))}
-                                </select>
-                                <div className={`mt-2 text-xs font-bold px-2 py-1 rounded w-fit ${obligationStatusLabels[obligationForm.status]?.color}`}>
-                                    {obligationStatusLabels[obligationForm.status]?.label}
-                                </div>
-                            </div>
-                            
-                            <div className="mt-4 pt-4 border-t border-slate-200">
-                                <div className="flex justify-between items-center text-sm font-medium">
-                                    <span className="text-slate-600">Tổng nguồn đã có:</span>
-                                    <span className={`font-bold ${
-                                        (obligationForm.sources || []).reduce((a,b) => a + b.value, 0) >= obligationForm.value 
-                                        ? 'text-emerald-600' 
-                                        : 'text-orange-600'
-                                    }`}>
-                                        {formatCurrency((obligationForm.sources || []).reduce((a,b) => a + b.value, 0))}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="border-t border-slate-200 pt-6">
-                        <div className="flex justify-between items-center mb-4">
-                            <h4 className="font-bold text-slate-700 flex items-center gap-2">
-                                <Landmark className="w-4 h-4 text-slate-500" />
-                                Chi tiết Nguồn tiền
-                            </h4>
-                            <button 
-                                onClick={handleAddFundingSource}
-                                className="text-xs bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg hover:bg-indigo-100 font-medium flex items-center gap-1"
-                            >
-                                <PlusCircle className="w-3 h-3" /> Thêm nguồn
-                            </button>
-                        </div>
-
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm text-left">
-                                <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
-                                    <tr>
-                                        <th className="px-4 py-3">Tên nguồn tiền</th>
-                                        <th className="px-4 py-3 text-right">Số tiền</th>
-                                        <th className="px-4 py-3 text-center">Trạng thái</th>
-                                        <th className="px-4 py-3 w-10"></th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {(!obligationForm.sources || obligationForm.sources.length === 0) ? (
-                                        <tr><td colSpan={4} className="px-4 py-6 text-center text-slate-400 italic">Chưa có nguồn tiền nào được thêm.</td></tr>
-                                    ) : (
-                                        obligationForm.sources.map(source => (
-                                            <tr key={source.id} className="group hover:bg-slate-50">
-                                                <td className="px-4 py-2">
-                                                    <input 
-                                                        type="text" 
-                                                        className="w-full bg-transparent border-b border-transparent focus:border-indigo-300 outline-none py-1"
-                                                        value={source.name}
-                                                        onChange={e => handleUpdateFundingSource(source.id, 'name', e.target.value)}
-                                                        placeholder="Nhập tên nguồn (VD: Từ đối tác A)..."
-                                                    />
-                                                </td>
-                                                <td className="px-4 py-2">
-                                                    <CurrencyInput 
-                                                        className="w-full text-right bg-transparent border-b border-transparent focus:border-indigo-300 outline-none py-1 font-mono text-slate-700"
-                                                        value={source.value}
-                                                        onChange={val => handleUpdateFundingSource(source.id, 'value', val)}
-                                                    />
-                                                </td>
-                                                <td className="px-4 py-2 text-center">
-                                                    <select 
-                                                        className={`text-xs border rounded px-2 py-1 outline-none cursor-pointer font-medium ${source.status === FundingSourceStatus.RECEIVED ? 'bg-green-50 text-green-700 border-green-200' : 'bg-slate-50 text-slate-600 border-slate-200'}`}
-                                                        value={source.status}
-                                                        onChange={e => handleUpdateFundingSource(source.id, 'status', e.target.value as FundingSourceStatus)}
-                                                    >
-                                                        <option value={FundingSourceStatus.RECEIVED}>Đã về</option>
-                                                        <option value={FundingSourceStatus.PENDING}>Chưa về</option>
-                                                    </select>
-                                                </td>
-                                                <td className="px-4 py-2 text-center">
-                                                    <button 
-                                                        onClick={() => handleDeleteFundingSource(source.id)}
-                                                        className="text-slate-300 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                    >
-                                                        <MinusCircle className="w-4 h-4" />
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <div className="flex justify-end mt-6 pt-4 border-t border-slate-100">
-                        <button 
-                            onClick={handleSaveObligation}
-                            className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 font-medium shadow-sm flex items-center gap-2"
-                        >
-                            <CheckSquare className="w-4 h-4" /> Lưu thông tin Nghĩa vụ
-                        </button>
                     </div>
                 </div>
             </div>
@@ -1111,21 +728,9 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                             placeholder="Chọn hoặc nhập tên đối tác..." 
                         />
                         <datalist id="partners-list">
-                            {partners
-                                // Filter partners based on Contract Type:
-                                // If Revenue (OUTPUT) -> Show Customers
-                                // If Cost (INPUT) -> Show Suppliers
-                                // If Category not selected -> Show all (or strictly follow type logic)
-                                .filter(p => {
-                                    if (!currentCategoryType) return true;
-                                    if (currentCategoryType === CategoryType.REVENUE) return p.type === PartnerType.CUSTOMER || !p.type;
-                                    if (currentCategoryType === CategoryType.COST) return p.type === PartnerType.SUPPLIER || !p.type;
-                                    return true;
-                                })
-                                .map(p => (
-                                    <option key={p.id} value={p.name} />
-                                ))
-                            }
+                            {partners.map(p => (
+                                <option key={p.id} value={p.name} />
+                            ))}
                         </datalist>
                    </div>
                </div>
@@ -1160,19 +765,16 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                     {/* List */}
                     <div className="space-y-2 mb-4">
                         {contractForm.installments?.map(ins => (
-                            <div key={ins.id} className="grid grid-cols-12 gap-2 p-2 bg-slate-50 rounded border border-slate-200 text-sm items-center">
-                                <span className="col-span-4 font-medium truncate" title={ins.name}>{ins.name}</span>
-                                <span className="col-span-3 text-right font-mono">{formatCurrency(ins.value)}</span>
-                                <span className="col-span-2 text-xs text-slate-500 text-center">
-                                    {ins.revenueMonth ? `Kỳ: ${ins.revenueMonth}` : 'Chưa chọn kỳ'}
-                                </span>
-                                <span className={`col-span-2 text-xs px-1 py-0.5 rounded text-center ${
+                            <div key={ins.id} className="flex items-center gap-2 p-2 bg-slate-50 rounded border border-slate-200 text-sm">
+                                <span className="flex-1 font-medium">{ins.name}</span>
+                                <span className="w-32 text-right font-mono">{formatCurrency(ins.value)}</span>
+                                <span className={`text-xs px-2 py-0.5 rounded ${
                                     ins.status === InstallmentStatus.PAID ? 'bg-green-100 text-green-700' :
                                     ins.status === InstallmentStatus.INVOICED ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 text-slate-600'
                                 }`}>
                                     {ins.status === InstallmentStatus.PAID ? 'Đã TT' : ins.status === InstallmentStatus.INVOICED ? 'Đã xuất HĐ' : 'Kế hoạch'}
                                 </span>
-                                <button type="button" onClick={() => handleRemoveInstallment(ins.id)} className="col-span-1 text-red-500 hover:bg-red-50 p-1 rounded flex justify-center">
+                                <button type="button" onClick={() => handleRemoveInstallment(ins.id)} className="text-red-500 hover:bg-red-50 p-1 rounded">
                                     <MinusCircle className="w-4 h-4" />
                                 </button>
                             </div>
@@ -1183,8 +785,8 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                     </div>
 
                     {/* Add New Installment Inline Form */}
-                    <div className="flex gap-2 items-end bg-indigo-50 p-3 rounded-lg border border-indigo-100 flex-wrap">
-                        <div className="flex-1 min-w-[200px]">
+                    <div className="flex gap-2 items-end bg-indigo-50 p-3 rounded-lg border border-indigo-100">
+                        <div className="flex-1">
                             <label className="text-xs font-medium text-slate-500 block mb-1">Nội dung đợt</label>
                             <input 
                                 type="text" 
@@ -1203,15 +805,6 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                              />
                         </div>
                         <div className="w-32">
-                             <label className="text-xs font-medium text-slate-500 block mb-1">Kỳ Doanh thu</label>
-                             <input 
-                                type="month"
-                                className="w-full p-1.5 text-sm border rounded"
-                                value={newInstallment.revenueMonth || ''}
-                                onChange={e => setNewInstallment({...newInstallment, revenueMonth: e.target.value})}
-                             />
-                        </div>
-                        <div className="w-28">
                              <label className="text-xs font-medium text-slate-500 block mb-1">Trạng thái</label>
                              <select 
                                 className="w-full p-1.5 text-sm border rounded"
@@ -1291,80 +884,28 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
       {/* Task Modal */}
       {isTaskModalOpen && (
           <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
-                  <h2 className="text-xl font-bold mb-4 text-slate-800">{taskForm.id ? 'Sửa Nhiệm vụ' : 'Thêm Nhiệm vụ Mới'}</h2>
+              <div className="bg-white rounded-xl max-w-md w-full p-6">
+                  <h2 className="text-xl font-bold mb-4 text-slate-800">{taskForm.id ? 'Sửa công việc' : 'Thêm công việc'}</h2>
                   <form onSubmit={handleSaveTask} className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                          <div className="col-span-2">
-                              <label className="block text-sm font-medium text-slate-700 mb-1">Tên nhiệm vụ <span className="text-red-500">*</span></label>
-                              <input required type="text" className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" value={taskForm.name} onChange={e => setTaskForm({...taskForm, name: e.target.value})} placeholder="VD: Khảo sát hiện trạng..." />
-                          </div>
-                          
-                          <div className="col-span-2">
-                               <label className="block text-sm font-medium text-slate-700 mb-1">Nội dung / Mô tả</label>
-                               <textarea className="w-full p-2 border rounded-lg h-24 focus:ring-2 focus:ring-indigo-500 outline-none" value={taskForm.description || ''} onChange={e => setTaskForm({...taskForm, description: e.target.value})} placeholder="Mô tả chi tiết công việc..." />
-                          </div>
-
-                          <div className="col-span-2">
-                               <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1"><Target className="w-3 h-3" /> Kết quả đầu ra (Output)</label>
-                               <input type="text" className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" value={taskForm.outputStandard || ''} onChange={e => setTaskForm({...taskForm, outputStandard: e.target.value})} placeholder="VD: File báo cáo khảo sát, Bản vẽ..." />
-                          </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
-                          <div>
-                              <label className="block text-sm font-medium text-slate-700 mb-1">Người giao việc</label>
-                              <select className="w-full p-2 border rounded-lg bg-white" value={taskForm.assignerId} onChange={e => setTaskForm({...taskForm, assignerId: e.target.value})}>
-                                  {users.map(u => (
-                                      <option key={u.id} value={u.id}>{u.fullName}</option>
-                                  ))}
-                              </select>
-                          </div>
-                          <div>
-                              <label className="block text-sm font-medium text-slate-700 mb-1">Người chủ trì (Assignee) <span className="text-red-500">*</span></label>
-                              <select required className="w-full p-2 border rounded-lg bg-white" value={taskForm.assigneeId} onChange={e => setTaskForm({...taskForm, assigneeId: e.target.value})}>
-                                  <option value="">-- Chọn nhân sự --</option>
-                                  {users.map(u => (
-                                      <option key={u.id} value={u.id}>{u.fullName}</option>
-                                  ))}
-                              </select>
-                          </div>
-                          <div>
-                              <label className="block text-sm font-medium text-slate-700 mb-1">Tiến độ thực hiện</label>
-                              <select className="w-full p-2 border rounded-lg bg-white" value={taskForm.status} onChange={e => setTaskForm({...taskForm, status: e.target.value as TaskStatus})}>
-                                  {Object.entries(taskStatusLabels).map(([key, val]) => (
-                                      <option key={key} value={key}>{val.label}</option>
-                                  ))}
-                              </select>
-                          </div>
-                          <div>
-                              <label className="block text-sm font-medium text-slate-700 mb-1">Hạn hoàn thành (Deadline)</label>
-                              <input type="date" className="w-full p-2 border rounded-lg bg-white" value={taskForm.deadline} onChange={e => setTaskForm({...taskForm, deadline: e.target.value})} />
-                          </div>
-                      </div>
-                      
                       <div>
-                           <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2"><Users className="w-4 h-4" /> Người phối hợp</label>
-                           <div className="border border-slate-200 rounded-lg p-3 max-h-32 overflow-y-auto bg-slate-50 grid grid-cols-2 gap-2">
-                               {users.map(u => (
-                                   <label key={u.id} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-white p-1 rounded">
-                                       <input 
-                                          type="checkbox" 
-                                          checked={(taskForm.collaboratorIds || []).includes(u.id)}
-                                          onChange={() => toggleCollaborator(u.id)}
-                                          className="rounded text-indigo-600 focus:ring-indigo-500"
-                                       />
-                                       <span>{u.fullName}</span>
-                                   </label>
-                               ))}
-                           </div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Tên công việc</label>
+                          <input required type="text" className="w-full p-2 border rounded-lg" value={taskForm.name} onChange={e => setTaskForm({...taskForm, name: e.target.value})} />
                       </div>
-
-                       <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-100">
+                      <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Người thực hiện</label>
+                          <select className="w-full p-2 border rounded-lg" value={taskForm.assigneeId} onChange={e => setTaskForm({...taskForm, assigneeId: e.target.value})}>
+                              {users.map(u => (
+                                  <option key={u.id} value={u.id}>{u.fullName}</option>
+                              ))}
+                          </select>
+                      </div>
+                      <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Hạn hoàn thành</label>
+                          <input type="date" className="w-full p-2 border rounded-lg" value={taskForm.deadline} onChange={e => setTaskForm({...taskForm, deadline: e.target.value})} />
+                      </div>
+                       <div className="flex justify-end gap-3 mt-6">
                         <button type="button" onClick={() => setIsTaskModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Hủy</button>
-                        <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2 font-medium">
-                            <CheckSquare className="w-4 h-4" /> Lưu nhiệm vụ
-                        </button>
+                        <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Lưu</button>
                     </div>
                   </form>
               </div>

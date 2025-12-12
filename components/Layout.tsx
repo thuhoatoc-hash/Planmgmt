@@ -1,75 +1,41 @@
 
 import React, { useEffect, useState } from 'react';
-import { LayoutDashboard, FolderKanban, LogOut, Menu, X, Settings, BarChart3, Download, Target, Award, CheckSquare, CalendarDays, Signal, Bell } from 'lucide-react';
-import { User, Role, UserRole, ResourceType } from '../types';
-import BannerSlider from './BannerSlider';
-import GeminiChat from './GeminiChat';
+import { LayoutDashboard, FolderKanban, Tags, Users, LogOut, Menu, X, Settings, Briefcase, Signal, BarChart3, Download, Target } from 'lucide-react';
+import { User } from '../types';
 
 interface LayoutProps {
   children: React.ReactNode;
   user: User | null;
-  roles?: Role[]; // Roles passed from App
   onLogout: () => void;
   currentPath: string;
   onNavigate: (path: string) => void;
   onOpenProfile: () => void;
-  contextData?: any; // Dữ liệu cho Gemini
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, user, roles = [], onLogout, currentPath, onNavigate, onOpenProfile, contextData }) => {
+const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, currentPath, onNavigate, onOpenProfile }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
-  // Map menu IDs to ResourceType for permission checking
-  const MENU_RESOURCE_MAP: Record<string, ResourceType> = {
-      'dashboard': 'PROJECTS', // Default accessible, logic below overrides
-      'tasks': 'TASKS',
-      'projects': 'PROJECTS',
-      'kpi': 'KPI',
-      'evaluation': 'EVALUATION',
-      'events': 'EVENTS',
-      'reports': 'REPORTS',
-      'notifications': 'NOTIFICATIONS',
-      'settings': 'CONFIG'
-  };
-
-  // Helper to check if a menu item should be shown
-  const canViewMenu = (itemId: string) => {
-      // Dashboard is always visible
-      if (itemId === 'dashboard') return true;
-
-      // Super Admin bypass
-      if (user?.role === UserRole.ADMIN) return true;
-
-      // Legacy fallback: if no roleId, allow all (or restrict as needed)
-      if (!user?.roleId) return true;
-
-      const userRole = roles.find(r => r.id === user.roleId);
-      if (!userRole) return false; // Role not found? Deny.
-
-      const resource = MENU_RESOURCE_MAP[itemId];
-      // Check 'view' permission for the resource
-      return userRole.permissions?.[resource]?.view || false;
-  };
-
-  // Updated Menu Structure - Notifications moved to bottom
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'tasks', label: 'Quản lý Nhiệm vụ', icon: CheckSquare }, 
-    { id: 'projects', label: 'Dự án', icon: FolderKanban },
     { id: 'kpi', label: 'Điều hành chỉ tiêu', icon: Target },
-    { id: 'evaluation', label: 'Đánh giá KI', icon: Award },
-    { id: 'events', label: 'Sự kiện (Sinh nhật)', icon: CalendarDays },
     { id: 'reports', label: 'Báo cáo', icon: BarChart3 },
-    { id: 'notifications', label: 'Thông báo', icon: Bell },
-    { id: 'settings', label: 'Cấu hình hệ thống', icon: Settings }
-  ].filter(item => canViewMenu(item.id));
+    { id: 'projects', label: 'Dự án', icon: FolderKanban },
+    { id: 'partners', label: 'Đối tác', icon: Briefcase },
+    { id: 'categories', label: 'Danh mục', icon: Tags },
+    ...(user?.role === 'ADMIN' ? [
+        { id: 'users', label: 'Người dùng', icon: Users },
+        { id: 'settings', label: 'Cấu hình', icon: Settings }
+    ] : []),
+  ];
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {
+      // Prevent the mini-infobar from appearing on mobile
       e.preventDefault();
+      // Stash the event so it can be triggered later.
       setDeferredPrompt(e);
     };
 
@@ -82,16 +48,14 @@ const Layout: React.FC<LayoutProps> = ({ children, user, roles = [], onLogout, c
 
   const handleInstallClick = async () => {
     if (!deferredPrompt) return;
+    // Show the install prompt
     deferredPrompt.prompt();
+    // Wait for the user to respond to the prompt
     const { outcome } = await deferredPrompt.userChoice;
     console.log(`User response to the install prompt: ${outcome}`);
+    // We've used the prompt, and can't use it again, throw it away
     setDeferredPrompt(null);
   };
-
-  // Get display role name
-  const roleName = user?.roleId 
-    ? roles.find(r => r.id === user.roleId)?.name 
-    : user?.role;
 
   return (
     <div className="flex h-screen bg-slate-50 text-slate-800 font-sans overflow-hidden">
@@ -109,16 +73,14 @@ const Layout: React.FC<LayoutProps> = ({ children, user, roles = [], onLogout, c
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         } flex flex-col`}
       >
-        <div className="flex flex-col items-center justify-center py-6 border-b border-slate-200 px-4 bg-white text-center">
-             <div className="w-10 h-10 bg-[#EE0033] rounded-lg flex items-center justify-center text-white mb-2 shadow-sm">
-                <Signal className="w-6 h-6" />
+        <div className="flex items-center justify-center h-20 border-b border-slate-200 px-4 bg-white">
+          <div className="flex flex-col items-center">
+             <div className="flex items-center gap-2 text-[#EE0033]">
+                <Signal className="h-6 w-6" />
+                <span className="text-xl font-bold tracking-tight">VIETTEL</span>
              </div>
-             <span className="text-[10px] font-bold text-slate-700 uppercase leading-relaxed">
-                HT QUẢN LÝ, ĐIỀU HÀNH GPCNTT
-             </span>
-             <span className="text-[10px] font-bold text-[#EE0033] uppercase tracking-wider mt-0.5">
-                VIETTEL HÀ NỘI
-             </span>
+             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Hà Nội</span>
+          </div>
         </div>
 
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
@@ -169,7 +131,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, roles = [], onLogout, c
             )}
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-slate-900 truncate">{user?.fullName}</p>
-              <p className="text-xs text-slate-500 truncate">{roleName}</p>
+              <p className="text-xs text-slate-500 truncate">{user?.role}</p>
             </div>
           </button>
           <button
@@ -179,6 +141,10 @@ const Layout: React.FC<LayoutProps> = ({ children, user, roles = [], onLogout, c
             <LogOut className="w-4 h-4 mr-2" />
             Đăng xuất
           </button>
+          
+          <div className="mt-4 pt-4 border-t border-slate-100 text-center">
+            <p className="text-[10px] text-slate-400">Copyright @ Dzung Nguyen</p>
+          </div>
         </div>
       </aside>
 
@@ -186,44 +152,19 @@ const Layout: React.FC<LayoutProps> = ({ children, user, roles = [], onLogout, c
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top Header (Mobile only mainly) */}
         <header className="lg:hidden bg-white border-b border-slate-200 h-16 flex items-center px-4 justify-between sticky top-0 z-20">
-          <div className="flex items-center gap-3 overflow-hidden">
-             <div className="w-8 h-8 bg-[#EE0033] rounded-md flex items-center justify-center text-white shadow-sm shrink-0">
-                <Signal className="w-5 h-5" />
-             </div>
-             <div className="flex flex-col justify-center border-l border-slate-300 pl-3 min-w-0">
-                 <span className="text-slate-800 font-bold text-[10px] uppercase truncate leading-tight">HT QUẢN LÝ, ĐIỀU HÀNH GPCNTT</span>
-                 <span className="text-[#EE0033] font-bold text-[10px] uppercase truncate leading-tight">VIETTEL HÀ NỘI</span>
-             </div>
+          <div className="flex items-center gap-2 font-semibold text-slate-800">
+            <Signal className="h-6 w-6 text-[#EE0033]" />
+            <span className="text-[#EE0033] font-bold">Viettel Hà Nội</span>
           </div>
-          <button onClick={toggleSidebar} className="p-2 rounded-md hover:bg-slate-100 text-slate-600 shrink-0">
+          <button onClick={toggleSidebar} className="p-2 rounded-md hover:bg-slate-100 text-slate-600">
             {isSidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
         </header>
 
-        <main className="flex-1 overflow-auto flex flex-col relative">
-          {/* Banner Slider Area - Global for all pages */}
-          <BannerSlider />
-
-          <div className="flex-1 p-4 lg:p-8">
-            <div className="max-w-7xl mx-auto w-full h-full">
-              {children}
-            </div>
+        <main className="flex-1 overflow-auto p-4 lg:p-8">
+          <div className="max-w-7xl mx-auto">
+            {children}
           </div>
-          
-          {/* Footer */}
-          <footer className="py-6 text-center border-t border-slate-200 w-full mt-auto">
-             <div className="flex flex-col items-center justify-center gap-1">
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">
-                    © {new Date().getFullYear()} Khối Giải pháp Công nghệ thông tin - Viettel Hà Nội
-                </p>
-                <p className="text-[10px] text-slate-400">
-                    Hệ thống Quản lý Phương án Kinh doanh & KPI • Version 1.3
-                </p>
-             </div>
-          </footer>
-
-          {/* Gemini Chat AI - Available everywhere */}
-          {user && <GeminiChat contextData={contextData} />}
         </main>
       </div>
     </div>
