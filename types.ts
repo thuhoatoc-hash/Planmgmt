@@ -7,7 +7,7 @@ export enum UserRole {
 }
 
 // --- NEW PERMISSION TYPES ---
-export type ResourceType = 'PROJECTS' | 'CONTRACTS' | 'TASKS' | 'KPI' | 'EVALUATION' | 'EVENTS' | 'USERS' | 'CONFIG' | 'REPORTS';
+export type ResourceType = 'PROJECTS' | 'CONTRACTS' | 'TASKS' | 'KPI' | 'EVALUATION' | 'EVENTS' | 'USERS' | 'CONFIG' | 'REPORTS' | 'NOTIFICATIONS';
 export type ActionType = 'view' | 'edit' | 'delete';
 
 export interface Permission {
@@ -276,4 +276,21 @@ export interface BannerConfig {
     images: string[];
     interval: number;
     enabled?: boolean;
+}
+
+// --- NOTIFICATION TYPES ---
+export enum NotificationPriority {
+    URGENT = 'URGENT',     // Khẩn
+    IMPORTANT = 'IMPORTANT', // Quan trọng
+    NORMAL = 'NORMAL'      // Bình thường
+}
+
+export interface Notification {
+    id: string;
+    title: string;
+    content: string;
+    priority: NotificationPriority;
+    createdAt: string; // ISO Date
+    authorId: string; // User ID
+    isRead?: boolean; // Local state for user
 }

@@ -12,7 +12,8 @@ import KPIManagement from './components/KPIManagement';
 import EmployeeEvaluationManager from './components/EmployeeEvaluation';
 import TaskManagement from './components/TaskManagement';
 import EventManager from './components/EventManager';
-import { User, Project, Contract, Category, Partner, ProjectStatusItem, Task, KPIMonthlyData, EmployeeEvaluation, TaskStatus, BirthdayEvent, Role, UserRole, ResourceType } from './types';
+import NotificationManager from './components/NotificationManager';
+import { User, Project, Contract, Category, Partner, ProjectStatusItem, Task, KPIMonthlyData, EmployeeEvaluation, TaskStatus, BirthdayEvent, Role, UserRole, ResourceType, Notification } from './types';
 import { api } from './services/api';
 import { Loader2 } from 'lucide-react';
 
@@ -61,6 +62,7 @@ const App: React.FC = () => {
   const [evaluations, setEvaluations] = useState<EmployeeEvaluation[]>([]);
   const [events, setEvents] = useState<BirthdayEvent[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
 
   // View State
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -71,7 +73,7 @@ const App: React.FC = () => {
     setIsAppLoading(true);
     try {
         const [
-            pData, cData, catData, uData, partData, sData, tData, kData, eData, evtData, roleData
+            pData, cData, catData, uData, partData, sData, tData, kData, eData, evtData, roleData, notifData
         ] = await Promise.all([
             api.projects.getAll(),
             api.contracts.getAll(),
@@ -83,7 +85,8 @@ const App: React.FC = () => {
             api.kpi.getAll(),
             api.evaluations.getAll(),
             api.events.getAll(),
-            api.roles.getAll()
+            api.roles.getAll(),
+            api.notifications.getAll()
         ]);
 
         setProjects(pData);
@@ -97,6 +100,7 @@ const App: React.FC = () => {
         setEvaluations(eData);
         setEvents(evtData);
         setRoles(roleData);
+        setNotifications(notifData);
 
         // Check for task reminders after loading
         checkTaskReminders(tData, uData);
@@ -332,6 +336,20 @@ const App: React.FC = () => {
       if (success) setEvents(events.filter(e => e.id !== id));
   };
 
+  // Notification Handlers
+  const handleAddNotification = async (n: Notification) => {
+      const saved = await api.notifications.save(n);
+      if (saved) setNotifications([...notifications, saved]);
+  };
+  const handleUpdateNotification = async (n: Notification) => {
+      const saved = await api.notifications.save(n);
+      if (saved) setNotifications(notifications.map(existing => existing.id === saved.id ? saved : existing));
+  };
+  const handleDeleteNotification = async (id: string) => {
+      const success = await api.notifications.delete(id);
+      if (success) setNotifications(notifications.filter(n => n.id !== id));
+  };
+
   // Navigation Logic
   const handleNavigate = (path: string, id?: string) => {
     setCurrentPath(path);
@@ -381,6 +399,7 @@ const App: React.FC = () => {
     if (currentPath === 'settings' && !checkPermission('CONFIG')) return <div className="p-8 text-center text-slate-500">Bạn không có quyền truy cập module này.</div>;
     if (currentPath === 'tasks' && !checkPermission('TASKS')) return <div className="p-8 text-center text-slate-500">Bạn không có quyền truy cập module này.</div>;
     if (currentPath === 'events' && !checkPermission('EVENTS')) return <div className="p-8 text-center text-slate-500">Bạn không có quyền truy cập module này.</div>;
+    if (currentPath === 'notifications' && !checkPermission('NOTIFICATIONS')) return <div className="p-8 text-center text-slate-500">Bạn không có quyền truy cập module này.</div>;
 
     switch (currentPath) {
       case 'dashboard':
@@ -394,6 +413,7 @@ const App: React.FC = () => {
                   users={users}
                   evaluations={evaluations}
                   events={events}
+                  notifications={notifications}
                   roles={roles} // Pass roles to Dashboard for widget permission check
                   onNavigate={handleNavigate} // Pass handleNavigate here
                />;
@@ -419,6 +439,14 @@ const App: React.FC = () => {
                   onAddEvent={handleAddEvent}
                   onUpdateEvent={handleUpdateEvent}
                   onDeleteEvent={handleDeleteEvent}
+               />;
+      case 'notifications':
+        return <NotificationManager 
+                  notifications={notifications}
+                  currentUser={user}
+                  onAdd={handleAddNotification}
+                  onUpdate={handleUpdateNotification}
+                  onDelete={handleDeleteNotification}
                />;
       case 'reports':
         return <Reports projects={projects} contracts={contracts} categories={categories} users={users} />;

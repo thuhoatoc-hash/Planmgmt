@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { LayoutDashboard, FolderKanban, LogOut, Menu, X, Settings, BarChart3, Download, Target, Award, CheckSquare, CalendarDays, Signal } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, LogOut, Menu, X, Settings, BarChart3, Download, Target, Award, CheckSquare, CalendarDays, Signal, Bell } from 'lucide-react';
 import { User, Role, UserRole, ResourceType } from '../types';
 import BannerSlider from './BannerSlider';
 
@@ -27,6 +27,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, roles = [], onLogout, c
       'evaluation': 'EVALUATION',
       'events': 'EVENTS',
       'reports': 'REPORTS',
+      'notifications': 'NOTIFICATIONS',
       'settings': 'CONFIG'
   };
 
@@ -49,7 +50,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, roles = [], onLogout, c
       return userRole.permissions?.[resource]?.view || false;
   };
 
-  // Updated Menu Structure
+  // Updated Menu Structure - Notifications moved to bottom
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'tasks', label: 'Quản lý Nhiệm vụ', icon: CheckSquare }, 
@@ -58,6 +59,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, roles = [], onLogout, c
     { id: 'evaluation', label: 'Đánh giá KI', icon: Award },
     { id: 'events', label: 'Sự kiện (Sinh nhật)', icon: CalendarDays },
     { id: 'reports', label: 'Báo cáo', icon: BarChart3 },
+    { id: 'notifications', label: 'Thông báo', icon: Bell },
     { id: 'settings', label: 'Cấu hình hệ thống', icon: Settings }
   ].filter(item => canViewMenu(item.id));
 

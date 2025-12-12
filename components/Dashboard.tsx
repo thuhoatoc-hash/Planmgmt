@@ -1,8 +1,8 @@
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Project, Contract, ContractType, Category, CategoryType, KPIMonthlyData, Task, User, TaskStatus, InstallmentStatus, EmployeeEvaluation, UserRole, BirthdayEvent, Role } from '../types';
-import { Wallet, TrendingUp, TrendingDown, Activity, Settings, Check, X, SlidersHorizontal, CheckSquare, Award, AlertTriangle, Target, Gift, Phone, ClipboardList, Move, GripHorizontal } from 'lucide-react';
+import { Project, Contract, ContractType, Category, CategoryType, KPIMonthlyData, Task, User, TaskStatus, InstallmentStatus, EmployeeEvaluation, UserRole, BirthdayEvent, Role, Notification, NotificationPriority } from '../types';
+import { Wallet, TrendingUp, TrendingDown, Activity, Settings, Check, X, SlidersHorizontal, CheckSquare, Award, AlertTriangle, Target, Gift, Phone, ClipboardList, Move, GripHorizontal, Bell, Info } from 'lucide-react';
 
 interface DashboardProps {
   currentUser?: User | null;
@@ -15,6 +15,7 @@ interface DashboardProps {
   evaluations?: EmployeeEvaluation[];
   events?: BirthdayEvent[];
   roles?: Role[];
+  notifications?: Notification[];
   onNavigate?: (path: string, id?: string) => void;
 }
 
@@ -35,12 +36,15 @@ const DEFAULT_CONFIG = {
   showMyTasks: true,
   showDueTasks: true,
   showBirthdays: true,
+  showNotifications: true,
 };
 
 // Widget Definitions for Drag and Drop
-type WidgetType = 'sales' | 'cost' | 'profit' | 'revenue' | 'my_tasks' | 'due_tasks' | 'birthdays' | 'kpi' | 'task_am' | 'task_project' | 'eval' | 'fin_project' | 'fin_category';
+type WidgetType = 'sales' | 'cost' | 'profit' | 'revenue' | 'my_tasks' | 'due_tasks' | 'birthdays' | 'kpi' | 'task_am' | 'task_project' | 'eval' | 'fin_project' | 'fin_category' | 'notifications';
 
 const DEFAULT_ORDER: WidgetType[] = [
+    // 0. Thông báo (Important)
+    'notifications',
     // 1. Chỉ tiêu điều hành (KPI)
     'kpi', 
     // 2. Việc cần làm (My Tasks) & Sinh nhật
@@ -55,7 +59,7 @@ const DEFAULT_ORDER: WidgetType[] = [
     'due_tasks', 'fin_project', 'fin_category'
 ];
 
-const Dashboard: React.FC<DashboardProps> = ({ currentUser, projects, contracts, categories, kpiData = [], tasks = [], users = [], evaluations = [], events = [], roles = [], onNavigate }) => {
+const Dashboard: React.FC<DashboardProps> = ({ currentUser, projects, contracts, categories, kpiData = [], tasks = [], users = [], evaluations = [], events = [], roles = [], notifications = [], onNavigate }) => {
   // State for customization
   const [config, setConfig] = useState(DEFAULT_CONFIG);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
@@ -85,13 +89,13 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, projects, contracts,
       }
       
       // Use v2 key to force reset order for users who had old order cached
-      const savedOrder = localStorage.getItem('pm_dashboard_order_v2');
+      const savedOrder = localStorage.getItem('pm_dashboard_order_v3'); // Increment to v3 for new widget
       if (savedOrder) {
           // Merge saved order with default to handle new widgets if any
           const parsedOrder = JSON.parse(savedOrder);
           const validOrder = parsedOrder.filter((id: string) => DEFAULT_ORDER.includes(id as WidgetType));
           const missing = DEFAULT_ORDER.filter(id => !validOrder.includes(id));
-          setWidgetOrder([...validOrder, ...missing]);
+          setWidgetOrder([...missing, ...validOrder]); // Put missing (new) widgets at top usually
       } else {
           // Use default order if no saved order
           setWidgetOrder(DEFAULT_ORDER);
@@ -104,7 +108,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, projects, contracts,
   // Save order when changed
   const handleOrderChange = (newOrder: WidgetType[]) => {
       setWidgetOrder(newOrder);
-      localStorage.setItem('pm_dashboard_order_v2', JSON.stringify(newOrder));
+      localStorage.setItem('pm_dashboard_order_v3', JSON.stringify(newOrder));
   };
 
   // Close config panel when clicking outside
@@ -365,6 +369,12 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, projects, contracts,
       .sort((a,b) => a.daysUntil - b.daysUntil);
   }, [events]);
 
+  // --- Latest Notifications ---
+  const latestNotifications = useMemo(() => {
+      if (!notifications || notifications.length === 0) return [];
+      return [...notifications].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 5);
+  }, [notifications]);
+
   const StatCard = ({ title, value, subValue, icon: Icon, colorClass, onClick }: any) => (
     <div 
         onClick={isDragMode ? undefined : onClick}
@@ -386,6 +396,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, projects, contracts,
   // --- RENDER WIDGET HELPERS ---
   const getWidgetSpan = (id: WidgetType) => {
       switch(id) {
+          case 'notifications': return 'col-span-1 md:col-span-2 lg:col-span-4'; // Top bar
           case 'kpi': return 'col-span-1 md:col-span-2 lg:col-span-4'; // Full width on large
           case 'fin_project': return 'col-span-1 md:col-span-2';
           case 'fin_category': return 'col-span-1 md:col-span-2';
@@ -445,6 +456,38 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, projects, contracts,
                     colorClass={{ bg: 'bg-emerald-50', icon: 'text-emerald-600', text: 'text-emerald-600' }}
                     onClick={() => onNavigate && onNavigate('projects')}
                   />
+              ) : null;
+          case 'notifications':
+              return config.showNotifications && latestNotifications.length > 0 ? (
+                  <div 
+                    onClick={() => !isDragMode && onNavigate && onNavigate('notifications')}
+                    className={`bg-white border border-slate-200 rounded-xl p-4 h-full shadow-sm overflow-hidden ${!isDragMode ? 'cursor-pointer hover:border-indigo-300' : ''}`}
+                  >
+                      <h3 className="flex items-center gap-2 text-slate-800 font-bold mb-3">
+                          <Bell className="w-5 h-5 text-[#EE0033]" /> Thông báo mới nhất
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {latestNotifications.map(notif => {
+                              const priorityColor = 
+                                notif.priority === NotificationPriority.URGENT ? 'bg-red-50 border-red-200' :
+                                notif.priority === NotificationPriority.IMPORTANT ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100';
+                              
+                              return (
+                                  <div key={notif.id} className={`p-3 rounded-lg border ${priorityColor} relative`}>
+                                      <div className="flex justify-between items-start mb-1">
+                                          <div className="flex items-center gap-1.5">
+                                              {notif.priority === NotificationPriority.URGENT && <AlertTriangle className="w-4 h-4 text-red-600" />}
+                                              {notif.priority === NotificationPriority.IMPORTANT && <Info className="w-4 h-4 text-amber-600" />}
+                                              <span className="font-bold text-sm text-slate-800 line-clamp-1">{notif.title}</span>
+                                          </div>
+                                          <span className="text-[10px] text-slate-500 whitespace-nowrap">{new Date(notif.createdAt).toLocaleDateString('vi-VN')}</span>
+                                      </div>
+                                      <p className="text-xs text-slate-600 line-clamp-2">{notif.content}</p>
+                                  </div>
+                              );
+                          })}
+                      </div>
+                  </div>
               ) : null;
           case 'my_tasks':
               return config.showMyTasks && myToDos.length > 0 ? (
@@ -818,6 +861,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, projects, contracts,
                 </div>
                 <div className="space-y-2 max-h-80 overflow-y-auto">
                   {[
+                    { key: 'showNotifications', label: 'Thông báo' },
                     { key: 'showSales', label: 'Thẻ Doanh số' },
                     { key: 'showCost', label: 'Thẻ Chi phí' },
                     { key: 'showProfit', label: 'Thẻ Lợi nhuận' },

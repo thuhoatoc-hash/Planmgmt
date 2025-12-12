@@ -1,6 +1,6 @@
 
 import { supabase } from '../lib/supabase';
-import { Project, Contract, Category, User, Partner, ProjectStatusItem, Task, KPIMonthlyData, EmployeeEvaluation, BirthdayEvent, Role, UserFieldDefinition, BannerConfig } from '../types';
+import { Project, Contract, Category, User, Partner, ProjectStatusItem, Task, KPIMonthlyData, EmployeeEvaluation, BirthdayEvent, Role, UserFieldDefinition, BannerConfig, Notification } from '../types';
 
 // Generic helper to fetch data
 async function fetchAll<T>(table: string): Promise<T[]> {
@@ -129,6 +129,11 @@ export const api = {
     getAll: () => fetchAll<BirthdayEvent>('birthday_events'),
     save: (e: BirthdayEvent) => upsert<BirthdayEvent>('birthday_events', e),
     delete: (id: string) => remove('birthday_events', id),
+  },
+  notifications: {
+    getAll: () => fetchAll<Notification>('notifications'),
+    save: (n: Notification) => upsert<Notification>('notifications', n),
+    delete: (id: string) => remove('notifications', id),
   },
   settings: {
       getBannerConfig: async (): Promise<BannerConfig | null> => {
