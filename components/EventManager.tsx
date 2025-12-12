@@ -40,6 +40,9 @@ const EventManager: React.FC<EventManagerProps> = ({ events, initialSelectedId, 
       }
   }, [initialSelectedId, events]);
 
+  // Current month index (0 = Jan, 11 = Dec)
+  const currentMonthIndex = new Date().getMonth();
+
   const filteredEvents = events.filter(e => {
     const matchText = e.fullName.toLowerCase().includes(searchTerm.toLowerCase()) || 
                       e.title.toLowerCase().includes(searchTerm.toLowerCase());
@@ -52,12 +55,24 @@ const EventManager: React.FC<EventManagerProps> = ({ events, initialSelectedId, 
 
     return matchText && matchType && matchMonth;
   }).sort((a, b) => {
-      // Sort by month/day (ignoring year) to show calendar order
       const dateA = new Date(a.date);
       const dateB = new Date(b.date);
-      const mmddA = (dateA.getMonth() + 1) * 100 + dateA.getDate();
-      const mmddB = (dateB.getMonth() + 1) * 100 + dateB.getDate();
-      return mmddA - mmddB;
+      
+      const monthA = dateA.getMonth();
+      const monthB = dateB.getMonth();
+
+      // Calculate relative distance from current month (0 to 11)
+      // Logic: (TargetMonth - CurrentMonth + 12) % 12
+      // Example: Current = 8 (Sept), Target = 1 (Feb). (1 - 8 + 12) % 12 = 5 (comes after).
+      const diffA = (monthA - currentMonthIndex + 12) % 12;
+      const diffB = (monthB - currentMonthIndex + 12) % 12;
+
+      if (diffA !== diffB) {
+          return diffA - diffB;
+      }
+      
+      // If same month relative to now, sort by day
+      return dateA.getDate() - dateB.getDate();
   });
 
   const handleOpenModal = (event?: BirthdayEvent) => {

@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Project, Contract, Category, User, ContractType, Task, TaskStatus } from '../types';
+import { Project, Contract, Category, User, ContractType, Task, TaskStatus, InstallmentStatus } from '../types';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Download, Filter, Calendar, BarChart3, PieChart as PieChartIcon, User as UserIcon, TrendingUp, CheckSquare } from 'lucide-react';
 
@@ -62,7 +62,18 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
     return projects.map(p => {
         const pContracts = filteredContracts.filter(c => c.projectId === p.id);
         const sales = pContracts.filter(c => c.type === ContractType.OUTPUT && c.status !== 'CANCELLED').reduce((sum, c) => sum + c.value, 0);
-        const revenue = pContracts.filter(c => c.type === ContractType.OUTPUT && c.status === 'COMPLETED').reduce((sum, c) => sum + c.value, 0);
+        
+        // Calculate Revenue based on installments or completed status
+        const revenue = pContracts.filter(c => c.type === ContractType.OUTPUT && c.status !== 'CANCELLED').reduce((sum, c) => {
+            if (c.installments && c.installments.length > 0) {
+                return sum + c.installments
+                    .filter(i => i.status === InstallmentStatus.INVOICED || i.status === InstallmentStatus.PAID)
+                    .reduce((s, i) => s + i.value, 0);
+            } else {
+                return sum + (c.status === 'COMPLETED' ? c.value : 0);
+            }
+        }, 0);
+
         const cost = pContracts.filter(c => c.type === ContractType.INPUT && c.status !== 'CANCELLED').reduce((sum, c) => sum + c.value, 0);
         return {
             projectName: p.name,
@@ -98,17 +109,40 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
   const amData = useMemo(() => {
       const amMap: Record<string, { amName: string, sales: number, revenue: number }> = {};
       
-      // Initialize AMs
-      users.filter(u => u.username.includes('am') || u.role === 'USER').forEach(u => {
-          amMap[u.id] = { amName: u.fullName, sales: 0, revenue: 0 };
-      });
-
-      // Iterate contracts to fill data
+      // Iterate contracts to fill data (More reliable than iterating users first)
       filteredContracts.filter(c => c.type === ContractType.OUTPUT).forEach(c => {
           const project = projects.find(p => p.id === c.projectId);
-          if (project && project.amId && amMap[project.amId]) {
-              if (c.status !== 'CANCELLED') amMap[project.amId].sales += c.value;
-              if (c.status === 'COMPLETED') amMap[project.amId].revenue += c.value;
+          // Only process if project exists and has an AM
+          if (project && project.amId) {
+              const amId = project.amId;
+              
+              // Initialize entry if not exists
+              if (!amMap[amId]) {
+                  const user = users.find(u => u.id === amId);
+                  amMap[amId] = { 
+                      amName: user ? user.fullName : 'Unknown AM', 
+                      sales: 0, 
+                      revenue: 0 
+                  };
+              }
+
+              // Calculate Sales (Signed Contracts)
+              if (c.status !== 'CANCELLED') {
+                  amMap[amId].sales += c.value;
+              }
+
+              // Calculate Revenue (Installments Invoiced/Paid OR Completed Contract)
+              if (c.status !== 'CANCELLED') {
+                  let contractRevenue = 0;
+                  if (c.installments && c.installments.length > 0) {
+                      contractRevenue = c.installments
+                          .filter(i => i.status === InstallmentStatus.INVOICED || i.status === InstallmentStatus.PAID)
+                          .reduce((sum, i) => sum + i.value, 0);
+                  } else if (c.status === 'COMPLETED') {
+                      contractRevenue = c.value;
+                  }
+                  amMap[amId].revenue += contractRevenue;
+              }
           }
       });
 
@@ -131,7 +165,7 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
           if (c.type === ContractType.OUTPUT && c.status !== 'CANCELLED') {
               trendMap[key].sales += c.value;
               if (c.status === 'COMPLETED') {
-                 trendMap[key].revenue += c.value;
+                 trendMap[key].revenue += c.value; // Simplified trend for revenue to keep consistent with signed date
               }
           } else if (c.type === ContractType.INPUT && c.status !== 'CANCELLED') {
               trendMap[key].cost += c.value;
@@ -145,16 +179,19 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
   const taskReportData = useMemo(() => {
       const assigneeMap: Record<string, { name: string, total: number, completed: number, late: number, inProgress: number }> = {};
       
-      users.forEach(u => {
-          assigneeMap[u.id] = { name: u.fullName, total: 0, completed: 0, late: 0, inProgress: 0 };
-      });
-
       const today = new Date();
       today.setHours(0,0,0,0);
 
       filteredTasks.forEach(t => {
           if (!assigneeMap[t.assigneeId]) {
-              assigneeMap[t.assigneeId] = { name: 'Unknown', total: 0, completed: 0, late: 0, inProgress: 0 };
+              const user = users.find(u => u.id === t.assigneeId);
+              assigneeMap[t.assigneeId] = { 
+                  name: user ? user.fullName : 'Unknown', 
+                  total: 0, 
+                  completed: 0, 
+                  late: 0, 
+                  inProgress: 0 
+              };
           }
           const entry = assigneeMap[t.assigneeId];
           entry.total += 1;
