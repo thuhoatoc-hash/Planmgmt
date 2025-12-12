@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { LayoutDashboard, FolderKanban, LogOut, Menu, X, Settings, BarChart3, Download, Target, Award, CheckSquare, CalendarDays } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, LogOut, Menu, X, Settings, BarChart3, Download, Target, Award, CheckSquare, CalendarDays, Signal } from 'lucide-react';
 import { User, Role, UserRole, ResourceType } from '../types';
 
 interface LayoutProps {
@@ -106,11 +106,9 @@ const Layout: React.FC<LayoutProps> = ({ children, user, roles = [], onLogout, c
       >
         <div className="flex items-center justify-center h-20 border-b border-slate-200 px-4 bg-white">
           <div className="flex flex-col items-center">
-             <img 
-               src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Viettel_logo_2021.svg/1200px-Viettel_logo_2021.svg.png" 
-               alt="Viettel Logo" 
-               className="h-10 object-contain mb-1"
-             />
+             <div className="w-10 h-10 bg-[#EE0033] rounded-lg flex items-center justify-center text-white mb-1 shadow-sm">
+                <Signal className="w-6 h-6" />
+             </div>
              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Hà Nội</span>
           </div>
         </div>
@@ -181,11 +179,9 @@ const Layout: React.FC<LayoutProps> = ({ children, user, roles = [], onLogout, c
         {/* Top Header (Mobile only mainly) */}
         <header className="lg:hidden bg-white border-b border-slate-200 h-16 flex items-center px-4 justify-between sticky top-0 z-20">
           <div className="flex items-center gap-2">
-            <img 
-               src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Viettel_logo_2021.svg/1200px-Viettel_logo_2021.svg.png" 
-               alt="Viettel" 
-               className="h-8 object-contain"
-             />
+             <div className="w-8 h-8 bg-[#EE0033] rounded-md flex items-center justify-center text-white shadow-sm">
+                <Signal className="w-5 h-5" />
+             </div>
              <span className="text-slate-500 font-bold text-sm uppercase border-l border-slate-300 pl-2 ml-1">Hà Nội</span>
           </div>
           <button onClick={toggleSidebar} className="p-2 rounded-md hover:bg-slate-100 text-slate-600">
@@ -202,10 +198,10 @@ const Layout: React.FC<LayoutProps> = ({ children, user, roles = [], onLogout, c
           <footer className="mt-8 py-6 text-center border-t border-slate-200 w-full">
              <div className="flex flex-col items-center justify-center gap-1">
                 <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">
-                    © {new Date().getFullYear()} Ban Khách hàng Doanh nghiệp - Viettel Hà Nội
+                    © {new Date().getFullYear()} Khối Giải pháp Công nghệ thông tin - Viettel Hà Nội
                 </p>
                 <p className="text-[10px] text-slate-400">
-                    Hệ thống Quản lý Phương án Kinh doanh & KPI • Version 1.2
+                    Hệ thống Quản lý Phương án Kinh doanh & KPI • Version 1.3
                 </p>
              </div>
           </footer>

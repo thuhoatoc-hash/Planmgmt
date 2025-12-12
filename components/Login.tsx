@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { User } from '../types';
 import { api } from '../services/api';
-import { ArrowRight, Loader2, Eye, EyeOff, Lock, CheckCircle } from 'lucide-react';
+import { ArrowRight, Loader2, Eye, EyeOff, Lock, CheckCircle, Signal } from 'lucide-react';
 import { hashPassword } from '../lib/crypto';
 
 interface LoginProps {
@@ -120,11 +120,9 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
         <div className="flex flex-col items-center mb-8 mt-2">
           <div className="p-4 mb-2">
-            <img 
-               src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Viettel_logo_2021.svg/1200px-Viettel_logo_2021.svg.png" 
-               alt="Viettel Logo" 
-               className="h-16 object-contain"
-            />
+             <div className="w-16 h-16 bg-[#EE0033] rounded-2xl flex items-center justify-center text-white shadow-lg mx-auto">
+                <Signal className="w-10 h-10" />
+             </div>
           </div>
           <h1 className="text-xl font-bold text-slate-900 text-center uppercase tracking-wide">PM Quản lý dự án kinh doanh</h1>
           <h2 className="text-sm font-bold text-slate-500 mt-1 uppercase tracking-widest">Viettel Hà Nội</h2>

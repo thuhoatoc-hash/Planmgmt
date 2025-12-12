@@ -44,15 +44,15 @@ const DEFAULT_ORDER: WidgetType[] = [
     // 1. Chỉ tiêu điều hành (KPI)
     'kpi', 
     // 2. Việc cần làm (My Tasks) & Sinh nhật
-    'my_tasks', 'birthdays', 'due_tasks',
+    'my_tasks', 'birthdays', 
     // 3. Doanh thu, doanh số, chi phí, lợi nhuận (Finance)
-    'sales', 'revenue', 'cost', 'profit', 
+    'revenue', 'sales', 'cost', 'profit', 
     // 4. Đánh giá nhân viên
     'eval',
     // 5. Nhiệm vụ nhân viên, nhiệm vụ dự án
     'task_am', 'task_project',
     // 6. Others
-    'fin_project', 'fin_category'
+    'due_tasks', 'fin_project', 'fin_category'
 ];
 
 const Dashboard: React.FC<DashboardProps> = ({ currentUser, projects, contracts, categories, kpiData = [], tasks = [], users = [], evaluations = [], events = [], roles = [], onNavigate }) => {
@@ -84,7 +84,8 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, projects, contracts,
         setConfig({ ...DEFAULT_CONFIG, ...JSON.parse(savedConfig) });
       }
       
-      const savedOrder = localStorage.getItem('pm_dashboard_order');
+      // Use v2 key to force reset order for users who had old order cached
+      const savedOrder = localStorage.getItem('pm_dashboard_order_v2');
       if (savedOrder) {
           // Merge saved order with default to handle new widgets if any
           const parsedOrder = JSON.parse(savedOrder);
@@ -103,7 +104,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, projects, contracts,
   // Save order when changed
   const handleOrderChange = (newOrder: WidgetType[]) => {
       setWidgetOrder(newOrder);
-      localStorage.setItem('pm_dashboard_order', JSON.stringify(newOrder));
+      localStorage.setItem('pm_dashboard_order_v2', JSON.stringify(newOrder));
   };
 
   // Close config panel when clicking outside
