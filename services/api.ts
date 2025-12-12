@@ -1,6 +1,6 @@
 
 import { supabase } from '../lib/supabase';
-import { Project, Contract, Category, User, Partner, ProjectStatusItem, Task, KPIMonthlyData, EmployeeEvaluation, BirthdayEvent, Role, UserFieldDefinition, BannerConfig, Notification } from '../types';
+import { Project, Contract, Category, User, Partner, ProjectStatusItem, Task, KPIMonthlyData, EmployeeEvaluation, BirthdayEvent, Role, UserFieldDefinition, BannerConfig, Notification, ActivityLog } from '../types';
 
 // Generic helper to fetch data
 async function fetchAll<T>(table: string): Promise<T[]> {
@@ -62,6 +62,36 @@ async function remove(table: string, id: string): Promise<boolean> {
   }
   return true;
 }
+
+// --- LOGGING HELPER ---
+const getDeviceName = () => {
+    const ua = navigator.userAgent;
+    if (/android/i.test(ua)) return 'Android';
+    if (/iPad|iPhone|iPod/.test(ua)) return 'iOS';
+    if (/windows phone/i.test(ua)) return 'Windows Phone';
+    if (/windows/i.test(ua)) return 'Windows PC';
+    if (/macintosh|mac os/i.test(ua)) return 'MacOS';
+    if (/linux/i.test(ua)) return 'Linux';
+    return 'Unknown Device';
+};
+
+export const logActivity = async (user: User, action: string, target: string, details?: string) => {
+    try {
+        const log: ActivityLog = {
+            id: `log_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+            userId: user.id,
+            userName: user.fullName,
+            action,
+            target,
+            timestamp: new Date().toISOString(),
+            device: getDeviceName(),
+            details
+        };
+        await supabase.from('activity_logs').insert(log);
+    } catch (e) {
+        console.error('Failed to save log', e);
+    }
+};
 
 export const api = {
   projects: {
@@ -134,6 +164,9 @@ export const api = {
     getAll: () => fetchAll<Notification>('notifications'),
     save: (n: Notification) => upsert<Notification>('notifications', n),
     delete: (id: string) => remove('notifications', id),
+  },
+  logs: {
+      getAll: () => fetchAll<ActivityLog>('activity_logs'),
   },
   settings: {
       getBannerConfig: async (): Promise<BannerConfig | null> => {

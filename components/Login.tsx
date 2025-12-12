@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { User } from '../types';
-import { api } from '../services/api';
+import { api, logActivity } from '../services/api';
 import { ArrowRight, Loader2, Eye, EyeOff, Lock, CheckCircle, Signal } from 'lucide-react';
 import { hashPassword } from '../lib/crypto';
 
@@ -69,6 +69,10 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       } else {
           localStorage.removeItem('rememberMe');
       }
+      
+      // LOG ACTIVITY
+      logActivity(user, 'LOGIN', 'System', 'User signed in');
+
       onLogin(user);
   };
 

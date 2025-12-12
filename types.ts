@@ -49,6 +49,18 @@ export interface User {
   extendedInfo?: Record<string, any>; // Stores values for custom fields
 }
 
+// --- ACTIVITY LOG TYPES ---
+export interface ActivityLog {
+    id: string;
+    userId: string;
+    userName: string;
+    action: string; // 'LOGIN', 'CREATE_PROJECT', etc.
+    target: string; // Object being acted upon
+    timestamp: string;
+    device: string;
+    details?: string;
+}
+
 export enum CategoryType {
   REVENUE = 'REVENUE', // Doanh thu
   COST = 'COST',       // Chi phí

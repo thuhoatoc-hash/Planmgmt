@@ -461,28 +461,30 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, projects, contracts,
               return config.showNotifications && latestNotifications.length > 0 ? (
                   <div 
                     onClick={() => !isDragMode && onNavigate && onNavigate('notifications')}
-                    className={`bg-white border border-slate-200 rounded-xl p-4 h-full shadow-sm overflow-hidden ${!isDragMode ? 'cursor-pointer hover:border-indigo-300' : ''}`}
+                    className={`bg-white border border-slate-200 rounded-xl p-4 h-full shadow-sm overflow-hidden flex flex-col ${!isDragMode ? 'cursor-pointer hover:border-indigo-300' : ''}`}
                   >
-                      <h3 className="flex items-center gap-2 text-slate-800 font-bold mb-3">
+                      <h3 className="flex items-center gap-2 text-slate-800 font-bold mb-3 flex-shrink-0">
                           <Bell className="w-5 h-5 text-[#EE0033]" /> Thông báo mới nhất
                       </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {/* FIX: Use flex-grow and allow scrolling or better grid distribution */}
+                      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 overflow-y-auto">
                           {latestNotifications.map(notif => {
                               const priorityColor = 
                                 notif.priority === NotificationPriority.URGENT ? 'bg-red-50 border-red-200' :
                                 notif.priority === NotificationPriority.IMPORTANT ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100';
                               
                               return (
-                                  <div key={notif.id} className={`p-3 rounded-lg border ${priorityColor} relative`}>
-                                      <div className="flex justify-between items-start mb-1">
-                                          <div className="flex items-center gap-1.5">
-                                              {notif.priority === NotificationPriority.URGENT && <AlertTriangle className="w-4 h-4 text-red-600" />}
-                                              {notif.priority === NotificationPriority.IMPORTANT && <Info className="w-4 h-4 text-amber-600" />}
-                                              <span className="font-bold text-sm text-slate-800 line-clamp-1">{notif.title}</span>
+                                  <div key={notif.id} className={`p-3 rounded-lg border ${priorityColor} relative flex flex-col h-full`}>
+                                      <div className="flex justify-between items-start mb-1 flex-shrink-0">
+                                          <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                              {notif.priority === NotificationPriority.URGENT && <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />}
+                                              {notif.priority === NotificationPriority.IMPORTANT && <Info className="w-4 h-4 text-amber-600 shrink-0" />}
+                                              <span className="font-bold text-sm text-slate-800 truncate">{notif.title}</span>
                                           </div>
-                                          <span className="text-[10px] text-slate-500 whitespace-nowrap">{new Date(notif.createdAt).toLocaleDateString('vi-VN')}</span>
+                                          <span className="text-[10px] text-slate-500 whitespace-nowrap ml-2">{new Date(notif.createdAt).toLocaleDateString('vi-VN')}</span>
                                       </div>
-                                      <p className="text-xs text-slate-600 line-clamp-2">{notif.content}</p>
+                                      {/* Updated: Increased line clamp for desktop and better handling */}
+                                      <p className="text-xs text-slate-600 line-clamp-2 md:line-clamp-4 leading-relaxed">{notif.content}</p>
                                   </div>
                               );
                           })}
