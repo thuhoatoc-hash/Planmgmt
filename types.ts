@@ -372,3 +372,32 @@ export interface AttendanceSystemConfig {
     defaultBehavior: 'PRESENT' | 'ABSENT'; // Nếu không chấm công thì mặc định là gì
     workingDays: number[]; // [1,2,3,4,5] = Mon-Fri. 0=Sun, 6=Sat
 }
+
+// --- SAVED REPORT TYPES ---
+export enum ReportPeriodType {
+    WEEKLY = 'WEEKLY',
+    MONTHLY = 'MONTHLY',
+    QUARTERLY = 'QUARTERLY',
+    YEARLY = 'YEARLY',
+    CUSTOM = 'CUSTOM'
+}
+
+export interface ReportContent {
+    customGov: string;
+    customEdu: string;
+    customInfra: string;
+    customOther: string;
+    customPlans: string;
+    customProposals: string;
+}
+
+export interface SavedReport {
+    id: string;
+    title: string;
+    periodType: ReportPeriodType;
+    startDate: string; // YYYY-MM-DD
+    endDate: string;   // YYYY-MM-DD
+    content: ReportContent;
+    createdAt: string;
+    updatedAt: string;
+}

@@ -285,7 +285,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                           <AlertTriangle className="w-5 h-5 text-orange-400" />
                           <div>
                               <div className="text-xl font-bold">{incompleteItems}/{totalItems}</div>
-                              <div className="text-[10px] text-slate-400 uppercase">Chưa xong</div>
+                              <div className="text-[10px] text-slate-400 uppercase">Chưa đạt</div>
                           </div>
                       </div>
                   </div>

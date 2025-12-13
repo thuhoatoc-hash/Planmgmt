@@ -15,7 +15,7 @@ import EventManager from './components/EventManager';
 import NotificationManager from './components/NotificationManager';
 import AttendanceManager from './components/AttendanceManager';
 import WeeklyReportGenerator from './components/WeeklyReportGenerator';
-import { User, Project, Contract, Category, Partner, ProjectStatusItem, Task, KPIMonthlyData, EmployeeEvaluation, TaskStatus, BirthdayEvent, Role, UserRole, ResourceType, Notification, AttendanceRecord, AttendanceStatusConfig } from './types';
+import { User, Project, Contract, Category, Partner, ProjectStatusItem, Task, KPIMonthlyData, EmployeeEvaluation, TaskStatus, BirthdayEvent, Role, UserRole, ResourceType, Notification, AttendanceRecord, AttendanceStatusConfig, SavedReport } from './types';
 import { api } from './services/api';
 import { Loader2 } from 'lucide-react';
 
@@ -67,6 +67,7 @@ const App: React.FC = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
   const [attendanceStatuses, setAttendanceStatuses] = useState<AttendanceStatusConfig[]>([]);
+  const [savedReports, setSavedReports] = useState<SavedReport[]>([]);
 
   // View State
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -77,7 +78,7 @@ const App: React.FC = () => {
     setIsAppLoading(true);
     try {
         const [
-            pData, cData, catData, uData, partData, sData, tData, kData, eData, evtData, roleData, notifData, attRecordData, attStatusData
+            pData, cData, catData, uData, partData, sData, tData, kData, eData, evtData, roleData, notifData, attRecordData, attStatusData, reportData
         ] = await Promise.all([
             api.projects.getAll(),
             api.contracts.getAll(),
@@ -92,7 +93,8 @@ const App: React.FC = () => {
             api.roles.getAll(),
             api.notifications.getAll(),
             api.attendance.getAll(),
-            api.attendanceStatuses.getAll()
+            api.attendanceStatuses.getAll(),
+            api.savedReports.getAll()
         ]);
 
         setProjects(pData);
@@ -109,6 +111,7 @@ const App: React.FC = () => {
         setNotifications(notifData);
         setAttendanceRecords(attRecordData);
         setAttendanceStatuses(attStatusData);
+        setSavedReports(reportData);
 
         // Check for task reminders after loading
         checkTaskReminders(tData, uData);
@@ -396,6 +399,23 @@ const App: React.FC = () => {
       if (success) setAttendanceStatuses(attendanceStatuses.filter(s => s.id !== id));
   };
 
+  // Saved Reports Handlers
+  const handleSaveReport = async (r: SavedReport): Promise<boolean> => {
+      const saved = await api.savedReports.save(r);
+      if (saved) {
+          setSavedReports(prev => {
+              const filtered = prev.filter(item => item.id !== saved.id);
+              return [saved, ...filtered];
+          });
+          return true;
+      }
+      return false;
+  };
+  const handleDeleteReport = async (id: string) => {
+      const success = await api.savedReports.delete(id);
+      if (success) setSavedReports(prev => prev.filter(item => item.id !== id));
+  };
+
   // Navigation Helper
   const navigateTo = (path: string, id?: string) => {
       if (path === 'projects' && id) {
@@ -513,6 +533,9 @@ const App: React.FC = () => {
               projects={projects}
               tasks={tasks}
               kpiData={kpiData}
+              savedReports={savedReports}
+              onSaveReport={handleSaveReport}
+              onDeleteReport={handleDeleteReport}
             />
           )}
           {currentPath === 'kpi' && (

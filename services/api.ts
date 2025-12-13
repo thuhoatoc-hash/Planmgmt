@@ -1,6 +1,6 @@
 
 import { supabase } from '../lib/supabase';
-import { Project, Contract, Category, User, Partner, ProjectStatusItem, Task, KPIMonthlyData, EmployeeEvaluation, BirthdayEvent, Role, UserFieldDefinition, BannerConfig, Notification, ActivityLog, AttendanceRecord, AttendanceStatusConfig, AttendanceSystemConfig } from '../types';
+import { Project, Contract, Category, User, Partner, ProjectStatusItem, Task, KPIMonthlyData, EmployeeEvaluation, BirthdayEvent, Role, UserFieldDefinition, BannerConfig, Notification, ActivityLog, AttendanceRecord, AttendanceStatusConfig, AttendanceSystemConfig, SavedReport } from '../types';
 
 // Generic helper to fetch data
 async function fetchAll<T>(table: string): Promise<T[]> {
@@ -174,6 +174,11 @@ export const api = {
       getAll: () => fetchAll<AttendanceStatusConfig>('attendance_statuses'),
       save: (s: AttendanceStatusConfig) => upsert<AttendanceStatusConfig>('attendance_statuses', s),
       delete: (id: string) => remove('attendance_statuses', id),
+  },
+  savedReports: {
+      getAll: () => fetchAll<SavedReport>('saved_reports'),
+      save: (r: SavedReport) => upsert<SavedReport>('saved_reports', r),
+      delete: (id: string) => remove('saved_reports', id),
   },
   logs: {
       getAll: () => fetchAll<ActivityLog>('activity_logs'),

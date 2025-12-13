@@ -128,8 +128,12 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 <Signal className="w-10 h-10" />
              </div>
           </div>
-          <h1 className="text-lg font-bold text-slate-900 text-center uppercase tracking-wide leading-tight">HỆ THỐNG QUẢN LÝ, ĐIỀU HÀNH</h1>
-          <h2 className="text-sm font-bold text-[#EE0033] mt-1 uppercase tracking-widest text-center">KHỐI GPCNTT- VIETTEL HÀ NỘI</h2>
+          <h1 className="text-lg font-bold text-slate-900 text-center uppercase tracking-wide leading-tight px-4">
+            HỆ THỐNG QUẢN LÝ, ĐIỀU HÀNH SXKD GPCNTT
+          </h1>
+          <h2 className="text-sm font-bold text-[#EE0033] mt-1 uppercase tracking-widest text-center">
+            VIETTEL HÀ NỘI
+          </h2>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">

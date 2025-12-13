@@ -7,9 +7,8 @@ Hệ thống quản lý phương án kinh doanh, theo dõi hợp đồng, doanh 
 
 ### Bước 1: Setup Supabase
 1. Tạo project mới trên [Supabase](https://supabase.com).
-2. Vào **SQL Editor**, mở file `SUPABASE_SETUP.sql` trong dự án này, copy toàn bộ nội dung.
-3. Dán vào SQL Editor trên Supabase và nhấn **Run** để tạo bảng và các cột cần thiết.
-   - **QUAN TRỌNG:** Nếu gặp lỗi "missing column" (ví dụ thiếu cột `type` hoặc `customerObligation`), hãy chạy lại file `SUPABASE_SETUP.sql`.
+2. Vào **SQL Editor**, copy nội dung từ file `SUPABASE_SETUP.sql` (nếu có) hoặc chạy các lệnh tạo bảng cơ bản.
+3. **QUAN TRỌNG:** Để tính năng **Lưu Báo Cáo** hoạt động, hãy mở file `SUPABASE_UPDATE_REPORTS.sql`, copy toàn bộ nội dung và dán vào SQL Editor trên Supabase, sau đó nhấn **Run**.
 4. Vào **Project Settings -> API**, copy `Project URL` và `anon public key`.
 
 ### Bước 2: Cấu hình biến môi trường
