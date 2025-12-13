@@ -100,7 +100,7 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUser, user
               statusId: defaultStatus?.id || '',
               startTime: '08:00',
               endTime: '17:30',
-              overtime: OvertimeType.NONE, // REQUIREMENT 1: Always Default to NONE
+              overtime: OvertimeType.NONE,
               overtimeReason: '',
               overtimeDate: dateStr, 
               overtimeStartTime: '18:00',
@@ -116,7 +116,6 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUser, user
   const handleEditFromList = (record: AttendanceRecord) => {
       setFormRecord({ ...record });
       setIsModalOpen(true);
-      // setIsApprovalListOpen(false); // Optional: keep list open behind? Better to close to avoid z-index mess or confusion
   };
 
   const handleSave = (e: React.FormEvent) => {
@@ -136,9 +135,7 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUser, user
           formRecord.overtimeDate = formRecord.date;
       }
 
-      // REQUIREMENT 2: Approval Logic
-      // If Admin is saving, respect the status selected in form, defaulting to APPROVED for new records if not set.
-      // If User is saving -> Always PENDING.
+      // Logic for status
       let status = formRecord.approvalStatus || ApprovalStatus.PENDING;
       
       if (isAdmin) {
@@ -374,7 +371,7 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUser, user
                             </div>
                         );
                     })}
-                </tbody>
+                </div>
             </div>
         </div>
 
