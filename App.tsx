@@ -15,7 +15,7 @@ import EventManager from './components/EventManager';
 import NotificationManager from './components/NotificationManager';
 import AttendanceManager from './components/AttendanceManager';
 import WeeklyReportGenerator from './components/WeeklyReportGenerator';
-import { User, Project, Contract, Category, Partner, ProjectStatusItem, Task, KPIMonthlyData, EmployeeEvaluation, TaskStatus, BirthdayEvent, Role, UserRole, ResourceType, Notification, AttendanceRecord, AttendanceStatusConfig, SavedReport } from './types';
+import { User, Project, Contract, Category, Partner, ProjectStatusItem, Task, KPIMonthlyData, EmployeeEvaluation, TaskStatus, BirthdayEvent, Role, UserRole, ResourceType, Notification, AttendanceRecord, AttendanceStatusConfig, SavedReport, NotificationType, NotificationPriority } from './types';
 import { api } from './services/api';
 import { Loader2 } from 'lucide-react';
 
@@ -115,6 +115,10 @@ const App: React.FC = () => {
 
         // Check for task reminders after loading
         checkTaskReminders(tData, uData);
+        
+        // Check for birthdays
+        checkBirthdayReminders(uData, notifData);
+
     } catch (error) {
         console.error("Failed to fetch initial data", error);
     } finally {
@@ -146,6 +150,58 @@ const App: React.FC = () => {
               }
           });
           console.groupEnd();
+      }
+  };
+
+  const checkBirthdayReminders = async (userList: User[], currentNotifs: Notification[]) => {
+      const today = new Date();
+      const currentMonth = today.getMonth() + 1;
+      const currentDay = today.getDate();
+      
+      const birthdayUsers = userList.filter(u => {
+          if (!u.dob) return false;
+          const dob = new Date(u.dob);
+          return dob.getMonth() + 1 === currentMonth && dob.getDate() === currentDay;
+      });
+
+      if (birthdayUsers.length === 0) return;
+
+      const newNotifs: Notification[] = [];
+
+      for (const bUser of birthdayUsers) {
+          // Check if notification already exists for today to avoid spamming
+          const title = `Chúc mừng sinh nhật ${bUser.fullName}! 🎂🎉`;
+          
+          const alreadyExists = currentNotifs.some(n => {
+              // Check if created today and matches title
+              const created = new Date(n.createdAt);
+              return n.type === NotificationType.CELEBRATION && 
+                     created.getMonth() + 1 === currentMonth && 
+                     created.getDate() === currentDay && 
+                     created.getFullYear() === today.getFullYear() &&
+                     n.title === title;
+          });
+
+          if (!alreadyExists) {
+              const notif: Notification = {
+                  id: `notif_bday_${bUser.id}_${today.getFullYear()}`,
+                  title: title,
+                  content: `Hôm nay là sinh nhật của ${bUser.fullName}.\nThay mặt Ban Lãnh đạo và toàn thể anh chị em Viettel Hà Nội, chúc đồng chí tuổi mới thật nhiều sức khỏe, hạnh phúc và gặt hái được nhiều thành công trong công việc cũng như cuộc sống!`,
+                  priority: NotificationPriority.NORMAL,
+                  type: NotificationType.CELEBRATION,
+                  imageUrl: bUser.avatarUrl || '', // Use user's avatar
+                  createdAt: new Date().toISOString(),
+                  authorId: 'system' // System generated
+              };
+              
+              // Save to API
+              const saved = await api.notifications.save(notif);
+              if (saved) newNotifs.push(saved);
+          }
+      }
+
+      if (newNotifs.length > 0) {
+          setNotifications(prev => [...newNotifs, ...prev]);
       }
   };
 

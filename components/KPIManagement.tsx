@@ -152,10 +152,13 @@ const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, use
   };
 
   const trendData = useMemo(() => {
-      return kpiData.map(d => ({
+      const allData = kpiData.map(d => ({
           month: d.month,
           score: calculateScoreForMonth(d)
       })).sort((a, b) => a.month.localeCompare(b.month));
+      
+      // Return last 6 months
+      return allData.slice(-6);
   }, [kpiData]);
 
   const calculatedData: CalculatedData | null = useMemo(() => {
@@ -397,7 +400,7 @@ const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, use
         </div>
       </div>
 
-      {/* --- ALERTS SECTION (NEW) --- */}
+      {/* --- ALERTS SECTION --- */}
       {atRiskItems.length > 0 && (
           <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 animate-in slide-in-from-top-4 duration-300 mb-6">
               <h3 className="flex items-center gap-2 text-orange-800 font-bold mb-3">
@@ -434,7 +437,7 @@ const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, use
           <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm animate-in slide-in-from-top-4 duration-300">
               <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2">
                   <TrendingUp className="w-5 h-5 text-[#EE0033]" />
-                  Xu hướng Điểm KPI qua các tháng
+                  Xu hướng Điểm KPI (6 tháng gần nhất)
               </h3>
               <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">

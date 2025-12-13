@@ -46,6 +46,7 @@ export interface User {
   phoneNumber?: string;
   email?: string;
   avatarUrl?: string;
+  dob?: string; // Date of Birth (YYYY-MM-DD)
   extendedInfo?: Record<string, any>; // Stores values for custom fields
 }
 

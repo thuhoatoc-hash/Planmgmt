@@ -1,9 +1,9 @@
 
 {
-  "name": "PM Quản lý dự án - Viettel HN",
-  "short_name": "PM Viettel",
-  "description": "Hệ thống quản lý phương án kinh doanh dự án Viettel Hà Nội",
-  "id": "pm-viettel-hanoi",
+  "name": "PM System - Management Tool",
+  "short_name": "PM System",
+  "description": "Hệ thống quản lý phương án kinh doanh dự án",
+  "id": "pm-system-hanoi",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",

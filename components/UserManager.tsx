@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { User, UserRole, Role, UserFieldDefinition, ActivityLog } from '../types';
-import { Shield, User as UserIcon, Phone, Edit, Trash2, Plus, Lock, Zap, Mail, CheckCircle2, History, Search, Download, Camera, Loader2, AlertCircle } from 'lucide-react';
+import { Shield, User as UserIcon, Phone, Edit, Trash2, Plus, Lock, Zap, Mail, CheckCircle2, History, Search, Download, Camera, Loader2, AlertCircle, Cake } from 'lucide-react';
 import { hashPassword } from '../lib/crypto';
 import { api } from '../services/api';
 
@@ -43,6 +43,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, roles, fieldDefinition
         phoneNumber: '',
         email: '',
         avatarUrl: '',
+        dob: '',
         extendedInfo: {}
       });
       setPasswordInput('123'); // Default password for new users
@@ -250,6 +251,7 @@ const UserManager: React.FC<UserManagerProps> = ({ users, roles, fieldDefinition
                 <tr>
                 <th className="px-6 py-4 text-sm font-semibold text-slate-600">Người dùng</th>
                 <th className="px-6 py-4 text-sm font-semibold text-slate-600">Thông tin liên hệ</th>
+                <th className="px-6 py-4 text-sm font-semibold text-slate-600">Ngày sinh</th>
                 <th className="px-6 py-4 text-sm font-semibold text-slate-600">Vai trò</th>
                 <th className="px-6 py-4 text-sm font-semibold text-slate-600 text-right w-32">Thao tác</th>
                 </tr>
@@ -288,6 +290,16 @@ const UserManager: React.FC<UserManagerProps> = ({ users, roles, fieldDefinition
                                     )}
                                     {!user.email && !user.phoneNumber && <span className="text-xs text-slate-400 italic">Chưa cập nhật</span>}
                                 </div>
+                            </td>
+                            <td className="px-6 py-4">
+                                {user.dob ? (
+                                    <div className="flex items-center gap-2 text-sm text-slate-600">
+                                        <Cake className="w-3.5 h-3.5 text-pink-400" />
+                                        {new Date(user.dob).toLocaleDateString('vi-VN')}
+                                    </div>
+                                ) : (
+                                    <span className="text-xs text-slate-400 italic">--/--/----</span>
+                                )}
                             </td>
                             <td className="px-6 py-4">
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
@@ -463,6 +475,18 @@ const UserManager: React.FC<UserManagerProps> = ({ users, roles, fieldDefinition
                     <label className="block text-sm font-medium text-slate-700 mb-1">Số điện thoại</label>
                     <input type="text" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" value={editingUser.phoneNumber || ''} onChange={e => setEditingUser({...editingUser, phoneNumber: e.target.value})} />
                 </div>
+              </div>
+
+              <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-2">
+                      <Cake className="w-4 h-4 text-pink-500" /> Ngày sinh
+                  </label>
+                  <input 
+                    type="date" 
+                    className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" 
+                    value={editingUser.dob || ''} 
+                    onChange={e => setEditingUser({...editingUser, dob: e.target.value})} 
+                  />
               </div>
 
               <div>
