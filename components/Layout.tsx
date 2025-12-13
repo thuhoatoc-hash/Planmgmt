@@ -52,19 +52,19 @@ const Layout: React.FC<LayoutProps> = ({ children, user, roles = [], onLogout, c
       return userRole.permissions?.[resource]?.view || false;
   };
 
-  // Updated Menu Structure - Notifications moved to bottom
+  // Updated Menu Structure - Reordered as requested
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'attendance', label: 'Điểm danh', icon: Clock },
-    { id: 'weekly_report', label: 'Báo cáo tuần', icon: FileText }, // New Menu Item
-    { id: 'tasks', label: 'Quản lý Nhiệm vụ', icon: CheckSquare }, 
-    { id: 'projects', label: 'Dự án', icon: FolderKanban },
     { id: 'kpi', label: 'Điều hành chỉ tiêu', icon: Target },
-    { id: 'evaluation', label: 'Đánh giá KI', icon: Award },
-    { id: 'events', label: 'Sự kiện (Sinh nhật)', icon: CalendarDays },
-    { id: 'reports', label: 'Thống kê & Biểu đồ', icon: BarChart3 },
+    { id: 'evaluation', label: 'Đánh giá KI', icon: Award }, // Placed near KPI
+    { id: 'projects', label: 'Dự án', icon: FolderKanban },
+    { id: 'tasks', label: 'Quản lý nhiệm vụ', icon: CheckSquare }, 
+    { id: 'events', label: 'Sự kiện', icon: CalendarDays },
+    { id: 'reports', label: 'Thống kê & biểu đồ', icon: BarChart3 },
+    { id: 'weekly_report', label: 'Báo cáo tuần', icon: FileText }, // Placed near Reports
     { id: 'notifications', label: 'Thông báo', icon: Bell },
-    { id: 'settings', label: 'Cấu hình hệ thống', icon: Settings }
+    { id: 'settings', label: 'Cấu hình', icon: Settings }
   ].filter(item => canViewMenu(item.id));
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
