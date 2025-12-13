@@ -44,7 +44,7 @@ interface ConfigurationManagerProps {
 }
 
 const ConfigurationManager: React.FC<ConfigurationManagerProps> = ({ 
-  statuses, users, partners, categories, projects, contracts, attendanceStatuses, tasks, kpiData,
+  statuses, users, partners, categories, projects, contracts, attendanceStatuses,
   onAddStatus, onUpdateStatus, onDeleteStatus,
   onAddUser, onUpdateUser, onDeleteUser,
   onAddPartner, onUpdatePartner, onDeletePartner,

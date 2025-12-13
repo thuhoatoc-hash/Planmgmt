@@ -1,8 +1,8 @@
 
 import React, { useState, useMemo } from 'react';
 import { Project, Task, KPIMonthlyData, TaskStatus } from '../types';
-import { Printer, FileText, RefreshCcw } from 'lucide-react';
-import { Document, Packer, Paragraph, Table, TableRow, TableCell, WidthType, BorderStyle, HeadingLevel, AlignmentType } from 'docx';
+import { Printer, FileText } from 'lucide-react';
+import { Document, Packer, Paragraph, Table, TableRow, TableCell, WidthType, BorderStyle, HeadingLevel, AlignmentType, TextRun } from 'docx';
 import FileSaver from 'file-saver';
 
 interface WeeklyReportGeneratorProps {
@@ -13,7 +13,7 @@ interface WeeklyReportGeneratorProps {
 
 const WeeklyReportGenerator: React.FC<WeeklyReportGeneratorProps> = ({ projects, tasks, kpiData }) => {
   // Config State
-  const [reportType, setReportType] = useState<'WEEKLY' | 'MONTHLY'>('WEEKLY');
+  const [reportType] = useState<'WEEKLY' | 'MONTHLY'>('WEEKLY'); // Removed unused setter
   const [reportDate, setReportDate] = useState(new Date().toISOString().slice(0, 10)); // Current date picker
   
   // Custom Content Inputs
@@ -212,19 +212,18 @@ const WeeklyReportGenerator: React.FC<WeeklyReportGeneratorProps> = ({ projects,
                     rows: [
                         new TableRow({
                             children: [
-                                new TableCell({ children: [new Paragraph({ text: "Chỉ tiêu", active: true, alignment: AlignmentType.CENTER })], width: { size: 40, type: WidthType.PERCENTAGE } }),
-                                new TableCell({ children: [new Paragraph({ text: "Đơn vị", active: true, alignment: AlignmentType.CENTER })] }),
-                                new TableCell({ children: [new Paragraph({ text: "Kế hoạch tháng", active: true, alignment: AlignmentType.CENTER })] }),
-                                new TableCell({ children: [new Paragraph({ text: "Thực hiện", active: true, alignment: AlignmentType.CENTER })] }),
-                                new TableCell({ children: [new Paragraph({ text: "Tỷ lệ", active: true, alignment: AlignmentType.CENTER })] }),
+                                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Chỉ tiêu", bold: true })], alignment: AlignmentType.CENTER })], width: { size: 40, type: WidthType.PERCENTAGE } }),
+                                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Đơn vị", bold: true })], alignment: AlignmentType.CENTER })] }),
+                                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Kế hoạch tháng", bold: true })], alignment: AlignmentType.CENTER })] }),
+                                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Thực hiện", bold: true })], alignment: AlignmentType.CENTER })] }),
+                                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Tỷ lệ", bold: true })], alignment: AlignmentType.CENTER })] }),
                             ],
                         }),
                         ...kpiSummary.map(item => new TableRow({
                             children: [
                                 new TableCell({ 
                                     children: [new Paragraph({ 
-                                        text: item.name, 
-                                        active: item.type === 'GROUP', // Bold if group
+                                        children: [new TextRun({ text: item.name, bold: item.type === 'GROUP' })],
                                         indent: item.type === 'ITEM' ? { left: 200 } : undefined 
                                     })] 
                                 }),
@@ -283,7 +282,7 @@ const WeeklyReportGenerator: React.FC<WeeklyReportGeneratorProps> = ({ projects,
                 new Paragraph({ text: "III. TIẾN ĐỘ MỘT SỐ DỰ ÁN TRỌNG ĐIỂM (>10 TỶ):", heading: HeadingLevel.HEADING_2 }),
                 ...keyProjectProgress.map(p => {
                     return [
-                        new Paragraph({ text: `- Dự án: ${p.project.name} (Doanh số KH: ${formatCurrency(p.project.plannedSales || 0)})`, active: true }),
+                        new Paragraph({ children: [new TextRun({ text: `- Dự án: ${p.project.name} (Doanh số KH: ${formatCurrency(p.project.plannedSales || 0)})`, bold: true })] }),
                         ...p.tasks.map(t => new Paragraph({ text: `  + ${t.name}: ${t.status}`, indent: { left: 400 } }))
                     ]
                 }).flat(),
@@ -309,10 +308,10 @@ const WeeklyReportGenerator: React.FC<WeeklyReportGeneratorProps> = ({ projects,
                                 new TableCell({ children: [], width: { size: 60, type: WidthType.PERCENTAGE } }), // Left spacer
                                 new TableCell({ 
                                     children: [
-                                        new Paragraph({ text: "VIETTEL HÀ NỘI", alignment: AlignmentType.CENTER, active: true }),
-                                        new Paragraph({ text: "NGƯỜI BÁO CÁO", alignment: AlignmentType.CENTER, active: true }),
+                                        new Paragraph({ children: [new TextRun({ text: "VIETTEL HÀ NỘI", bold: true })], alignment: AlignmentType.CENTER }),
+                                        new Paragraph({ children: [new TextRun({ text: "NGƯỜI BÁO CÁO", bold: true })], alignment: AlignmentType.CENTER }),
                                         new Paragraph({ text: "", spacing: { after: 1200 } }), // Signature space
-                                        new Paragraph({ text: "Nguyễn Văn Dũng", alignment: AlignmentType.CENTER, active: true })
+                                        new Paragraph({ children: [new TextRun({ text: "Nguyễn Văn Dũng", bold: true })], alignment: AlignmentType.CENTER })
                                     ],
                                     width: { size: 40, type: WidthType.PERCENTAGE } 
                                 }),
