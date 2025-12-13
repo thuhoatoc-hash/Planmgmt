@@ -1,8 +1,8 @@
 
-import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
-import { Project, Contract, ContractType, Category, CategoryType, KPIMonthlyData, Task, User, TaskStatus, InstallmentStatus, EmployeeEvaluation, UserRole, BirthdayEvent, Role, Notification, NotificationPriority, AttendanceRecord, AttendanceStatusConfig, ApprovalStatus, OvertimeType, NotificationType, TaskType } from '../types';
-import { Wallet, TrendingUp, TrendingDown, Activity, Settings, Check, X, SlidersHorizontal, CheckSquare, Award, AlertTriangle, Target, Gift, Phone, ClipboardList, Move, GripHorizontal, Bell, Info, Clock, CheckCircle2, XCircle, ChevronLeft, ChevronRight, PartyPopper, BarChart3, Briefcase, CalendarClock, Users, CheckCircle } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { Project, Contract, ContractType, KPIMonthlyData, Task, User, TaskStatus, InstallmentStatus, EmployeeEvaluation, BirthdayEvent, Role, Notification, NotificationPriority, AttendanceRecord, AttendanceStatusConfig, ApprovalStatus, OvertimeType, NotificationType, Category } from '../types';
+import { TrendingUp, Activity, Settings, Move, GripHorizontal, Bell, Clock, ChevronLeft, ChevronRight, PartyPopper, BarChart3, ClipboardList, CheckSquare, Gift, Award, AlertTriangle, CheckCircle } from 'lucide-react';
 
 interface DashboardProps {
   currentUser?: User | null;
@@ -21,8 +21,6 @@ interface DashboardProps {
   onUpdateAttendanceRecord?: (r: AttendanceRecord) => void;
   onNavigate?: (path: string, id?: string) => void;
 }
-
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#FF6B6B'];
 
 // Default configuration for visibility
 const DEFAULT_CONFIG = {
@@ -51,9 +49,9 @@ const DEFAULT_ORDER: WidgetType[] = [
 ];
 
 const Dashboard: React.FC<DashboardProps> = ({ 
-    currentUser, projects, contracts, categories, kpiData = [], tasks = [], users = [], 
-    evaluations = [], events = [], roles = [], notifications = [], 
-    attendanceRecords = [], attendanceStatuses = [], onUpdateAttendanceRecord,
+    currentUser, projects, contracts, kpiData = [], tasks = [], users = [], 
+    evaluations = [], events = [], notifications = [], 
+    attendanceRecords = [], attendanceStatuses = [],
     onNavigate 
 }) => {
   // State for customization
@@ -71,8 +69,6 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [attPage, setAttPage] = useState(1);
   const ITEMS_PER_PAGE_NOTIF = 3;
   const ITEMS_PER_PAGE_ATT = 3;
-
-  const isAdmin = currentUser?.role === UserRole.ADMIN;
 
   // --- STATS CALCULATION ---
   const stats = useMemo(() => {
@@ -505,7 +501,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                               <YAxis allowDecimals={false} tick={{fontSize: 12}} />
                               <Tooltip />
                               <Bar dataKey="value" name="Số lượng" fill="#f59e0b" radius={[4, 4, 0, 0]} barSize={30}>
-                                {data.map((entry, index) => (
+                                {data.map((_, index) => (
                                     <Cell key={`cell-${index}`} fill={['#ca8a04', '#16a34a', '#2563eb', '#ea580c', '#dc2626'][index]} />
                                 ))}
                               </Bar>

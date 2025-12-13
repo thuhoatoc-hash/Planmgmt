@@ -1,8 +1,8 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Project, Task, KPIMonthlyData, TaskStatus, SavedReport, ReportPeriodType } from '../types';
-import { Printer, FileText, Save, List, Plus, Search, Edit, Trash2, Calendar, FileClock, Loader2 } from 'lucide-react';
-import { Document, Packer, Paragraph, Table, TableRow, TableCell, WidthType, BorderStyle, HeadingLevel, AlignmentType, TextRun, VerticalAlign } from 'docx';
+import { Printer, FileText, Save, List, Plus, Search, Edit, Trash2, FileClock, Loader2 } from 'lucide-react';
+import { Document, Packer, Paragraph, Table, TableRow, TableCell, WidthType, BorderStyle, HeadingLevel, AlignmentType, TextRun } from 'docx';
 import FileSaver from 'file-saver';
 
 interface WeeklyReportGeneratorProps {
