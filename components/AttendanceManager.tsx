@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { User, AttendanceRecord, AttendanceStatusConfig, OvertimeType, UserRole, ApprovalStatus } from '../types';
-import { Clock, CheckCircle, Plus, User as UserIcon, ArrowLeft, ArrowRight, Moon, Briefcase, MapPin, AlignLeft, List, ShieldCheck, AlertCircle, X, Check, Edit } from 'lucide-react';
+import { Clock, CheckCircle, Plus, User as UserIcon, ArrowLeft, ArrowRight, Moon, Briefcase, MapPin, AlignLeft, List, ShieldCheck, AlertCircle, X, Check, Edit, XCircle, CheckCircle2 } from 'lucide-react';
 
 interface AttendanceManagerProps {
   currentUser: User;
@@ -16,7 +16,7 @@ const OT_REASONS = [
     'Trực lễ',
     'Làm tăng cường',
     'Họp, gặp đối tác',
-    'Khác'
+    'Khác (Lưu ý ghi chú lý do)'
 ];
 
 const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUser, users, records, statuses, onAddRecord, onUpdateRecord }) => {
@@ -137,16 +137,26 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUser, user
       }
 
       // REQUIREMENT 2: Approval Logic
-      // If Admin is saving -> APPROVED immediately (or keep existing status if they are just editing details)
-      // If User is saving -> Always PENDING (unless they are editing a draft, but here simplicity = Pending)
+      // If Admin is saving, respect the status selected in form, defaulting to APPROVED for new records if not set.
+      // If User is saving -> Always PENDING.
       let status = formRecord.approvalStatus || ApprovalStatus.PENDING;
       
       if (isAdmin) {
-          // Admin always approves by default when creating/editing, unless they explicitly set it to REJECTED in the form (not implemented in form UI yet, usually done via buttons)
-          // For simplicity: Admin edits = Approved
-          status = ApprovalStatus.APPROVED;
+          if (!formRecord.id) {
+              // New record by Admin -> Default to Approved unless specified
+              status = formRecord.approvalStatus || ApprovalStatus.APPROVED;
+          } else {
+              // Edit existing -> Trust the form state (controlled by Admin buttons)
+              status = formRecord.approvalStatus!;
+          }
+
+          // Validate Rejection Note
+          if (status === ApprovalStatus.REJECTED && (!formRecord.reviewerNote || !formRecord.reviewerNote.trim())) {
+              alert("Vui lòng nhập lý do từ chối!");
+              return;
+          }
       } else {
-          // Normal user: Always reset to PENDING on edit/create to require re-approval
+          // Normal user: Always reset to PENDING on edit/create
           status = ApprovalStatus.PENDING;
       }
       
@@ -169,16 +179,23 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUser, user
       onUpdateRecord({ 
           ...record, 
           approvalStatus: ApprovalStatus.APPROVED, 
-          reviewerId: currentUser.id 
+          reviewerId: currentUser.id,
+          reviewerNote: '' // Clear rejection note
       });
   };
 
   const handleReject = (record: AttendanceRecord) => {
-      if(!window.confirm("Bạn có chắc chắn muốn từ chối yêu cầu này?")) return;
+      const reason = window.prompt("Nhập lý do từ chối (Bắt buộc):", record.reviewerNote || "");
+      if (reason === null) return; // Cancelled
+      if (reason.trim() === "") {
+          alert("Vui lòng nhập lý do từ chối.");
+          return;
+      }
       onUpdateRecord({ 
           ...record, 
           approvalStatus: ApprovalStatus.REJECTED, 
-          reviewerId: currentUser.id 
+          reviewerId: currentUser.id,
+          reviewerNote: reason
       });
   };
 
@@ -357,7 +374,7 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUser, user
                             </div>
                         );
                     })}
-                </div>
+                </tbody>
             </div>
         </div>
 
@@ -447,6 +464,11 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUser, user
                                                 <td className="px-4 py-3 max-w-xs text-slate-600">
                                                     {record.note && <div className="truncate" title={record.note}>{record.note}</div>}
                                                     {record.overtimeReason && <div className="text-xs text-purple-700 font-medium mt-0.5">{record.overtimeReason}</div>}
+                                                    {record.reviewerNote && (
+                                                        <div className="text-xs text-red-600 font-medium mt-1 border-t border-red-100 pt-1">
+                                                            Lý do từ chối: {record.reviewerNote}
+                                                        </div>
+                                                    )}
                                                 </td>
                                                 <td className="px-4 py-3 text-center">
                                                     <span className={`px-2 py-1 rounded text-xs font-bold ${
@@ -458,8 +480,9 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUser, user
                                                     </span>
                                                 </td>
                                                 <td className="px-4 py-3 text-right">
-                                                    {record.approvalStatus === ApprovalStatus.PENDING ? (
-                                                        <div className="flex justify-end gap-2">
+                                                    <div className="flex justify-end gap-2">
+                                                        {/* Approve Button: Show if PENDING or REJECTED */}
+                                                        {(record.approvalStatus === ApprovalStatus.PENDING || record.approvalStatus === ApprovalStatus.REJECTED) && (
                                                             <button 
                                                                 onClick={() => handleApprove(record)}
                                                                 className="p-1.5 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 rounded shadow-sm"
@@ -467,32 +490,27 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUser, user
                                                             >
                                                                 <Check className="w-4 h-4" />
                                                             </button>
+                                                        )}
+                                                        
+                                                        {/* Reject Button: Show if PENDING or APPROVED */}
+                                                        {(record.approvalStatus === ApprovalStatus.PENDING || record.approvalStatus === ApprovalStatus.APPROVED) && (
                                                             <button 
                                                                 onClick={() => handleReject(record)}
                                                                 className="p-1.5 bg-red-100 text-red-700 hover:bg-red-200 rounded shadow-sm"
-                                                                title="Từ chối"
+                                                                title={record.approvalStatus === ApprovalStatus.APPROVED ? "Hủy duyệt / Từ chối" : "Từ chối"}
                                                             >
                                                                 <X className="w-4 h-4" />
                                                             </button>
-                                                            <button 
-                                                                onClick={() => handleEditFromList(record)}
-                                                                className="p-1.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded shadow-sm"
-                                                                title="Sửa"
-                                                            >
-                                                                <Edit className="w-4 h-4" />
-                                                            </button>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="flex justify-end gap-2">
-                                                            <button 
-                                                                onClick={() => handleEditFromList(record)}
-                                                                className="p-1.5 text-slate-400 hover:text-blue-600 rounded"
-                                                                title="Sửa chi tiết"
-                                                            >
-                                                                <Edit className="w-4 h-4" />
-                                                            </button>
-                                                        </div>
-                                                    )}
+                                                        )}
+
+                                                        <button 
+                                                            onClick={() => handleEditFromList(record)}
+                                                            className="p-1.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded shadow-sm"
+                                                            title="Sửa chi tiết"
+                                                        >
+                                                            <Edit className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         );
@@ -667,34 +685,61 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUser, user
                             )}
                         </div>
 
-                        {/* Admin Approval Section (Only if editing a record and Pending) */}
-                        {isAdmin && formRecord.id && formRecord.approvalStatus === ApprovalStatus.PENDING && (
-                            <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
+                        {/* Admin Approval Section (Show for Admin regardless of status to allow edits) */}
+                        {isAdmin && formRecord.id && (
+                            <div className="bg-amber-50 p-4 rounded-lg border border-amber-200 mt-4">
                                 <label className="block text-sm font-bold text-amber-800 mb-2 flex items-center gap-2">
-                                    <ShieldCheck className="w-4 h-4" /> Phê duyệt (Admin)
+                                    <ShieldCheck className="w-4 h-4" /> Xét duyệt (Admin)
                                 </label>
-                                <textarea 
-                                    className="w-full p-2 border border-amber-200 rounded bg-white text-sm focus:ring-2 focus:ring-amber-500 outline-none mb-3"
-                                    placeholder="Nhập ghi chú của người duyệt..."
-                                    value={formRecord.reviewerNote || ''}
-                                    onChange={e => setFormRecord({ ...formRecord, reviewerNote: e.target.value })}
-                                />
-                                <div className="flex gap-2">
-                                    <button 
-                                        type="button" 
-                                        onClick={() => handleApprove(formRecord as AttendanceRecord)}
-                                        className="flex-1 bg-emerald-600 text-white py-2 rounded-lg font-bold hover:bg-emerald-700 shadow-sm"
+                                
+                                <div className="flex gap-2 mb-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormRecord({...formRecord, approvalStatus: ApprovalStatus.APPROVED})}
+                                        className={`flex-1 py-2 rounded-lg text-sm font-bold border transition-colors flex items-center justify-center gap-2 ${formRecord.approvalStatus === ApprovalStatus.APPROVED ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'}`}
                                     >
-                                        Duyệt đơn
+                                        <CheckCircle2 className="w-4 h-4" /> Đã duyệt
                                     </button>
-                                    <button 
-                                        type="button" 
-                                        onClick={() => handleReject(formRecord as AttendanceRecord)}
-                                        className="flex-1 bg-red-600 text-white py-2 rounded-lg font-bold hover:bg-red-700 shadow-sm"
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormRecord({...formRecord, approvalStatus: ApprovalStatus.REJECTED})}
+                                        className={`flex-1 py-2 rounded-lg text-sm font-bold border transition-colors flex items-center justify-center gap-2 ${formRecord.approvalStatus === ApprovalStatus.REJECTED ? 'bg-red-600 text-white border-red-600' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'}`}
                                     >
-                                        Từ chối
+                                        <XCircle className="w-4 h-4" /> Từ chối
+                                    </button>
+                                     <button
+                                        type="button"
+                                        onClick={() => setFormRecord({...formRecord, approvalStatus: ApprovalStatus.PENDING})}
+                                        className={`flex-1 py-2 rounded-lg text-sm font-bold border transition-colors flex items-center justify-center gap-2 ${formRecord.approvalStatus === ApprovalStatus.PENDING ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'}`}
+                                    >
+                                        <AlertCircle className="w-4 h-4" /> Chờ duyệt
                                     </button>
                                 </div>
+
+                                {formRecord.approvalStatus === ApprovalStatus.REJECTED && (
+                                    <div className="animate-in fade-in slide-in-from-top-1">
+                                        <label className="block text-xs font-bold text-red-700 mb-1">Lý do từ chối <span className="text-red-500">*</span></label>
+                                        <textarea 
+                                            className="w-full p-2 border border-red-300 rounded bg-white text-sm focus:ring-2 focus:ring-red-500 outline-none"
+                                            placeholder="Nhập lý do từ chối..."
+                                            value={formRecord.reviewerNote || ''}
+                                            onChange={e => setFormRecord({ ...formRecord, reviewerNote: e.target.value })}
+                                        />
+                                    </div>
+                                )}
+                                
+                                {formRecord.approvalStatus !== ApprovalStatus.REJECTED && (
+                                     <div>
+                                        <label className="block text-xs font-medium text-amber-800 mb-1">Ghi chú của người duyệt</label>
+                                        <input 
+                                            type="text"
+                                            className="w-full p-2 border border-amber-200 rounded bg-white text-sm focus:ring-2 focus:ring-amber-500 outline-none"
+                                            placeholder="Ghi chú (tùy chọn)..."
+                                            value={formRecord.reviewerNote || ''}
+                                            onChange={e => setFormRecord({ ...formRecord, reviewerNote: e.target.value })}
+                                        />
+                                    </div>
+                                )}
                             </div>
                         )}
 
