@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Project, Contract, Category, ContractType, CategoryType, ProjectType, ProductType, User, Partner, ProjectStatusItem, UserRole, Task, TaskStatus, ContractInstallment, InstallmentStatus, TaskType, CustomerObligation, ObligationStatus, FundingSource, FundingSourceStatus, PartnerType } from '../types';
-import { ArrowLeft, Plus, Calendar, User as UserIcon, Building2, Edit, Trash2, Tag, Box, ListTodo, PlusCircle, MinusCircle, Clock, CheckSquare, Users, Target, Shield, Coins, Landmark, RefreshCcw } from 'lucide-react';
+import { ArrowLeft, Plus, Calendar, User as UserIcon, Building2, Edit, Trash2, Tag, Box, ListTodo, PlusCircle, MinusCircle, Clock, CheckSquare, Users, Target, Shield, Coins, Landmark, RefreshCcw, LayoutList } from 'lucide-react';
 import CurrencyInput from './CurrencyInput';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
@@ -128,7 +128,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
     assigneeId: '',
     collaboratorIds: [],
     taskType: TaskType.PROJECT,
-    parentId: undefined,
+    parentId: undefined, // undefined for database compatibility if column missing, but effectively null
     milestoneKey: undefined
   };
   const [taskForm, setTaskForm] = useState<Partial<Task>>(initialTaskState);
@@ -162,6 +162,14 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
   const projectTasks = useMemo(() => {
       return tasks.filter(t => t.projectId === project.id);
   }, [tasks, project.id]);
+
+  // Available Parent Tasks (Milestones) for Dropdown
+  const availableParents = useMemo(() => {
+      return STANDARD_MILESTONES.map(m => {
+          const task = projectTasks.find(t => t.milestoneKey === m.key);
+          return task ? { id: task.id, name: m.name } : null;
+      }).filter(Boolean) as { id: string, name: string }[];
+  }, [projectTasks]);
   
   const stats = useMemo(() => {
     // 1. Doanh số (Sales): Tổng HĐ đầu ra (trừ Hủy)
@@ -353,7 +361,8 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
       if(task) {
           setTaskForm({
               ...task,
-              collaboratorIds: task.collaboratorIds || []
+              collaboratorIds: task.collaboratorIds || [],
+              parentId: task.parentId || undefined // Ensure undefined if null
           });
       } else {
           setTaskForm({
@@ -361,7 +370,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
               projectId: project.id,
               assignerId: user.id,
               taskType: TaskType.PROJECT,
-              parentId: parentId // Set parent ID if creating subtask
+              parentId: parentId || undefined // Set parent ID if creating subtask
           });
       }
       setIsTaskModalOpen(true);
@@ -374,7 +383,9 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
           ...taskForm,
           projectId: project.id, 
           taskType: TaskType.PROJECT,
-          collaboratorIds: taskForm.collaboratorIds || []
+          collaboratorIds: taskForm.collaboratorIds || [],
+          // Clean up parentId if it's an empty string to avoid DB error if UUID expected
+          parentId: taskForm.parentId === '' ? undefined : taskForm.parentId
       } as Task;
 
       if(finalTask.id) {
@@ -682,6 +693,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
 
       {/* Content */}
       <div className="min-h-[500px]">
+        {/* ... (Overview, Output, Input Tabs - No changes needed) ... */}
         {activeTab === 'OVERVIEW' && (
             <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-300">
                 {/* Stats Cards */}
@@ -945,6 +957,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
         {activeTab === 'OBLIGATION' && isAdmin && (
             <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-300">
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+                    {/* ... (Obligation Content - No Change) ... */}
                     <div className="flex items-center justify-between mb-6">
                         <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                             <Coins className="w-5 h-5 text-indigo-600" />
@@ -1120,6 +1133,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
       </div>
 
       {/* Contract Modal */}
+      {/* ... (Keep existing Contract Modal code, no changes needed here) ... */}
       {isContractModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl max-w-4xl w-full p-6 max-h-[90vh] overflow-y-auto">
@@ -1383,6 +1397,29 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                               />
                           </div>
                           
+                          {/* New Parent Task Selector */}
+                          <div className="col-span-2">
+                              <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1">
+                                  <LayoutList className="w-3 h-3" /> Thuộc đầu việc (Parent Task)
+                              </label>
+                              <select 
+                                className="w-full p-2 border rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                                value={taskForm.parentId || ''}
+                                onChange={e => setTaskForm({...taskForm, parentId: e.target.value})}
+                                disabled={!!taskForm.milestoneKey} // Cannot nest a milestone under another milestone easily
+                              >
+                                  <option value="">-- Công việc độc lập / Không --</option>
+                                  {availableParents.map(p => (
+                                      <option key={p.id} value={p.id}>{p.name}</option>
+                                  ))}
+                              </select>
+                              {taskForm.parentId && (
+                                  <p className="text-xs text-indigo-600 mt-1">
+                                      * Nhiệm vụ này sẽ nằm trong nhóm: <strong>{availableParents.find(p => p.id === taskForm.parentId)?.name}</strong>
+                                  </p>
+                              )}
+                          </div>
+
                           <div className="col-span-2">
                                <label className="block text-sm font-medium text-slate-700 mb-1">Nội dung / Mô tả</label>
                                <textarea className="w-full p-2 border rounded-lg h-24 focus:ring-2 focus:ring-indigo-500 outline-none" value={taskForm.description || ''} onChange={e => setTaskForm({...taskForm, description: e.target.value})} placeholder="Mô tả chi tiết công việc..." />
