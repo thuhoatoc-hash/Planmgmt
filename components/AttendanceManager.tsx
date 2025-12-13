@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { User, AttendanceRecord, AttendanceStatusConfig, OvertimeType, UserRole, ApprovalStatus } from '../types';
-import { Clock, CheckCircle, Plus, User as UserIcon, ArrowLeft, ArrowRight, Moon, Briefcase, MapPin, AlignLeft, List, ShieldCheck, AlertCircle, X, Check, Filter, Trash2, Edit } from 'lucide-react';
+import { Clock, CheckCircle, Plus, User as UserIcon, ArrowLeft, ArrowRight, Moon, Briefcase, MapPin, AlignLeft, List, ShieldCheck, AlertCircle, X, Check, Edit } from 'lucide-react';
 
 interface AttendanceManagerProps {
   currentUser: User;
