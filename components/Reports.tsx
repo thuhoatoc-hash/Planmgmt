@@ -1,25 +1,32 @@
 
 import React, { useState, useMemo } from 'react';
-import { Project, Contract, Category, User, ContractType, Task, TaskStatus, InstallmentStatus } from '../types';
+import { Project, Contract, Category, User, ContractType, Task, TaskStatus, InstallmentStatus, AttendanceRecord, AttendanceType, OvertimeType, AttendanceStatusConfig } from '../types';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Download, Filter, Calendar, BarChart3, PieChart as PieChartIcon, User as UserIcon, TrendingUp, CheckSquare } from 'lucide-react';
+import { Download, Filter, Calendar, BarChart3, PieChart as PieChartIcon, User as UserIcon, TrendingUp, CheckSquare, Clock } from 'lucide-react';
 
 interface ReportsProps {
   projects: Project[];
   contracts: Contract[];
   categories: Category[];
   users: User[];
-  tasks?: Task[]; // Add optional tasks prop
+  tasks?: Task[]; 
+  attendanceRecords?: AttendanceRecord[];
+  attendanceStatuses?: AttendanceStatusConfig[]; // Added Prop
 }
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#FF6B6B'];
 
-const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, users, tasks = [] }) => {
-  const [activeTab, setActiveTab] = useState<'GENERAL' | 'COST' | 'AM' | 'TREND' | 'TASKS'>('GENERAL');
+const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, users, tasks = [], attendanceRecords = [], attendanceStatuses = [] }) => {
+  const [activeTab, setActiveTab] = useState<'GENERAL' | 'COST' | 'AM' | 'TREND' | 'TASKS' | 'ATTENDANCE'>('GENERAL');
   
   // Date Filter State
   const [startDate, setStartDate] = useState(new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0]); // First day of year
   const [endDate, setEndDate] = useState(new Date(new Date().getFullYear(), 11, 31).toISOString().split('T')[0]); // Last day of year
+  
+  // Attendance Specific State
+  const [attendanceMonth, setAttendanceMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
+  const [attendanceSubTab, setAttendanceSubTab] = useState<'MATRIX' | 'DETAIL' | 'SUMMARY'>('MATRIX');
+  const [filterEmployeeId, setFilterEmployeeId] = useState<string>('');
 
   const formatCurrency = (val: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(val);
 
@@ -53,44 +60,114 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
   }, [contracts, startDate, endDate]);
 
   const filteredTasks = useMemo(() => {
-      // Filter by deadline within range
       return tasks.filter(t => t.deadline >= startDate && t.deadline <= endDate);
   }, [tasks, startDate, endDate]);
 
-  // --- REPORT 1: GENERAL (Revenue, Sales, Cost by Project) ---
+  const filteredAttendance = useMemo(() => {
+      // Filter by Month string match (YYYY-MM)
+      return attendanceRecords.filter(r => r.date.startsWith(attendanceMonth) && (filterEmployeeId === '' || r.userId === filterEmployeeId));
+  }, [attendanceRecords, attendanceMonth, filterEmployeeId]);
+
+  // --- ATTENDANCE REPORT DATA ---
+  const getStatusConfig = (id: string) => attendanceStatuses.find(s => s.id === id);
+
+  const attendanceMatrix = useMemo(() => {
+      if (attendanceSubTab !== 'MATRIX') return [];
+      
+      const [year, month] = attendanceMonth.split('-').map(Number);
+      const daysInMonth = new Date(year, month, 0).getDate();
+      const days = Array.from({length: daysInMonth}, (_, i) => i + 1);
+
+      return users.map(user => {
+          const userRecords = filteredAttendance.filter(r => r.userId === user.id);
+          const row: any = { id: user.id, name: user.fullName };
+          
+          days.forEach(day => {
+              const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+              const record = userRecords.find(r => r.date === dateStr);
+              
+              if (record) {
+                  const status = getStatusConfig(record.statusId);
+                  let symbol = '✔'; // Default Present
+                  
+                  if (status) {
+                      switch(status.type) {
+                          case 'LATE': symbol = 'M'; break;
+                          case 'LEAVE': symbol = 'P'; break;
+                          case 'SICK': symbol = 'O'; break;
+                          case 'CUSTOMER_VISIT': symbol = 'CT'; break;
+                          case 'WFH': symbol = 'W'; break;
+                          default: symbol = '✔';
+                      }
+                  }
+                  
+                  if (record.overtime !== 'NONE') {
+                      symbol += '+OT';
+                  }
+                  row[`day_${day}`] = symbol;
+              } else {
+                  row[`day_${day}`] = '';
+              }
+          });
+          return row;
+      });
+  }, [users, filteredAttendance, attendanceMonth, attendanceSubTab, attendanceStatuses]);
+
+  const attendanceSummary = useMemo(() => {
+      if (attendanceSubTab !== 'SUMMARY') return [];
+      
+      return users.map(user => {
+          const userRecords = filteredAttendance.filter(r => r.userId === user.id);
+          
+          let totalWorkDays = 0; // Present + Late + Visit + WFH
+          let totalLeaveDays = 0; // Leave + Sick
+          let totalOTHours = 0;
+          let visitDays = 0;
+
+          userRecords.forEach(r => {
+              const status = getStatusConfig(r.statusId);
+              const type = status?.type || 'PRESENT';
+
+              if (type === 'LEAVE' || type === 'SICK') {
+                  totalLeaveDays++;
+              } else {
+                  totalWorkDays++; // Assume valid work day
+                  if (type === 'CUSTOMER_VISIT') visitDays++;
+              }
+
+              if (r.overtime !== 'NONE') {
+                  totalOTHours += (r.overtimeHours || 0);
+              }
+          });
+          
+          return {
+              name: user.fullName,
+              totalWorkDays,
+              totalLeaveDays,
+              visitDays,
+              totalOTHours
+          };
+      }).filter(u => (u.totalWorkDays + u.totalLeaveDays) > 0 || filterEmployeeId); // Show only if active or explicitly filtered
+  }, [users, filteredAttendance, attendanceSubTab, filterEmployeeId, attendanceStatuses]);
+
+
+  // ... (Existing Reports Data Logic) ...
   const generalData = useMemo(() => {
     return projects.map(p => {
         const pContracts = filteredContracts.filter(c => c.projectId === p.id);
         const sales = pContracts.filter(c => c.type === ContractType.OUTPUT && c.status !== 'CANCELLED').reduce((sum, c) => sum + c.value, 0);
-        
-        // Calculate Revenue based on installments or completed status
         const revenue = pContracts.filter(c => c.type === ContractType.OUTPUT && c.status !== 'CANCELLED').reduce((sum, c) => {
             if (c.installments && c.installments.length > 0) {
-                return sum + c.installments
-                    .filter(i => i.status === InstallmentStatus.INVOICED || i.status === InstallmentStatus.PAID)
-                    .reduce((s, i) => s + i.value, 0);
-            } else {
-                return sum + (c.status === 'COMPLETED' ? c.value : 0);
-            }
+                return sum + c.installments.filter(i => i.status === InstallmentStatus.INVOICED || i.status === InstallmentStatus.PAID).reduce((s, i) => s + i.value, 0);
+            } else { return sum + (c.status === 'COMPLETED' ? c.value : 0); }
         }, 0);
-
         const cost = pContracts.filter(c => c.type === ContractType.INPUT && c.status !== 'CANCELLED').reduce((sum, c) => sum + c.value, 0);
-        return {
-            projectName: p.name,
-            projectCode: p.code,
-            sales,
-            revenue,
-            cost,
-            profit: sales - cost // Profit = Sales - Cost
-        };
+        return { projectName: p.name, projectCode: p.code, sales, revenue, cost, profit: sales - cost };
     }).filter(d => d.sales > 0 || d.cost > 0 || d.revenue > 0).sort((a,b) => b.sales - a.sales);
   }, [projects, filteredContracts]);
 
-  // --- REPORT 2: COST ANALYSIS ---
   const costData = useMemo(() => {
-     // Aggregate by Leaf Category or Parent Category? Let's do Parent Category for Chart
      const costMap: Record<string, number> = {};
-     
      filteredContracts.filter(c => c.type === ContractType.INPUT && c.status !== 'CANCELLED').forEach(c => {
          const cat = categories.find(cat => cat.id === c.categoryId);
          if (cat) {
@@ -99,111 +176,62 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
              costMap[key] = (costMap[key] || 0) + c.value;
          }
      });
-
-     return Object.entries(costMap)
-        .map(([name, value]) => ({ name, value }))
-        .sort((a,b) => b.value - a.value);
+     return Object.entries(costMap).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value);
   }, [filteredContracts, categories]);
 
-  // --- REPORT 3: AM PERFORMANCE ---
   const amData = useMemo(() => {
       const amMap: Record<string, { amName: string, sales: number, revenue: number }> = {};
-      
-      // Iterate contracts to fill data (More reliable than iterating users first)
       filteredContracts.filter(c => c.type === ContractType.OUTPUT).forEach(c => {
           const project = projects.find(p => p.id === c.projectId);
-          // Only process if project exists and has an AM
           if (project && project.amId) {
               const amId = project.amId;
-              
-              // Initialize entry if not exists
               if (!amMap[amId]) {
                   const user = users.find(u => u.id === amId);
-                  amMap[amId] = { 
-                      amName: user ? user.fullName : 'Unknown AM', 
-                      sales: 0, 
-                      revenue: 0 
-                  };
+                  amMap[amId] = { amName: user ? user.fullName : 'Unknown AM', sales: 0, revenue: 0 };
               }
-
-              // Calculate Sales (Signed Contracts)
-              if (c.status !== 'CANCELLED') {
-                  amMap[amId].sales += c.value;
-              }
-
-              // Calculate Revenue (Installments Invoiced/Paid OR Completed Contract)
+              if (c.status !== 'CANCELLED') amMap[amId].sales += c.value;
               if (c.status !== 'CANCELLED') {
                   let contractRevenue = 0;
                   if (c.installments && c.installments.length > 0) {
-                      contractRevenue = c.installments
-                          .filter(i => i.status === InstallmentStatus.INVOICED || i.status === InstallmentStatus.PAID)
-                          .reduce((sum, i) => sum + i.value, 0);
-                  } else if (c.status === 'COMPLETED') {
-                      contractRevenue = c.value;
-                  }
+                      contractRevenue = c.installments.filter(i => i.status === InstallmentStatus.INVOICED || i.status === InstallmentStatus.PAID).reduce((sum, i) => sum + i.value, 0);
+                  } else if (c.status === 'COMPLETED') contractRevenue = c.value;
                   amMap[amId].revenue += contractRevenue;
               }
           }
       });
-
       return Object.values(amMap).filter(d => d.sales > 0 || d.revenue > 0).sort((a,b) => b.sales - a.sales);
   }, [filteredContracts, projects, users]);
 
-  // --- REPORT 4: TREND ANALYSIS ---
   const trendData = useMemo(() => {
       const trendMap: Record<string, { date: string, sales: number, revenue: number, cost: number }> = {};
-      
       filteredContracts.forEach(c => {
           const d = new Date(c.signedDate);
-          // Format YYYY-MM
           const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-          
-          if (!trendMap[key]) {
-              trendMap[key] = { date: key, sales: 0, revenue: 0, cost: 0 };
-          }
-
+          if (!trendMap[key]) trendMap[key] = { date: key, sales: 0, revenue: 0, cost: 0 };
           if (c.type === ContractType.OUTPUT && c.status !== 'CANCELLED') {
               trendMap[key].sales += c.value;
-              if (c.status === 'COMPLETED') {
-                 trendMap[key].revenue += c.value; // Simplified trend for revenue to keep consistent with signed date
-              }
-          } else if (c.type === ContractType.INPUT && c.status !== 'CANCELLED') {
-              trendMap[key].cost += c.value;
-          }
+              if (c.status === 'COMPLETED') trendMap[key].revenue += c.value;
+          } else if (c.type === ContractType.INPUT && c.status !== 'CANCELLED') trendMap[key].cost += c.value;
       });
-
       return Object.values(trendMap).sort((a,b) => a.date.localeCompare(b.date));
   }, [filteredContracts]);
 
-  // --- REPORT 5: TASKS REPORT ---
   const taskReportData = useMemo(() => {
       const assigneeMap: Record<string, { name: string, total: number, completed: number, late: number, inProgress: number }> = {};
-      
-      const today = new Date();
-      today.setHours(0,0,0,0);
-
+      const today = new Date(); today.setHours(0,0,0,0);
       filteredTasks.forEach(t => {
           if (!assigneeMap[t.assigneeId]) {
               const user = users.find(u => u.id === t.assigneeId);
-              assigneeMap[t.assigneeId] = { 
-                  name: user ? user.fullName : 'Unknown', 
-                  total: 0, 
-                  completed: 0, 
-                  late: 0, 
-                  inProgress: 0 
-              };
+              assigneeMap[t.assigneeId] = { name: user ? user.fullName : 'Unknown', total: 0, completed: 0, late: 0, inProgress: 0 };
           }
           const entry = assigneeMap[t.assigneeId];
           entry.total += 1;
-          
-          if (t.status === TaskStatus.COMPLETED) {
-              entry.completed += 1;
-          } else {
+          if (t.status === TaskStatus.COMPLETED) entry.completed += 1;
+          else {
               if (t.status === TaskStatus.IN_PROGRESS) entry.inProgress += 1;
               if (new Date(t.deadline) < today && t.status !== TaskStatus.CANCELLED) entry.late += 1;
           }
       });
-
       return Object.values(assigneeMap).filter(d => d.total > 0).sort((a,b) => b.total - a.total);
   }, [filteredTasks, users]);
 
@@ -212,16 +240,20 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
            <h1 className="text-2xl font-bold text-slate-800">Báo cáo & Thống kê</h1>
-           <p className="text-slate-500">Phân tích hiệu quả hoạt động kinh doanh và công việc</p>
+           <p className="text-slate-500">Phân tích hiệu quả hoạt động kinh doanh, công việc và nhân sự</p>
         </div>
         <div className="flex gap-2">
              <button 
                 onClick={() => {
-                    if(activeTab === 'GENERAL') exportToCSV(generalData, `Bao_Cao_Tong_Hop_${startDate}_${endDate}`);
-                    if(activeTab === 'COST') exportToCSV(costData, `Bao_Cao_Chi_Phi_${startDate}_${endDate}`);
-                    if(activeTab === 'AM') exportToCSV(amData, `Bao_Cao_AM_${startDate}_${endDate}`);
-                    if(activeTab === 'TREND') exportToCSV(trendData, `Bao_Cao_Xu_Huong_${startDate}_${endDate}`);
-                    if(activeTab === 'TASKS') exportToCSV(taskReportData, `Bao_Cao_Nhiem_Vu_${startDate}_${endDate}`);
+                    if(activeTab === 'GENERAL') exportToCSV(generalData, `Bao_Cao_Tong_Hop`);
+                    if(activeTab === 'COST') exportToCSV(costData, `Bao_Cao_Chi_Phi`);
+                    if(activeTab === 'AM') exportToCSV(amData, `Bao_Cao_AM`);
+                    if(activeTab === 'TREND') exportToCSV(trendData, `Bao_Cao_Xu_Huong`);
+                    if(activeTab === 'TASKS') exportToCSV(taskReportData, `Bao_Cao_Nhiem_Vu`);
+                    if(activeTab === 'ATTENDANCE') {
+                        if (attendanceSubTab === 'DETAIL') exportToCSV(filteredAttendance, `Chi_Tiet_Cham_Cong`);
+                        else exportToCSV(attendanceSummary, `Tong_Hop_Cham_Cong`);
+                    }
                 }}
                 className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 flex items-center gap-2 shadow-sm font-medium"
              >
@@ -230,37 +262,62 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
         </div>
       </div>
 
-      {/* Filter Bar */}
+      {/* Main Filter Bar */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center gap-4">
          <div className="flex items-center gap-2 text-slate-700 font-medium">
             <Filter className="w-5 h-5 text-slate-500" />
-            Bộ lọc thời gian:
+            Bộ lọc:
          </div>
-         <div className="flex items-center gap-2">
-            <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Calendar className="h-4 w-4 text-slate-400" />
+         
+         {activeTab === 'ATTENDANCE' ? (
+             <div className="flex items-center gap-4 w-full">
+                 <div className="flex items-center gap-2">
+                    <span className="text-sm text-slate-600">Tháng:</span>
+                    <input 
+                        type="month" 
+                        className="border border-slate-200 rounded px-2 py-1 text-sm font-bold text-slate-800 focus:ring-2 focus:ring-[#EE0033] outline-none"
+                        value={attendanceMonth}
+                        onChange={(e) => setAttendanceMonth(e.target.value)}
+                    />
+                 </div>
+                 <div className="flex-1">
+                     <select 
+                        className="w-full md:w-64 px-3 py-2 border border-slate-200 rounded text-sm outline-none focus:ring-2 focus:ring-[#EE0033]"
+                        value={filterEmployeeId}
+                        onChange={e => setFilterEmployeeId(e.target.value)}
+                     >
+                         <option value="">-- Tất cả nhân viên --</option>
+                         {users.map(u => <option key={u.id} value={u.id}>{u.fullName}</option>)}
+                     </select>
+                 </div>
+             </div>
+         ) : (
+             <div className="flex items-center gap-2">
+                <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Calendar className="h-4 w-4 text-slate-400" />
+                    </div>
+                    <input 
+                        type="date" 
+                        className="pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-[#EE0033] outline-none text-slate-600 font-medium" 
+                        value={startDate}
+                        onChange={e => setStartDate(e.target.value)}
+                    />
                 </div>
-                <input 
-                    type="date" 
-                    className="pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-[#EE0033] outline-none text-slate-600 font-medium" 
-                    value={startDate}
-                    onChange={e => setStartDate(e.target.value)}
-                />
-            </div>
-            <span className="text-slate-400">-</span>
-            <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Calendar className="h-4 w-4 text-slate-400" />
+                <span className="text-slate-400">-</span>
+                <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Calendar className="h-4 w-4 text-slate-400" />
+                    </div>
+                    <input 
+                        type="date" 
+                        className="pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-[#EE0033] outline-none text-slate-600 font-medium" 
+                        value={endDate}
+                        onChange={e => setEndDate(e.target.value)}
+                    />
                 </div>
-                <input 
-                    type="date" 
-                    className="pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-[#EE0033] outline-none text-slate-600 font-medium" 
-                    value={endDate}
-                    onChange={e => setEndDate(e.target.value)}
-                />
-            </div>
-         </div>
+             </div>
+         )}
       </div>
 
       {/* Tabs */}
@@ -268,6 +325,7 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
         <nav className="flex gap-4 min-w-max">
           {[
             { id: 'GENERAL', label: 'Tổng hợp Dự án', icon: BarChart3 },
+            { id: 'ATTENDANCE', label: 'Chấm công', icon: Clock },
             { id: 'TREND', label: 'Xu hướng (Trend)', icon: TrendingUp },
             { id: 'COST', label: 'Phân tích Chi phí', icon: PieChartIcon },
             { id: 'AM', label: 'Hiệu quả AM', icon: UserIcon },
@@ -291,7 +349,149 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
 
       {/* Report Content */}
       <div className="min-h-[500px]">
-         {/* --- GENERAL REPORT --- */}
+         
+         {/* --- ATTENDANCE REPORT --- */}
+         {activeTab === 'ATTENDANCE' && (
+             <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-300">
+                 {/* Sub Tabs */}
+                 <div className="flex gap-2 p-1 bg-slate-100 w-fit rounded-lg">
+                     {[
+                         { id: 'MATRIX', label: 'Bảng chấm công tháng' },
+                         { id: 'DETAIL', label: 'Nhật ký chi tiết' },
+                         { id: 'SUMMARY', label: 'Tổng hợp ngày công' },
+                     ].map(sub => (
+                         <button
+                            key={sub.id}
+                            onClick={() => setAttendanceSubTab(sub.id as any)}
+                            className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                                attendanceSubTab === sub.id ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                         >
+                             {sub.label}
+                         </button>
+                     ))}
+                 </div>
+
+                 {attendanceSubTab === 'MATRIX' && (
+                     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                         <div className="p-3 bg-slate-50 text-xs text-slate-500 flex gap-4 border-b border-slate-200">
+                             <div className="flex items-center gap-1"><span className="text-emerald-500 font-bold">✔</span> Có mặt</div>
+                             <div className="flex items-center gap-1"><span className="text-yellow-600 font-bold">M</span> Đi muộn</div>
+                             <div className="flex items-center gap-1"><span className="text-red-600 font-bold">P</span> Nghỉ phép</div>
+                             <div className="flex items-center gap-1"><span className="text-blue-600 font-bold">CT</span> Công tác</div>
+                             <div className="flex items-center gap-1"><span className="text-purple-600 font-bold">OT</span> Tăng ca</div>
+                         </div>
+                         <div className="overflow-x-auto">
+                             <table className="w-full text-xs text-center border-collapse">
+                                 <thead>
+                                     <tr className="bg-slate-50 text-slate-700 border-b border-slate-200">
+                                         <th className="px-4 py-3 text-left font-bold border-r border-slate-200 sticky left-0 bg-slate-50 z-10 w-40">Nhân viên</th>
+                                         {Array.from({length: new Date(parseInt(attendanceMonth.split('-')[0]), parseInt(attendanceMonth.split('-')[1]), 0).getDate()}, (_, i) => i + 1).map(d => (
+                                             <th key={d} className="w-10 py-3 border-r border-slate-100 min-w-[32px]">{d}</th>
+                                         ))}
+                                     </tr>
+                                 </thead>
+                                 <tbody>
+                                     {attendanceMatrix.map((row: any) => (
+                                         <tr key={row.id} className="border-b border-slate-100 hover:bg-slate-50">
+                                             <td className="px-4 py-2 text-left font-medium border-r border-slate-200 sticky left-0 bg-white z-10 whitespace-nowrap">{row.name}</td>
+                                             {Array.from({length: new Date(parseInt(attendanceMonth.split('-')[0]), parseInt(attendanceMonth.split('-')[1]), 0).getDate()}, (_, i) => i + 1).map(d => (
+                                                 <td key={d} className="border-r border-slate-100 py-1 font-bold">
+                                                     {row[`day_${d}`].includes('P') || row[`day_${d}`].includes('O') && !row[`day_${d}`].includes('OT') ? 
+                                                        <span className="text-red-500">{row[`day_${d}`]}</span> :
+                                                        (row[`day_${d}`].includes('OT') ? 
+                                                            <span className="text-purple-600 text-[9px]">{row[`day_${d}`]}</span> : 
+                                                            <span className="text-slate-700">{row[`day_${d}`]}</span>
+                                                        )
+                                                     }
+                                                 </td>
+                                             ))}
+                                         </tr>
+                                     ))}
+                                 </tbody>
+                             </table>
+                         </div>
+                     </div>
+                 )}
+
+                 {attendanceSubTab === 'DETAIL' && (
+                     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                         <table className="w-full text-sm text-left">
+                             <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                                 <tr>
+                                     <th className="px-6 py-3">Ngày</th>
+                                     <th className="px-6 py-3">Nhân viên</th>
+                                     <th className="px-6 py-3">Loại hình</th>
+                                     <th className="px-6 py-3">Giờ làm việc</th>
+                                     <th className="px-6 py-3">OT</th>
+                                     <th className="px-6 py-3">Ghi chú</th>
+                                 </tr>
+                             </thead>
+                             <tbody className="divide-y divide-slate-100">
+                                 {filteredAttendance.map(record => {
+                                     const status = getStatusConfig(record.statusId);
+                                     return (
+                                     <tr key={record.id} className="hover:bg-slate-50">
+                                         <td className="px-6 py-3 whitespace-nowrap">{new Date(record.date).toLocaleDateString('vi-VN')}</td>
+                                         <td className="px-6 py-3 font-medium text-slate-800">{users.find(u => u.id === record.userId)?.fullName}</td>
+                                         <td className="px-6 py-3">
+                                             <span className={`px-2 py-1 rounded text-xs font-medium ${status?.color || 'bg-slate-100'}`}>
+                                                 {status?.name || '---'}
+                                             </span>
+                                         </td>
+                                         <td className="px-6 py-3">
+                                             {record.startTime && record.endTime ? `${record.startTime} - ${record.endTime}` : '-'}
+                                         </td>
+                                         <td className="px-6 py-3">
+                                             {record.overtime !== 'NONE' ? (
+                                                 <span className="text-purple-600 font-medium bg-purple-50 px-2 py-1 rounded-full text-xs">
+                                                     {record.overtimeHours}h
+                                                 </span>
+                                             ) : '-'}
+                                         </td>
+                                         <td className="px-6 py-3 text-slate-500 max-w-xs truncate" title={record.note}>
+                                             {record.note || ''}
+                                         </td>
+                                     </tr>
+                                 )})}
+                                 {filteredAttendance.length === 0 && (
+                                     <tr><td colSpan={6} className="px-6 py-8 text-center text-slate-400">Không có dữ liệu</td></tr>
+                                 )}
+                             </tbody>
+                         </table>
+                     </div>
+                 )}
+
+                 {attendanceSubTab === 'SUMMARY' && (
+                     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                         <table className="w-full text-sm text-left">
+                             <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                                 <tr>
+                                     <th className="px-6 py-3">Nhân viên</th>
+                                     <th className="px-6 py-3 text-center">Tổng ngày đi làm</th>
+                                     <th className="px-6 py-3 text-center">Ngày nghỉ (P/O)</th>
+                                     <th className="px-6 py-3 text-center">Đi công tác</th>
+                                     <th className="px-6 py-3 text-center">Tổng giờ OT</th>
+                                 </tr>
+                             </thead>
+                             <tbody className="divide-y divide-slate-100">
+                                 {attendanceSummary.map((row, idx) => (
+                                     <tr key={idx} className="hover:bg-slate-50">
+                                         <td className="px-6 py-3 font-medium text-slate-800">{row.name}</td>
+                                         <td className="px-6 py-3 text-center font-bold text-indigo-600">{row.totalWorkDays}</td>
+                                         <td className="px-6 py-3 text-center text-red-600">{row.totalLeaveDays}</td>
+                                         <td className="px-6 py-3 text-center text-blue-600">{row.visitDays}</td>
+                                         <td className="px-6 py-3 text-center font-bold text-purple-600">{row.totalOTHours}</td>
+                                     </tr>
+                                 ))}
+                             </tbody>
+                         </table>
+                     </div>
+                 )}
+             </div>
+         )}
+
+         {/* --- GENERAL REPORT (Existing) --- */}
          {activeTab === 'GENERAL' && (
              <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-300">
                  {/* Chart */}
@@ -361,7 +561,7 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
              </div>
          )}
          
-         {/* --- TREND REPORT --- */}
+         {/* ... (Other existing reports: Trend, Cost, AM, Tasks) ... */}
          {activeTab === 'TREND' && (
              <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-300">
                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-96">
@@ -379,43 +579,9 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
                         </LineChart>
                     </ResponsiveContainer>
                  </div>
-                 
-                 <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-                    <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
-                        <h3 className="font-bold text-slate-800">Chi tiết số liệu theo Tháng</h3>
-                    </div>
-                    <table className="w-full text-sm text-left">
-                        <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
-                            <tr>
-                                <th className="px-6 py-3">Tháng</th>
-                                <th className="px-6 py-3 text-right">Doanh số (Ký)</th>
-                                <th className="px-6 py-3 text-right">Doanh thu (NT)</th>
-                                <th className="px-6 py-3 text-right">Chi phí</th>
-                                <th className="px-6 py-3 text-right">Chênh lệch (DS - CP)</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {trendData.map((row, idx) => (
-                                <tr key={idx} className="hover:bg-slate-50">
-                                    <td className="px-6 py-3 font-medium text-slate-800">{row.date}</td>
-                                    <td className="px-6 py-3 text-right text-indigo-600">{formatCurrency(row.sales)}</td>
-                                    <td className="px-6 py-3 text-right text-emerald-600">{formatCurrency(row.revenue)}</td>
-                                    <td className="px-6 py-3 text-right text-rose-600">{formatCurrency(row.cost)}</td>
-                                    <td className={`px-6 py-3 text-right font-medium ${row.sales - row.cost >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>
-                                        {formatCurrency(row.sales - row.cost)}
-                                    </td>
-                                </tr>
-                            ))}
-                            {trendData.length === 0 && (
-                                <tr><td colSpan={5} className="px-6 py-8 text-center text-slate-400">Không có dữ liệu</td></tr>
-                            )}
-                        </tbody>
-                    </table>
-                 </div>
              </div>
          )}
 
-         {/* --- COST REPORT --- */}
          {activeTab === 'COST' && (
              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in slide-in-from-bottom-2 duration-300">
                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
@@ -442,7 +608,6 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
                         </ResponsiveContainer>
                     </div>
                  </div>
-
                  <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm h-full">
                     <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
                         <h3 className="font-bold text-slate-800">Chi tiết theo loại Chi phí</h3>
@@ -477,7 +642,6 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
              </div>
          )}
 
-         {/* --- AM REPORT --- */}
          {activeTab === 'AM' && (
              <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-300">
                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-96">
@@ -494,42 +658,9 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
                         </BarChart>
                     </ResponsiveContainer>
                  </div>
-
-                  <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-                    <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
-                        <h3 className="font-bold text-slate-800">Chi tiết số liệu theo Nhân sự (AM)</h3>
-                    </div>
-                    <table className="w-full text-sm text-left">
-                        <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
-                            <tr>
-                                <th className="px-6 py-3">Tên Nhân sự (AM)</th>
-                                <th className="px-6 py-3 text-right">Tổng Doanh số (Ký HĐ)</th>
-                                <th className="px-6 py-3 text-right">Tổng Doanh thu (Nghiệm thu)</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {amData.map((row, idx) => (
-                                <tr key={idx} className="hover:bg-slate-50">
-                                    <td className="px-6 py-3 font-medium text-slate-800 flex items-center gap-2">
-                                        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-xs">
-                                            {row.amName.charAt(0)}
-                                        </div>
-                                        {row.amName}
-                                    </td>
-                                    <td className="px-6 py-3 text-right text-indigo-600 font-medium">{formatCurrency(row.sales)}</td>
-                                    <td className="px-6 py-3 text-right text-emerald-600 font-medium">{formatCurrency(row.revenue)}</td>
-                                </tr>
-                            ))}
-                            {amData.length === 0 && (
-                                <tr><td colSpan={3} className="px-6 py-8 text-center text-slate-400">Chưa có dữ liệu</td></tr>
-                            )}
-                        </tbody>
-                    </table>
-                 </div>
              </div>
          )}
 
-         {/* --- TASKS REPORT --- */}
          {activeTab === 'TASKS' && (
              <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-300">
                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -548,87 +679,6 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
                             </BarChart>
                         </ResponsiveContainer>
                      </div>
-                     
-                     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm h-full">
-                        <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
-                            <h3 className="font-bold text-slate-800">Chi tiết Nhiệm vụ theo Nhân sự</h3>
-                        </div>
-                        <div className="overflow-y-auto max-h-[340px]">
-                            <table className="w-full text-sm text-left">
-                                <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 sticky top-0">
-                                    <tr>
-                                        <th className="px-6 py-3">Nhân sự</th>
-                                        <th className="px-6 py-3 text-right">Tổng việc</th>
-                                        <th className="px-6 py-3 text-right">Hoàn thành</th>
-                                        <th className="px-6 py-3 text-right">Tỷ lệ HT</th>
-                                        <th className="px-6 py-3 text-right text-red-600">Quá hạn</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {taskReportData.map((row, idx) => (
-                                        <tr key={idx} className="hover:bg-slate-50">
-                                            <td className="px-6 py-3 font-medium text-slate-800">{row.name}</td>
-                                            <td className="px-6 py-3 text-right">{row.total}</td>
-                                            <td className="px-6 py-3 text-right text-emerald-600 font-bold">{row.completed}</td>
-                                            <td className="px-6 py-3 text-right">
-                                                {((row.completed / row.total) * 100).toFixed(0)}%
-                                            </td>
-                                            <td className="px-6 py-3 text-right text-red-600 font-bold">{row.late}</td>
-                                        </tr>
-                                    ))}
-                                    {taskReportData.length === 0 && (
-                                        <tr><td colSpan={5} className="px-6 py-8 text-center text-slate-400">Không có dữ liệu</td></tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                     </div>
-                 </div>
-
-                 {/* Detailed Task List Table */}
-                 <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-                    <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
-                        <h3 className="font-bold text-slate-800">Danh sách Chi tiết Nhiệm vụ ({startDate} đến {endDate})</h3>
-                    </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm text-left">
-                            <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
-                                <tr>
-                                    <th className="px-6 py-3">Tên Nhiệm vụ</th>
-                                    <th className="px-6 py-3">Người thực hiện</th>
-                                    <th className="px-6 py-3">Hạn chót</th>
-                                    <th className="px-6 py-3 text-center">Trạng thái</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {filteredTasks.map(task => {
-                                    const assigneeName = users.find(u => u.id === task.assigneeId)?.fullName || 'Unknown';
-                                    return (
-                                        <tr key={task.id} className="hover:bg-slate-50">
-                                            <td className="px-6 py-3 font-medium text-slate-800">{task.name}</td>
-                                            <td className="px-6 py-3 text-slate-600">{assigneeName}</td>
-                                            <td className="px-6 py-3 text-slate-600">{new Date(task.deadline).toLocaleDateString('vi-VN')}</td>
-                                            <td className="px-6 py-3 text-center">
-                                                <span className={`px-2 py-1 rounded text-xs font-bold ${
-                                                    task.status === TaskStatus.COMPLETED ? 'bg-emerald-100 text-emerald-700' :
-                                                    task.status === TaskStatus.IN_PROGRESS ? 'bg-blue-100 text-blue-700' :
-                                                    task.status === TaskStatus.CANCELLED ? 'bg-red-100 text-red-700' :
-                                                    'bg-slate-100 text-slate-700'
-                                                }`}>
-                                                    {task.status === TaskStatus.COMPLETED ? 'Hoàn thành' :
-                                                     task.status === TaskStatus.IN_PROGRESS ? 'Đang làm' :
-                                                     task.status === TaskStatus.CANCELLED ? 'Hủy' : 'Mới'}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                                {filteredTasks.length === 0 && (
-                                    <tr><td colSpan={4} className="px-6 py-8 text-center text-slate-400">Không có nhiệm vụ nào trong khoảng thời gian này</td></tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
                  </div>
              </div>
          )}

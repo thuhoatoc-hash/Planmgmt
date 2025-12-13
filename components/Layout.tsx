@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { LayoutDashboard, FolderKanban, LogOut, Menu, X, Settings, BarChart3, Download, Target, Award, CheckSquare, CalendarDays, Signal, Bell } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, LogOut, Menu, X, Settings, BarChart3, Download, Target, Award, CheckSquare, CalendarDays, Signal, Bell, Clock } from 'lucide-react';
 import { User, Role, UserRole, ResourceType } from '../types';
 import BannerSlider from './BannerSlider';
 
@@ -23,6 +23,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, roles = [], onLogout, c
       'dashboard': 'PROJECTS', // Default accessible, logic below overrides
       'tasks': 'TASKS',
       'projects': 'PROJECTS',
+      'attendance': 'ATTENDANCE',
       'kpi': 'KPI',
       'evaluation': 'EVALUATION',
       'events': 'EVENTS',
@@ -53,6 +54,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, roles = [], onLogout, c
   // Updated Menu Structure - Notifications moved to bottom
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'attendance', label: 'Điểm danh', icon: Clock },
     { id: 'tasks', label: 'Quản lý Nhiệm vụ', icon: CheckSquare }, 
     { id: 'projects', label: 'Dự án', icon: FolderKanban },
     { id: 'kpi', label: 'Điều hành chỉ tiêu', icon: Target },

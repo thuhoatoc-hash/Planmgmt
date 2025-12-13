@@ -7,7 +7,7 @@ export enum UserRole {
 }
 
 // --- NEW PERMISSION TYPES ---
-export type ResourceType = 'PROJECTS' | 'CONTRACTS' | 'TASKS' | 'KPI' | 'EVALUATION' | 'EVENTS' | 'USERS' | 'CONFIG' | 'REPORTS' | 'NOTIFICATIONS';
+export type ResourceType = 'PROJECTS' | 'CONTRACTS' | 'TASKS' | 'KPI' | 'EVALUATION' | 'EVENTS' | 'USERS' | 'CONFIG' | 'REPORTS' | 'NOTIFICATIONS' | 'ATTENDANCE';
 export type ActionType = 'view' | 'edit' | 'delete';
 
 export interface Permission {
@@ -305,4 +305,43 @@ export interface Notification {
     createdAt: string; // ISO Date
     authorId: string; // User ID
     isRead?: boolean; // Local state for user
+}
+
+// --- ATTENDANCE TYPES ---
+// Updated to match new requirements
+export type AttendanceType = 'LEAVE' | 'SICK' | 'LATE' | 'CUSTOMER_VISIT' | 'PRESENT' | 'WFH';
+
+export interface AttendanceStatusConfig {
+    id: string;
+    name: string; // e.g., "Nghỉ phép", "Đi khách hàng"
+    color: string; // Tailwind class
+    type: AttendanceType;
+    order: number;
+}
+
+export enum OvertimeType {
+    NONE = 'NONE',
+    WEEKEND = 'WEEKEND', // Cuối tuần
+    HOLIDAY = 'HOLIDAY'  // Ngày lễ
+}
+
+export interface AttendanceRecord {
+    id: string;
+    userId: string;
+    date: string; // YYYY-MM-DD
+    
+    // Attendance Info
+    statusId: string; // Ref to AttendanceStatusConfig
+    startTime?: string; // HH:mm (Từ giờ)
+    endTime?: string;   // HH:mm (Đến giờ)
+    
+    // OT Info
+    overtime: OvertimeType;
+    overtimeDate?: string; // Allow different date for OT if needed, but usually same
+    overtimeStartTime?: string; // HH:mm
+    overtimeEndTime?: string; // HH:mm
+    overtimeHours?: number; // Calculated or manual input
+    
+    note?: string;
+    location?: string;
 }

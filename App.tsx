@@ -13,7 +13,8 @@ import EmployeeEvaluationManager from './components/EmployeeEvaluation';
 import TaskManagement from './components/TaskManagement';
 import EventManager from './components/EventManager';
 import NotificationManager from './components/NotificationManager';
-import { User, Project, Contract, Category, Partner, ProjectStatusItem, Task, KPIMonthlyData, EmployeeEvaluation, TaskStatus, BirthdayEvent, Role, UserRole, ResourceType, Notification } from './types';
+import AttendanceManager from './components/AttendanceManager';
+import { User, Project, Contract, Category, Partner, ProjectStatusItem, Task, KPIMonthlyData, EmployeeEvaluation, TaskStatus, BirthdayEvent, Role, UserRole, ResourceType, Notification, AttendanceRecord, AttendanceStatusConfig } from './types';
 import { api } from './services/api';
 import { Loader2 } from 'lucide-react';
 
@@ -63,6 +64,8 @@ const App: React.FC = () => {
   const [events, setEvents] = useState<BirthdayEvent[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
+  const [attendanceStatuses, setAttendanceStatuses] = useState<AttendanceStatusConfig[]>([]);
 
   // View State
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -73,7 +76,7 @@ const App: React.FC = () => {
     setIsAppLoading(true);
     try {
         const [
-            pData, cData, catData, uData, partData, sData, tData, kData, eData, evtData, roleData, notifData
+            pData, cData, catData, uData, partData, sData, tData, kData, eData, evtData, roleData, notifData, attRecordData, attStatusData
         ] = await Promise.all([
             api.projects.getAll(),
             api.contracts.getAll(),
@@ -86,7 +89,9 @@ const App: React.FC = () => {
             api.evaluations.getAll(),
             api.events.getAll(),
             api.roles.getAll(),
-            api.notifications.getAll()
+            api.notifications.getAll(),
+            api.attendance.getAll(),
+            api.attendanceStatuses.getAll()
         ]);
 
         setProjects(pData);
@@ -101,6 +106,8 @@ const App: React.FC = () => {
         setEvents(evtData);
         setRoles(roleData);
         setNotifications(notifData);
+        setAttendanceRecords(attRecordData);
+        setAttendanceStatuses(attStatusData);
 
         // Check for task reminders after loading
         checkTaskReminders(tData, uData);
@@ -248,18 +255,16 @@ const App: React.FC = () => {
               setUsers(prevUsers => [...prevUsers, u]);
           }
       } catch (error) {
-          console.error("Add user failed:", error);
-          setUsers(prevUsers => [...prevUsers, u]);
+          console.error("Error adding user:", error);
+          alert("Lỗi khi thêm người dùng mới.");
       }
   };
   const handleUpdateUser = async (u: User) => {
       const saved = await api.users.save(u);
       if (saved) {
-          setUsers(prevUsers => prevUsers.map(existing => existing.id === saved.id ? saved : existing));
-          if (user.id === saved.id) {
-              setUser(saved);
-              localStorage.setItem('currentUser', JSON.stringify(saved));
-          }
+          setUsers(users.map(existing => existing.id === saved.id ? saved : existing));
+          // Update current user session if self-update
+          if (user.id === saved.id) setUser(saved);
       }
   };
   const handleDeleteUser = async (id: string) => {
@@ -310,15 +315,13 @@ const App: React.FC = () => {
   };
 
   // KPI Handlers
-  const handleUpdateKPI = async (data: KPIMonthlyData) => {
-      const saved = await api.kpi.save(data);
+  const handleUpdateKPI = async (k: KPIMonthlyData) => {
+      const saved = await api.kpi.save(k);
       if (saved) {
-          const exists = kpiData.some(d => d.id === saved.id);
-          if (exists) {
-              setKpiData(kpiData.map(d => d.id === saved.id ? saved : d));
-          } else {
-              setKpiData([...kpiData, saved]);
-          }
+          setKpiData(prev => {
+              const others = prev.filter(item => item.id !== saved.id);
+              return [...others, saved];
+          });
       }
   };
 
@@ -326,20 +329,20 @@ const App: React.FC = () => {
   const handleAddEvent = async (e: BirthdayEvent) => {
       const saved = await api.events.save(e);
       if (saved) setEvents([...events, saved]);
-  };
+  }
   const handleUpdateEvent = async (e: BirthdayEvent) => {
       const saved = await api.events.save(e);
-      if (saved) setEvents(events.map(existing => existing.id === saved.id ? saved : existing));
-  };
+      if (saved) setEvents(events.map(ev => ev.id === saved.id ? saved : ev));
+  }
   const handleDeleteEvent = async (id: string) => {
       const success = await api.events.delete(id);
       if (success) setEvents(events.filter(e => e.id !== id));
-  };
+  }
 
   // Notification Handlers
   const handleAddNotification = async (n: Notification) => {
       const saved = await api.notifications.save(n);
-      if (saved) setNotifications([...notifications, saved]);
+      if (saved) setNotifications([saved, ...notifications]);
   };
   const handleUpdateNotification = async (n: Notification) => {
       const saved = await api.notifications.save(n);
@@ -350,25 +353,64 @@ const App: React.FC = () => {
       if (success) setNotifications(notifications.filter(n => n.id !== id));
   };
 
-  // Navigation Logic
-  const handleNavigate = (path: string, id?: string) => {
-    setCurrentPath(path);
-    if (path !== 'projects') {
-      setSelectedProject(null);
-    }
-    
-    // Handle Event Selection
-    if (path === 'events' && id) {
-        setSelectedEventId(id);
-    } else {
-        setSelectedEventId(null);
-    }
+  // Attendance Handlers
+  const handleAddAttendanceRecord = async (r: AttendanceRecord) => {
+      const saved = await api.attendance.save(r);
+      if (saved) {
+          // Replace if exists (based on API upsert logic), or add
+          setAttendanceRecords(prev => {
+              const filtered = prev.filter(item => item.userId !== saved.userId || item.date !== saved.date);
+              return [...filtered, saved];
+          });
+      }
+  };
+  const handleUpdateAttendanceRecord = async (r: AttendanceRecord) => {
+      const saved = await api.attendance.save(r);
+      if (saved) {
+          setAttendanceRecords(prev => prev.map(item => item.id === saved.id ? saved : item));
+      }
   };
 
-  const renderContent = () => {
-    // Detail View Override
-    if (currentPath === 'projects' && selectedProject) {
-      return (
+  // Attendance Status Config Handlers
+  const handleAddAttendanceStatus = async (s: AttendanceStatusConfig) => {
+      const saved = await api.attendanceStatuses.save(s);
+      if (saved) setAttendanceStatuses([...attendanceStatuses, saved]);
+  };
+  const handleUpdateAttendanceStatus = async (s: AttendanceStatusConfig) => {
+      const saved = await api.attendanceStatuses.save(s);
+      if (saved) setAttendanceStatuses(attendanceStatuses.map(existing => existing.id === saved.id ? saved : existing));
+  };
+  const handleDeleteAttendanceStatus = async (id: string) => {
+      const success = await api.attendanceStatuses.delete(id);
+      if (success) setAttendanceStatuses(attendanceStatuses.filter(s => s.id !== id));
+  };
+
+  // Navigation Helper
+  const navigateTo = (path: string, id?: string) => {
+      if (path === 'projects' && id) {
+          const project = projects.find(p => p.id === id);
+          if (project) {
+              setSelectedProject(project);
+              setCurrentPath('projects');
+          }
+      } else if (path === 'events' && id) {
+          setSelectedEventId(id);
+          setCurrentPath('events');
+      } else {
+          setCurrentPath(path);
+      }
+  };
+
+  return (
+    <Layout 
+        user={user} 
+        roles={roles}
+        onLogout={handleLogout} 
+        currentPath={currentPath} 
+        onNavigate={navigateTo}
+        onOpenProfile={() => setIsProfileOpen(true)}
+    >
+      {selectedProject ? (
         <ProjectDetail 
           project={selectedProject}
           contracts={contracts}
@@ -389,122 +431,136 @@ const App: React.FC = () => {
           onUpdateTask={handleUpdateTask}
           onDeleteTask={handleDeleteTask}
         />
-      );
-    }
-
-    // Permission Guard for Routes
-    if (currentPath === 'kpi' && !checkPermission('KPI')) return <div className="p-8 text-center text-slate-500">Bạn không có quyền truy cập module này.</div>;
-    if (currentPath === 'evaluation' && !checkPermission('EVALUATION')) return <div className="p-8 text-center text-slate-500">Bạn không có quyền truy cập module này.</div>;
-    if (currentPath === 'reports' && !checkPermission('REPORTS')) return <div className="p-8 text-center text-slate-500">Bạn không có quyền truy cập module này.</div>;
-    if (currentPath === 'settings' && !checkPermission('CONFIG')) return <div className="p-8 text-center text-slate-500">Bạn không có quyền truy cập module này.</div>;
-    if (currentPath === 'tasks' && !checkPermission('TASKS')) return <div className="p-8 text-center text-slate-500">Bạn không có quyền truy cập module này.</div>;
-    if (currentPath === 'events' && !checkPermission('EVENTS')) return <div className="p-8 text-center text-slate-500">Bạn không có quyền truy cập module này.</div>;
-    if (currentPath === 'notifications' && !checkPermission('NOTIFICATIONS')) return <div className="p-8 text-center text-slate-500">Bạn không có quyền truy cập module này.</div>;
-
-    switch (currentPath) {
-      case 'dashboard':
-        return <Dashboard 
+      ) : (
+        <>
+          {currentPath === 'dashboard' && (
+            <Dashboard 
+              currentUser={user}
+              projects={projects} 
+              contracts={contracts} 
+              categories={categories} 
+              kpiData={kpiData}
+              tasks={tasks}
+              users={users}
+              evaluations={evaluations}
+              events={events}
+              roles={roles}
+              notifications={notifications}
+              onNavigate={navigateTo}
+            />
+          )}
+          {currentPath === 'attendance' && (
+              <AttendanceManager 
                   currentUser={user}
+                  users={users}
+                  records={attendanceRecords}
+                  statuses={attendanceStatuses}
+                  onAddRecord={handleAddAttendanceRecord}
+                  onUpdateRecord={handleUpdateAttendanceRecord}
+              />
+          )}
+          {currentPath === 'tasks' && (
+              <TaskManagement 
+                  tasks={tasks} 
                   projects={projects} 
-                  contracts={contracts} 
-                  categories={categories} 
-                  kpiData={kpiData} 
-                  tasks={tasks}
-                  users={users}
-                  evaluations={evaluations}
-                  events={events}
-                  notifications={notifications}
-                  roles={roles} // Pass roles to Dashboard for widget permission check
-                  onNavigate={handleNavigate} // Pass handleNavigate here
-               />;
-      case 'kpi':
-        return <KPIManagement kpiData={kpiData} onUpdateKPI={handleUpdateKPI} user={user} />;
-      case 'evaluation':
-        return <EmployeeEvaluationManager users={users} currentUser={user} />;
-      case 'tasks':
-        return <TaskManagement 
-                  tasks={tasks}
-                  projects={projects}
-                  users={users}
+                  users={users} 
                   currentUser={user}
                   onAddTask={handleAddTask}
                   onUpdateTask={handleUpdateTask}
                   onDeleteTask={handleDeleteTask}
-               />;
-      case 'events':
-        return <EventManager 
+              />
+          )}
+          {currentPath === 'projects' && (
+            <ProjectList 
+              projects={projects} 
+              contracts={contracts}
+              users={users}
+              partners={partners}
+              statuses={statuses}
+              onAddProject={handleAddProject}
+              onUpdateProject={handleUpdateProject}
+              onDeleteProject={handleDeleteProject}
+              onSelectProject={setSelectedProject}
+            />
+          )}
+          {currentPath === 'reports' && (
+            <Reports 
+              projects={projects} 
+              contracts={contracts} 
+              categories={categories}
+              users={users}
+              tasks={tasks}
+              attendanceRecords={attendanceRecords}
+              attendanceStatuses={attendanceStatuses}
+            />
+          )}
+          {currentPath === 'kpi' && (
+            <KPIManagement 
+              kpiData={kpiData}
+              onUpdateKPI={handleUpdateKPI}
+              user={user}
+            />
+          )}
+          {currentPath === 'evaluation' && (
+              <EmployeeEvaluationManager 
+                  users={users}
+                  currentUser={user}
+              />
+          )}
+          {currentPath === 'events' && (
+              <EventManager 
                   events={events}
                   initialSelectedId={selectedEventId}
                   onClearSelection={() => setSelectedEventId(null)}
                   onAddEvent={handleAddEvent}
                   onUpdateEvent={handleUpdateEvent}
                   onDeleteEvent={handleDeleteEvent}
-               />;
-      case 'notifications':
-        return <NotificationManager 
+              />
+          )}
+          {currentPath === 'notifications' && (
+              <NotificationManager 
                   notifications={notifications}
                   currentUser={user}
                   onAdd={handleAddNotification}
                   onUpdate={handleUpdateNotification}
                   onDelete={handleDeleteNotification}
-               />;
-      case 'reports':
-        return <Reports projects={projects} contracts={contracts} categories={categories} users={users} />;
-      case 'projects':
-        return <ProjectList 
-                  projects={projects} 
-                  contracts={contracts} 
-                  users={users} 
-                  partners={partners}
-                  statuses={statuses}
-                  onAddProject={handleAddProject} 
-                  onUpdateProject={handleUpdateProject}
-                  onDeleteProject={handleDeleteProject}
-                  onSelectProject={setSelectedProject} 
-               />;
-      // Consolidated Settings Route
-      case 'settings':
-        return <ConfigurationManager 
-                  currentUser={user}
-                  statuses={statuses}
-                  users={users}
-                  partners={partners}
-                  categories={categories}
-                  projects={projects}
-                  contracts={contracts}
-                  onAddStatus={handleAddStatus}
-                  onUpdateStatus={handleUpdateStatus}
-                  onDeleteStatus={handleDeleteStatus}
-                  onAddUser={handleAddUser}
-                  onUpdateUser={handleUpdateUser}
-                  onDeleteUser={handleDeleteUser}
-                  onAddPartner={handleAddPartner}
-                  onUpdatePartner={handleUpdatePartner}
-                  onDeletePartner={handleDeletePartner}
-                  onAddCategory={handleAddCategory}
-                  onDeleteCategory={handleDeleteCategory}
-               />;
-      default:
-        return <div>Not found</div>;
-    }
-  };
+              />
+          )}
+          {currentPath === 'settings' && checkPermission('CONFIG') && (
+            <ConfigurationManager 
+              currentUser={user}
+              statuses={statuses}
+              users={users}
+              partners={partners}
+              categories={categories}
+              projects={projects}
+              contracts={contracts}
+              attendanceStatuses={attendanceStatuses}
+              onAddStatus={handleAddStatus}
+              onUpdateStatus={handleUpdateStatus}
+              onDeleteStatus={handleDeleteStatus}
+              onAddUser={handleAddUser}
+              onUpdateUser={handleUpdateUser}
+              onDeleteUser={handleDeleteUser}
+              onAddPartner={handleAddPartner}
+              onUpdatePartner={handleUpdatePartner}
+              onDeletePartner={handleDeletePartner}
+              onAddCategory={handleAddCategory}
+              onDeleteCategory={handleDeleteCategory}
+              onAddAttendanceStatus={handleAddAttendanceStatus}
+              onUpdateAttendanceStatus={handleUpdateAttendanceStatus}
+              onDeleteAttendanceStatus={handleDeleteAttendanceStatus}
+            />
+          )}
+        </>
+      )}
 
-  return (
-    <Layout 
-      user={user} 
-      onLogout={handleLogout} 
-      currentPath={currentPath} 
-      onNavigate={handleNavigate}
-      onOpenProfile={() => setIsProfileOpen(true)}
-      roles={roles} // Pass roles to Layout
-    >
-      {renderContent()}
       {isProfileOpen && (
-        <UserProfile 
-            user={user} 
-            onClose={() => setIsProfileOpen(false)}
-            onUpdate={handleUpdateUser}
-        />
+          <UserProfile 
+              user={user} 
+              onUpdate={handleUpdateUser} 
+              onClose={() => setIsProfileOpen(false)} 
+          />
       )}
     </Layout>
   );
