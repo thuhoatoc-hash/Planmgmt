@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { ProjectStatusItem, User, Partner, Category, Project, Contract, Role, UserFieldDefinition, AttendanceStatusConfig, AttendanceSystemConfig } from '../types';
+import React, { useState, useEffect } from 'react';
+import { ProjectStatusItem, User, Partner, Category, Project, Contract, UserRole, Role, UserFieldDefinition, AttendanceStatusConfig, AttendanceSystemConfig } from '../types';
 import { Edit, Trash2, List, Settings, Users, Tags, Briefcase, Shield, Settings2, Image, Clock, ToggleLeft, ToggleRight, Save, Loader2 } from 'lucide-react';
 import UserManager from './UserManager';
 import PartnerManager from './PartnerManager';
@@ -111,6 +111,8 @@ const ConfigurationManager: React.FC<ConfigurationManagerProps> = ({
     else onAddStatus({ ...editingStatus, id: `st_${Date.now()}` } as ProjectStatusItem);
     setIsStatusModalOpen(false);
   };
+
+  const isAdmin = currentUser.role === UserRole.ADMIN;
 
   const tabs = [
       { id: 'USERS', label: 'Người dùng', icon: Users },

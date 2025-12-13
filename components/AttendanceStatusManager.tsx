@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { AttendanceStatusConfig, AttendanceType } from '../types';
-import { Edit, Trash2, Plus } from 'lucide-react';
+import { Edit, Trash2, Plus, ListChecks } from 'lucide-react';
 
 interface AttendanceStatusManagerProps {
   statuses: AttendanceStatusConfig[];

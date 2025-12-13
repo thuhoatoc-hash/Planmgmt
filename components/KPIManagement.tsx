@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { KPIMonthlyData, KPIGroup, KPIItem, UserRole, User } from '../types';
-import { TrendingUp, AlertCircle, Lock, Unlock, Plus, Trash2, PlusCircle, Copy, CheckSquare, Square, BarChart3, List, FileBarChart, Bell } from 'lucide-react';
+import { TrendingUp, AlertCircle, CheckCircle, Lock, Unlock, Plus, Trash2, PlusCircle, Copy, CheckSquare, Square, BarChart3, List, FileBarChart, Bell } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 interface KPIManagementProps {
@@ -174,11 +174,11 @@ const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, use
             groupActual = group.items.reduce((sum, item) => sum + (item.actual || 0), 0);
         }
 
-        // Calculate percent independently of weight to ensure display for "Revenue" groups
-        let groupPercent = groupTarget > 0 ? (groupActual / groupTarget) * 100 : 0;
-        
+        let groupPercent = 0;
         let groupScore = 0;
+        
         if (group.weight && group.weight > 0) {
+            groupPercent = groupTarget > 0 ? (groupActual / groupTarget) * 100 : 0;
             const cappedPercent = Math.min(groupPercent, 120);
             groupScore = (cappedPercent * group.weight) / 100;
             grandTotalScore += groupScore;
@@ -221,6 +221,7 @@ const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, use
       
       calculatedData.groups.forEach(g => {
           g.items.forEach(i => {
+              // Consider item at risk if it has a target, weight, and completion is less than 100%
               if (i.target > 0 && i.weight > 0 && i.percent < 100) {
                   riskList.push({
                       groupName: g.name,
@@ -232,6 +233,7 @@ const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, use
               }
           });
       });
+      // Sort by lowest percentage first
       return riskList.sort((a,b) => a.percent - b.percent);
   }, [calculatedData]);
 
@@ -395,7 +397,7 @@ const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, use
         </div>
       </div>
 
-      {/* --- ALERTS SECTION --- */}
+      {/* --- ALERTS SECTION (NEW) --- */}
       {atRiskItems.length > 0 && (
           <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 animate-in slide-in-from-top-4 duration-300 mb-6">
               <h3 className="flex items-center gap-2 text-orange-800 font-bold mb-3">
@@ -466,8 +468,71 @@ const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, use
           </div>
       )}
 
-      {/* --- DETAIL TABLE --- */}
+      {/* --- SCORE SUMMARY CARDS --- */}
       {calculatedData ? (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl p-6 text-white shadow-lg relative overflow-hidden">
+                <div className="flex justify-between items-start mb-4 relative z-10">
+                    <div>
+                        <p className="text-blue-100 text-sm font-medium uppercase">Tổng điểm {selectedMonth}</p>
+                        <h3 className="text-4xl font-bold mt-1">{calculatedData.totalScore.toFixed(2)}</h3>
+                    </div>
+                    <div className="p-2 bg-white/20 rounded-lg">
+                        <TrendingUp className="w-6 h-6 text-white" />
+                    </div>
+                </div>
+                <div className="w-full bg-black/20 rounded-full h-1.5 mt-2 relative z-10">
+                    <div className="bg-white h-1.5 rounded-full" style={{width: `${Math.min(calculatedData.totalScore, 100)}%`}}></div>
+                </div>
+            </div>
+
+            <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm">
+                <div className="flex justify-between items-start mb-4">
+                    <div>
+                        <p className="text-slate-500 text-sm font-medium uppercase">Chỉ tiêu hoàn thành</p>
+                        <h3 className="text-3xl font-bold text-emerald-600 mt-1">{calculatedData.completed} <span className="text-lg text-slate-400 font-normal">/ {calculatedData.total}</span></h3>
+                    </div>
+                    <div className="p-2 bg-emerald-50 rounded-lg">
+                        <CheckCircle className="w-6 h-6 text-emerald-600" />
+                    </div>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span> Đạt {'>'}= 100% kế hoạch
+                </div>
+            </div>
+
+            <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm">
+                <div className="flex justify-between items-start mb-4">
+                    <div>
+                        <p className="text-slate-500 text-sm font-medium uppercase">Chưa hoàn thành</p>
+                        <h3 className="text-3xl font-bold text-orange-600 mt-1">{calculatedData.total - calculatedData.completed}</h3>
+                    </div>
+                    <div className="p-2 bg-orange-50 rounded-lg">
+                        <AlertCircle className="w-6 h-6 text-orange-600" />
+                    </div>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                    <span className="w-2 h-2 rounded-full bg-orange-500"></span> Cần đẩy mạnh thực hiện
+                </div>
+            </div>
+        </div>
+      ) : (
+          <div className="p-12 flex flex-col items-center justify-center bg-white rounded-xl border border-dashed border-slate-300 text-slate-500 gap-4">
+            <p>Chưa có dữ liệu chỉ tiêu cho tháng {selectedMonth}</p>
+            {isAdmin && (
+                <button 
+                  onClick={handleInitMonth}
+                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
+                >
+                    <Copy className="w-4 h-4" />
+                    Khởi tạo dữ liệu (Copy tháng trước)
+                </button>
+            )}
+        </div>
+      )}
+
+      {/* --- DETAIL TABLE --- */}
+      {calculatedData && (
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left border-collapse min-w-[1000px]">
@@ -495,7 +560,6 @@ const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, use
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
-                     {/* Grand Total Row */}
                      <tr className="bg-blue-100 font-bold text-slate-900">
                         <td className="px-4 py-3 border-r border-slate-300"></td>
                         <td className="px-4 py-3 border-r border-slate-300 underline">TỔNG HỢP CHỈ TIÊU VTS</td>
@@ -545,8 +609,7 @@ const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, use
                                      ) : group.unit}
                                 </td>
                                 
-                                {/* Group Target */}
-                                <td className="px-4 py-3 border-r border-slate-300 text-right text-indigo-800">
+                                <td className="px-4 py-3 border-r border-slate-300 text-right">
                                     {!group.autoCalculate && isEditMode ? (
                                          <input 
                                             type="number" 
@@ -555,8 +618,7 @@ const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, use
                                             onChange={(e) => handleUpdateGroup(group.id, 'target', e.target.value)}
                                         />
                                     ) : (
-                                        // Show calculated Target for groups like Revenue
-                                        (group.target || group.autoCalculate) ? formatNumber(group.target) : ''
+                                        group.target ? formatNumber(group.target) : ''
                                     )}
                                 </td>
 
@@ -576,8 +638,7 @@ const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, use
                                     )}
                                 </td>
 
-                                {/* Group Actual */}
-                                <td className="px-4 py-3 border-r border-slate-300 text-right text-emerald-800">
+                                <td className="px-4 py-3 border-r border-slate-300 text-right">
                                     {group.autoCalculate ? (
                                         formatNumber(group.actual || 0)
                                     ) : (
@@ -592,9 +653,8 @@ const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, use
                                     )}
                                 </td>
 
-                                {/* Group Percent */}
-                                <td className="px-4 py-3 border-r border-slate-300 text-right font-bold text-blue-700">
-                                    {group.percent > 0 ? `${group.percent.toFixed(1)}%` : ''}
+                                <td className="px-4 py-3 border-r border-slate-300 text-right text-slate-600">
+                                    {group.percent && group.percent > 0 ? `${group.percent.toFixed(1)}%` : ''}
                                 </td>
 
                                 <td className="px-4 py-3 text-right font-bold text-slate-900">
@@ -723,19 +783,6 @@ const KPIManagement: React.FC<KPIManagementProps> = ({ kpiData, onUpdateKPI, use
               </div>
           )}
       </div>
-      ) : (
-          <div className="p-12 flex flex-col items-center justify-center bg-white rounded-xl border border-dashed border-slate-300 text-slate-500 gap-4">
-            <p>Chưa có dữ liệu chỉ tiêu cho tháng {selectedMonth}</p>
-            {isAdmin && (
-                <button 
-                  onClick={handleInitMonth}
-                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
-                >
-                    <Copy className="w-4 h-4" />
-                    Khởi tạo dữ liệu (Copy tháng trước)
-                </button>
-            )}
-        </div>
       )}
       </>
       )}
