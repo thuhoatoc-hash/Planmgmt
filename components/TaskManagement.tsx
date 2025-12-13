@@ -130,7 +130,11 @@ const TaskManagement: React.FC<TaskManagementProps> = ({ tasks, projects, users,
   }, [tasks, searchTerm, filterType, filterStatus, filterAssignee]);
 
   // --- HANDLERS ---
-  const handleOpenModal = (task?: Task) => {
+  const handleOpenModal = (task?: Task, e?: React.MouseEvent) => {
+      if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+      }
       if (task) {
           setFormData({ 
               ...task, 
@@ -146,12 +150,28 @@ const TaskManagement: React.FC<TaskManagementProps> = ({ tasks, projects, users,
       setIsModalOpen(true);
   };
 
+  const handleDelete = (id: string, e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (window.confirm('Bạn có chắc chắn muốn xóa nhiệm vụ này? Hành động này không thể hoàn tác.')) {
+          onDeleteTask(id);
+      }
+  };
+
+  const handleDeleteFromModal = (e: React.MouseEvent) => {
+      e.preventDefault();
+      if (formData.id) {
+          if (window.confirm('Bạn có chắc chắn muốn xóa nhiệm vụ này? Hành động này không thể hoàn tác.')) {
+              onDeleteTask(formData.id);
+              setIsModalOpen(false);
+          }
+      }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       
       // Clean up data before saving
-      // CRITICAL FIX: Ensure projectId is NULL if it's an ADHOC task or empty string.
-      // This prevents UUID syntax error in Supabase if an empty string is passed.
       let projectIdValue = null;
       if (formData.taskType === TaskType.PROJECT && formData.projectId && formData.projectId.trim() !== '') {
           projectIdValue = formData.projectId;
@@ -167,7 +187,6 @@ const TaskManagement: React.FC<TaskManagementProps> = ({ tasks, projects, users,
           outputStandard: formData.outputStandard || ''
       } as Task;
 
-      // Do NOT generate mock ID here. Let Database/API handle it.
       if (finalTask.id) {
           onUpdateTask(finalTask);
       } else {
@@ -229,6 +248,7 @@ const TaskManagement: React.FC<TaskManagementProps> = ({ tasks, projects, users,
             <div className="flex gap-2">
                 {tasksDueTomorrow.length > 0 && (
                     <button 
+                        type="button"
                         onClick={handleSendReminders}
                         className="bg-amber-500 text-white px-4 py-2 rounded-lg hover:bg-amber-600 flex items-center gap-2 shadow-sm font-medium transition-colors"
                         title={`Gửi nhắc nhở cho ${tasksDueTomorrow.length} nhiệm vụ đến hạn ngày mai`}
@@ -239,6 +259,7 @@ const TaskManagement: React.FC<TaskManagementProps> = ({ tasks, projects, users,
                     </button>
                 )}
                 <button 
+                    type="button"
                     onClick={() => handleOpenModal()}
                     className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 flex items-center gap-2 shadow-sm font-medium"
                 >
@@ -393,11 +414,21 @@ const TaskManagement: React.FC<TaskManagementProps> = ({ tasks, projects, users,
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 text-right">
-                                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button onClick={() => handleOpenModal(task)} className="p-1.5 text-slate-400 hover:text-indigo-600 bg-white border border-slate-200 rounded shadow-sm">
+                                        <div className="flex justify-end gap-2">
+                                            <button 
+                                                type="button"
+                                                onClick={(e) => handleOpenModal(task, e)} 
+                                                className="p-1.5 text-slate-400 hover:text-indigo-600 bg-white border border-slate-200 rounded shadow-sm"
+                                                title="Sửa"
+                                            >
                                                 <Edit className="w-4 h-4" />
                                             </button>
-                                            <button onClick={() => { if(window.confirm('Xóa nhiệm vụ?')) onDeleteTask(task.id) }} className="p-1.5 text-slate-400 hover:text-red-600 bg-white border border-slate-200 rounded shadow-sm">
+                                            <button 
+                                                type="button"
+                                                onClick={(e) => handleDelete(task.id, e)} 
+                                                className="p-1.5 text-slate-400 hover:text-red-600 bg-white border border-slate-200 rounded shadow-sm"
+                                                title="Xóa"
+                                            >
                                                 <Trash2 className="w-4 h-4" />
                                             </button>
                                         </div>
@@ -520,11 +551,24 @@ const TaskManagement: React.FC<TaskManagementProps> = ({ tasks, projects, users,
                              </div>
                         </div>
 
-                         <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-100">
-                            <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Hủy</button>
-                            <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2 font-medium">
-                                <CheckSquare className="w-4 h-4" /> Lưu nhiệm vụ
-                            </button>
+                         <div className="flex justify-between items-center mt-6 pt-4 border-t border-slate-100">
+                            {formData.id ? (
+                                <button 
+                                    type="button" 
+                                    onClick={handleDeleteFromModal}
+                                    className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg font-medium flex items-center gap-2 transition-colors"
+                                >
+                                    <Trash2 className="w-4 h-4" /> Xóa nhiệm vụ
+                                </button>
+                            ) : (
+                                <div></div>
+                            )}
+                            <div className="flex gap-3">
+                                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Hủy</button>
+                                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2 font-medium">
+                                    <CheckSquare className="w-4 h-4" /> Lưu nhiệm vụ
+                                </button>
+                            </div>
                         </div>
                     </form>
                 </div>

@@ -301,11 +301,18 @@ export enum NotificationPriority {
     NORMAL = 'NORMAL'      // Bình thường
 }
 
+export enum NotificationType {
+    NORMAL = 'NORMAL',
+    CELEBRATION = 'CELEBRATION' // Sinh nhật, chúc mừng, sự kiện
+}
+
 export interface Notification {
     id: string;
     title: string;
     content: string;
     priority: NotificationPriority;
+    type?: NotificationType; // New field
+    imageUrl?: string; // New field for uploaded image or link
     createdAt: string; // ISO Date
     authorId: string; // User ID
     isRead?: boolean; // Local state for user

@@ -42,6 +42,12 @@ const AttendanceStatusManager: React.FC<AttendanceStatusManagerProps> = ({ statu
     setIsModalOpen(false);
   };
 
+  const handleDelete = (id: string) => {
+      if(window.confirm('Bạn có chắc chắn muốn xóa loại hình chấm công này?')) {
+          onDelete(id);
+      }
+  };
+
   return (
     <div className="space-y-6">
         <div className="flex justify-between items-center">
@@ -86,7 +92,7 @@ const AttendanceStatusManager: React.FC<AttendanceStatusManagerProps> = ({ statu
                                     <button onClick={() => handleOpenModal(s)} className="p-1.5 text-slate-400 hover:text-indigo-600 bg-white border border-slate-200 rounded">
                                         <Edit className="w-4 h-4" />
                                     </button>
-                                    <button onClick={() => onDelete(s.id)} className="p-1.5 text-slate-400 hover:text-red-600 bg-white border border-slate-200 rounded">
+                                    <button onClick={() => handleDelete(s.id)} className="p-1.5 text-slate-400 hover:text-red-600 bg-white border border-slate-200 rounded">
                                         <Trash2 className="w-4 h-4" />
                                     </button>
                                 </div>

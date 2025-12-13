@@ -57,6 +57,12 @@ const RoleManager: React.FC<RoleManagerProps> = ({ roles, onAddRole, onUpdateRol
     setIsModalOpen(false);
   };
 
+  const handleDelete = (id: string) => {
+      if (window.confirm('Bạn có chắc chắn muốn xóa vai trò này? Hành động này sẽ ảnh hưởng đến các người dùng đang được gán vai trò này.')) {
+          onDeleteRole(id);
+      }
+  };
+
   const togglePermission = (resource: ResourceType, action: keyof Permission) => {
       const perms = { ...(editingRole.permissions || {}) };
       if (!perms[resource]) perms[resource] = { view: false, edit: false, delete: false };
@@ -102,7 +108,7 @@ const RoleManager: React.FC<RoleManagerProps> = ({ roles, onAddRole, onUpdateRol
                           <button onClick={() => handleOpenModal(role)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded">
                               <Edit className="w-4 h-4" />
                           </button>
-                          <button onClick={() => onDeleteRole(role.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded">
+                          <button onClick={() => handleDelete(role.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded">
                               <Trash2 className="w-4 h-4" />
                           </button>
                       </div>

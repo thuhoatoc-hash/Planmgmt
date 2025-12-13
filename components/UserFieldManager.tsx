@@ -46,6 +46,12 @@ const UserFieldManager: React.FC<UserFieldManagerProps> = ({ fields, onAddField,
       setNewField({ key: '', label: '', type: 'text', options: '', required: false });
   };
 
+  const handleDelete = (id: string) => {
+      if (window.confirm('Bạn có chắc chắn muốn xóa trường này? Dữ liệu người dùng liên quan có thể bị ẩn.')) {
+          onDeleteField(id);
+      }
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
@@ -80,7 +86,7 @@ const UserFieldManager: React.FC<UserFieldManagerProps> = ({ fields, onAddField,
                                      {field.required ? <span className="text-red-600 font-bold">Yes</span> : <span className="text-slate-400">No</span>}
                                  </td>
                                  <td className="px-6 py-3 text-center">
-                                     <button onClick={() => onDeleteField(field.id)} className="text-slate-400 hover:text-red-600 transition-colors">
+                                     <button onClick={() => handleDelete(field.id)} className="text-slate-400 hover:text-red-600 transition-colors">
                                          <Trash2 className="w-4 h-4" />
                                      </button>
                                  </td>

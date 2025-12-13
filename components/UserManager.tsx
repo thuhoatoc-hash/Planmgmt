@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { User, UserRole, Role, UserFieldDefinition, ActivityLog } from '../types';
-import { Shield, User as UserIcon, Phone, Edit, Trash2, Plus, Lock, Zap, Mail, CheckCircle2, History, Search, Download } from 'lucide-react';
+import { Shield, User as UserIcon, Phone, Edit, Trash2, Plus, Lock, Zap, Mail, CheckCircle2, History, Search, Download, Camera, Loader2, AlertCircle } from 'lucide-react';
 import { hashPassword } from '../lib/crypto';
 import { api } from '../services/api';
 
@@ -21,6 +21,10 @@ const UserManager: React.FC<UserManagerProps> = ({ users, roles, fieldDefinition
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<Partial<User>>({});
   const [passwordInput, setPasswordInput] = useState('');
+  
+  // Avatar Upload State
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
 
   // Logs State
   const [logs, setLogs] = useState<ActivityLog[]>([]);
@@ -44,6 +48,52 @@ const UserManager: React.FC<UserManagerProps> = ({ users, roles, fieldDefinition
       setPasswordInput('123'); // Default password for new users
     }
     setIsModalOpen(true);
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      if (file.size > 5 * 1024 * 1024) {
+          alert("Vui lòng chọn ảnh nhỏ hơn 5MB");
+          return;
+      }
+
+      setUploading(true);
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+          const img = new Image();
+          img.src = event.target?.result as string;
+          img.onload = () => {
+              // Resize image to max 300x300
+              const canvas = document.createElement('canvas');
+              const MAX_SIZE = 300;
+              let width = img.width;
+              let height = img.height;
+
+              if (width > height) {
+                  if (width > MAX_SIZE) {
+                      height *= MAX_SIZE / width;
+                      width = MAX_SIZE;
+                  }
+              } else {
+                  if (height > MAX_SIZE) {
+                      width *= MAX_SIZE / height;
+                      height = MAX_SIZE;
+                  }
+              }
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext('2d');
+              ctx?.drawImage(img, 0, 0, width, height);
+              
+              // Compress to JPEG 80%
+              const base64 = canvas.toDataURL('image/jpeg', 0.8);
+              setEditingUser(prev => ({ ...prev, avatarUrl: base64 }));
+              setUploading(false);
+          };
+      };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -201,61 +251,76 @@ const UserManager: React.FC<UserManagerProps> = ({ users, roles, fieldDefinition
                 <th className="px-6 py-4 text-sm font-semibold text-slate-600">Người dùng</th>
                 <th className="px-6 py-4 text-sm font-semibold text-slate-600">Thông tin liên hệ</th>
                 <th className="px-6 py-4 text-sm font-semibold text-slate-600">Vai trò</th>
-                <th className="px-6 py-4 text-sm font-semibold text-slate-600 text-right">Thao tác</th>
+                <th className="px-6 py-4 text-sm font-semibold text-slate-600 text-right w-32">Thao tác</th>
                 </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-                {users.map(user => (
-                <tr key={user.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                        {user.avatarUrl ? (
-                            <img src={user.avatarUrl} alt="avt" className="w-9 h-9 rounded-full object-cover border border-slate-200" />
-                        ) : (
-                            <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 border border-slate-200">
-                            <UserIcon className="w-5 h-5" />
+                {users.map(user => {
+                    const isSystemAdmin = user.username.toLowerCase() === 'admin';
+                    return (
+                        <tr key={user.id} className="hover:bg-slate-50 transition-colors">
+                            <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                                {user.avatarUrl ? (
+                                    <img src={user.avatarUrl} alt="avt" className="w-9 h-9 rounded-full object-cover border border-slate-200" />
+                                ) : (
+                                    <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 border border-slate-200">
+                                    <UserIcon className="w-5 h-5" />
+                                    </div>
+                                )}
+                                <div>
+                                    <div className="font-medium text-slate-900">{user.fullName}</div>
+                                    <div className="text-xs text-slate-500 font-mono">@{user.username}</div>
+                                </div>
                             </div>
-                        )}
-                        <div>
-                            <div className="font-medium text-slate-900">{user.fullName}</div>
-                            <div className="text-xs text-slate-500 font-mono">@{user.username}</div>
-                        </div>
-                    </div>
-                    </td>
-                    <td className="px-6 py-4">
-                        <div className="flex flex-col gap-1.5">
-                            {user.email && (
-                                <div className="flex items-center gap-2 text-sm text-slate-600">
-                                    <Mail className="w-3.5 h-3.5 text-slate-400" /> {user.email}
+                            </td>
+                            <td className="px-6 py-4">
+                                <div className="flex flex-col gap-1.5">
+                                    {user.email && (
+                                        <div className="flex items-center gap-2 text-sm text-slate-600">
+                                            <Mail className="w-3.5 h-3.5 text-slate-400" /> {user.email}
+                                        </div>
+                                    )}
+                                    {user.phoneNumber && (
+                                        <div className="flex items-center gap-2 text-sm text-slate-600">
+                                            <Phone className="w-3.5 h-3.5 text-slate-400" /> {user.phoneNumber}
+                                        </div>
+                                    )}
+                                    {!user.email && !user.phoneNumber && <span className="text-xs text-slate-400 italic">Chưa cập nhật</span>}
                                 </div>
-                            )}
-                            {user.phoneNumber && (
-                                <div className="flex items-center gap-2 text-sm text-slate-600">
-                                    <Phone className="w-3.5 h-3.5 text-slate-400" /> {user.phoneNumber}
-                                </div>
-                            )}
-                            {!user.email && !user.phoneNumber && <span className="text-xs text-slate-400 italic">Chưa cập nhật</span>}
-                        </div>
-                    </td>
-                    <td className="px-6 py-4">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
-                        <Shield className="w-3 h-3" /> {getRoleName(user)}
-                    </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => handleOpenModal(user)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors" title="Sửa thông tin">
-                            <Edit className="w-4 h-4" />
-                        </button>
-                        {user.username !== 'admin' && (
-                            <button onClick={() => onDeleteUser(user.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" title="Xóa user">
-                                <Trash2 className="w-4 h-4" />
-                            </button>
-                        )}
-                    </div>
-                    </td>
-                </tr>
-                ))}
+                            </td>
+                            <td className="px-6 py-4">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
+                                <Shield className="w-3 h-3" /> {getRoleName(user)}
+                            </span>
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                                <button 
+                                    onClick={() => handleOpenModal(user)} 
+                                    className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors border border-transparent hover:border-indigo-100" 
+                                    title="Sửa thông tin"
+                                >
+                                    <Edit className="w-4 h-4" />
+                                </button>
+                                
+                                <button 
+                                    onClick={() => !isSystemAdmin && onDeleteUser(user.id)} 
+                                    className={`p-2 rounded-lg transition-colors border border-transparent ${
+                                        isSystemAdmin 
+                                        ? 'text-slate-300 cursor-not-allowed' 
+                                        : 'text-slate-500 hover:text-red-600 hover:bg-red-50 hover:border-red-100'
+                                    }`} 
+                                    title={isSystemAdmin ? "Không thể xóa Admin hệ thống" : "Xóa người dùng"}
+                                    disabled={isSystemAdmin}
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            </div>
+                            </td>
+                        </tr>
+                    );
+                })}
             </tbody>
             </table>
         </div>
@@ -370,8 +435,9 @@ const UserManager: React.FC<UserManagerProps> = ({ users, roles, fieldDefinition
                           </label>
                       ))}
                       {roles.length === 0 && (
-                          <div className="col-span-2 p-3 bg-amber-50 text-amber-700 text-sm rounded-lg border border-amber-200">
-                              Chưa có vai trò nào được định nghĩa. Vui lòng tạo vai trò trong tab "Vai trò & Phân quyền".
+                          <div className="col-span-2 p-3 bg-amber-50 text-amber-700 text-sm rounded-lg border border-amber-200 flex items-center gap-2">
+                              <AlertCircle className="w-4 h-4" />
+                              Chưa có vai trò nào. Vui lòng tạo vai trò trong tab "Vai trò & Phân quyền".
                           </div>
                       )}
                   </div>
@@ -400,8 +466,53 @@ const UserManager: React.FC<UserManagerProps> = ({ users, roles, fieldDefinition
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Avatar URL</label>
-                <input type="text" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" value={editingUser.avatarUrl || ''} onChange={e => setEditingUser({...editingUser, avatarUrl: e.target.value})} />
+                <label className="block text-sm font-medium text-slate-700 mb-2">Ảnh đại diện (Avatar)</label>
+                <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
+                        {editingUser.avatarUrl ? (
+                            <img src={editingUser.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                        ) : (
+                            <UserIcon className="w-8 h-8 text-slate-300" />
+                        )}
+                    </div>
+                    
+                    <div className="flex-1">
+                        <input 
+                            type="file" 
+                            accept="image/*" 
+                            ref={fileInputRef} 
+                            className="hidden" 
+                            onChange={handleImageUpload} 
+                        />
+                        <div className="flex gap-2 mb-2">
+                            <button 
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={uploading}
+                                className="px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                            >
+                                {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
+                                Tải ảnh lên
+                            </button>
+                            {editingUser.avatarUrl && (
+                                <button 
+                                    type="button"
+                                    onClick={() => setEditingUser({ ...editingUser, avatarUrl: '' })}
+                                    className="px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg"
+                                >
+                                    Xóa ảnh
+                                </button>
+                            )}
+                        </div>
+                        <input 
+                            type="text" 
+                            className="w-full p-2 text-xs border border-slate-300 rounded bg-slate-50 text-slate-500 truncate" 
+                            value={editingUser.avatarUrl || ''} 
+                            readOnly
+                            placeholder="Link ảnh (hoặc tải lên để tự động điền)" 
+                        />
+                    </div>
+                </div>
               </div>
 
               {/* DYNAMIC FIELDS SECTION */}

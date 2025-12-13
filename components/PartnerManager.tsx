@@ -50,6 +50,13 @@ const PartnerManager: React.FC<PartnerManagerProps> = ({ partners, projects, con
     setIsModalOpen(false);
   };
   
+  const handleDelete = (id: string, e: React.MouseEvent) => {
+      e.stopPropagation();
+      if(window.confirm('Bạn có chắc chắn muốn xóa đối tác này?')) {
+          onDelete(id);
+      }
+  };
+  
   const formatCurrency = (val: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(val);
 
   return (
@@ -82,7 +89,7 @@ const PartnerManager: React.FC<PartnerManagerProps> = ({ partners, projects, con
                         <button onClick={(e) => handleOpenModal(p, e)} className="p-1.5 text-slate-400 hover:text-indigo-600 rounded hover:bg-indigo-50">
                             <Edit className="w-4 h-4" />
                         </button>
-                        <button onClick={(e) => { e.stopPropagation(); onDelete(p.id); }} className="p-1.5 text-slate-400 hover:text-red-600 rounded hover:bg-red-50">
+                        <button onClick={(e) => handleDelete(p.id, e)} className="p-1.5 text-slate-400 hover:text-red-600 rounded hover:bg-red-50">
                             <Trash2 className="w-4 h-4" />
                         </button>
                     </div>

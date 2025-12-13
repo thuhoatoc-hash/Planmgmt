@@ -341,17 +341,27 @@ const App: React.FC = () => {
   }
 
   // Notification Handlers
-  const handleAddNotification = async (n: Notification) => {
+  const handleAddNotification = async (n: Notification): Promise<boolean> => {
       const saved = await api.notifications.save(n);
-      if (saved) setNotifications([saved, ...notifications]);
+      if (saved) {
+          setNotifications([saved, ...notifications]);
+          return true;
+      }
+      return false;
   };
-  const handleUpdateNotification = async (n: Notification) => {
+  const handleUpdateNotification = async (n: Notification): Promise<boolean> => {
       const saved = await api.notifications.save(n);
-      if (saved) setNotifications(notifications.map(existing => existing.id === saved.id ? saved : existing));
+      if (saved) {
+          setNotifications(notifications.map(existing => existing.id === saved.id ? saved : existing));
+          return true;
+      }
+      return false;
   };
   const handleDeleteNotification = async (id: string) => {
       const success = await api.notifications.delete(id);
-      if (success) setNotifications(notifications.filter(n => n.id !== id));
+      if (success) {
+          setNotifications(prev => prev.filter(n => n.id !== id)); // Functional update for safety
+      }
   };
 
   // Attendance Handlers
