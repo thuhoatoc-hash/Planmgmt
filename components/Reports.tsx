@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Project, Contract, Category, User, ContractType, Task, TaskStatus, InstallmentStatus, AttendanceRecord, AttendanceType, OvertimeType, AttendanceStatusConfig, AttendanceSystemConfig } from '../types';
+import { Project, Contract, Category, User, ContractType, Task, TaskStatus, InstallmentStatus, AttendanceRecord, AttendanceStatusConfig, AttendanceSystemConfig } from '../types';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Download, Filter, Calendar, BarChart3, PieChart as PieChartIcon, User as UserIcon, TrendingUp, CheckSquare, Clock } from 'lucide-react';
 import { api } from '../services/api';
