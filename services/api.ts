@@ -1,6 +1,6 @@
 
 import { supabase } from '../lib/supabase';
-import { Project, Contract, Category, User, Partner, ProjectStatusItem, Task, KPIMonthlyData, EmployeeEvaluation, BirthdayEvent, Role, UserFieldDefinition, BannerConfig, Notification, ActivityLog, AttendanceRecord, AttendanceStatusConfig } from '../types';
+import { Project, Contract, Category, User, Partner, ProjectStatusItem, Task, KPIMonthlyData, EmployeeEvaluation, BirthdayEvent, Role, UserFieldDefinition, BannerConfig, Notification, ActivityLog, AttendanceRecord, AttendanceStatusConfig, AttendanceSystemConfig } from '../types';
 
 // Generic helper to fetch data
 async function fetchAll<T>(table: string): Promise<T[]> {
@@ -186,14 +186,17 @@ export const api = {
       },
       saveBannerConfig: async (config: BannerConfig) => {
           const { error } = await supabase.from('system_settings').upsert({ id: 'BANNER_CONFIG', value: config });
-          if (error) {
-              console.error('Error saving banner config:', error);
-              // Fallback alert if table missing
-              if (error.message.includes('relation "system_settings" does not exist')) {
-                  alert('Lỗi: Bảng "system_settings" chưa được tạo trong Database. Vui lòng chạy lệnh SQL tạo bảng.');
-              }
-              return false;
-          }
+          if (error) return false;
+          return true;
+      },
+      getAttendanceConfig: async (): Promise<AttendanceSystemConfig | null> => {
+          const { data, error } = await supabase.from('system_settings').select('value').eq('id', 'ATTENDANCE_CONFIG').single();
+          if (error || !data) return null;
+          return data.value as AttendanceSystemConfig;
+      },
+      saveAttendanceConfig: async (config: AttendanceSystemConfig) => {
+          const { error } = await supabase.from('system_settings').upsert({ id: 'ATTENDANCE_CONFIG', value: config });
+          if (error) return false;
           return true;
       }
   }

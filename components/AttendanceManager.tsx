@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
-import { User, AttendanceRecord, AttendanceStatusConfig, OvertimeType, UserRole, AttendanceType } from '../types';
-import { Calendar as CalendarIcon, Clock, CheckCircle, Plus, Edit, User as UserIcon, ArrowLeft, ArrowRight, Sun, Moon, Briefcase, MapPin, AlignLeft } from 'lucide-react';
+import { User, AttendanceRecord, AttendanceStatusConfig, OvertimeType, UserRole, ApprovalStatus } from '../types';
+import { Calendar as CalendarIcon, Clock, CheckCircle, Plus, User as UserIcon, ArrowLeft, ArrowRight, Moon, Briefcase, MapPin, AlignLeft, List, XCircle, ShieldCheck, AlertCircle, X, Check } from 'lucide-react';
 
 interface AttendanceManagerProps {
   currentUser: User;
@@ -12,18 +12,29 @@ interface AttendanceManagerProps {
   onUpdateRecord: (r: AttendanceRecord) => void;
 }
 
+const OT_REASONS = [
+    'Trực lễ',
+    'Làm tăng cường',
+    'Họp, gặp đối tác',
+    'Khác'
+];
+
 const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUser, users, records, statuses, onAddRecord, onUpdateRecord }) => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedUserId, setSelectedUserId] = useState<string>(currentUser.id);
+  
+  // Modals State
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isApprovalListOpen, setIsApprovalListOpen] = useState(false); // New state for Approval List Modal
+  
   const [formRecord, setFormRecord] = useState<Partial<AttendanceRecord>>({});
 
   const isAdmin = currentUser.role === UserRole.ADMIN;
-  const isManager = isAdmin || currentUser.role === UserRole.PM;
+  // If admin, they are viewing another user, otherwise viewing themselves
+  const isViewingOther = isAdmin && selectedUserId !== currentUser.id;
 
   // --- ENSURE STATUSES EXIST (FALLBACK) ---
   const displayStatuses = useMemo(() => {
-      // If config exists, use it. Otherwise use defaults to satisfy user request immediately.
       if (statuses.length > 0) return statuses;
       return [
           { id: 'default_late', name: 'Đi muộn', type: 'LATE', color: 'bg-yellow-100 text-yellow-700', order: 1 },
@@ -54,9 +65,21 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUser, user
 
   const getStatusConfig = (id: string) => displayStatuses.find(s => s.id === id);
 
+  // --- PENDING RECORDS LOGIC ---
+  const pendingRecords = useMemo(() => {
+      if (!isAdmin) return [];
+      return records
+        .filter(r => r.approvalStatus === ApprovalStatus.PENDING)
+        .sort((a,b) => b.date.localeCompare(a.date)); // Newest first
+  }, [records, isAdmin]);
+
   // --- MODAL HANDLERS ---
   const handleDayClick = (day: number) => {
-      const dateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const date = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), day);
+      const dayOfWeek = date.getDay(); // 0 = Sun, 6 = Sat
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+      const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       const existing = getRecordForDay(day);
       
       if (existing) {
@@ -70,11 +93,13 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUser, user
               statusId: defaultStatus?.id || '',
               startTime: '08:00',
               endTime: '17:30',
-              overtime: OvertimeType.NONE,
+              overtime: isWeekend ? OvertimeType.WEEKEND : OvertimeType.NONE, // Auto suggest OT if weekend
+              overtimeReason: '',
               overtimeDate: dateStr, 
               overtimeStartTime: '18:00',
               overtimeEndTime: '20:00',
               overtimeHours: 0,
+              approvalStatus: ApprovalStatus.PENDING,
               note: ''
           });
       }
@@ -84,18 +109,24 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUser, user
   const handleSave = (e: React.FormEvent) => {
       e.preventDefault();
       
-      // Calculate OT Hours if OT is selected
+      // Calculate OT Hours
       let otHours = 0;
       if (formRecord.overtime !== OvertimeType.NONE && formRecord.overtimeStartTime && formRecord.overtimeEndTime) {
           const start = new Date(`2000-01-01T${formRecord.overtimeStartTime}`);
           const end = new Date(`2000-01-01T${formRecord.overtimeEndTime}`);
-          const diff = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-          otHours = diff > 0 ? parseFloat(diff.toFixed(1)) : 0;
+          let diff = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+          if (diff < 0) diff += 24; // Handle overnight
+          otHours = parseFloat(diff.toFixed(1));
       }
 
+      // APPROVAL LOGIC
+      const status = isAdmin ? ApprovalStatus.APPROVED : (formRecord.approvalStatus || ApprovalStatus.PENDING);
+      
       const record = { 
           ...formRecord,
-          overtimeHours: otHours
+          overtimeHours: otHours,
+          approvalStatus: status,
+          reviewerId: isAdmin ? currentUser.id : formRecord.reviewerId
       } as AttendanceRecord;
 
       if (record.id) {
@@ -104,6 +135,26 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUser, user
           onAddRecord({ ...record, id: `att_${Date.now()}` });
       }
       setIsModalOpen(false);
+  };
+
+  const handleApprove = (record: AttendanceRecord) => {
+      onUpdateRecord({ 
+          ...record, 
+          approvalStatus: ApprovalStatus.APPROVED, 
+          reviewerId: currentUser.id 
+      });
+      // Don't close list modal to allow multiple approvals
+      if (isModalOpen) setIsModalOpen(false);
+  };
+
+  const handleReject = (record: AttendanceRecord) => {
+      if(!window.confirm("Bạn có chắc chắn muốn từ chối yêu cầu này?")) return;
+      onUpdateRecord({ 
+          ...record, 
+          approvalStatus: ApprovalStatus.REJECTED, 
+          reviewerId: currentUser.id 
+      });
+      if (isModalOpen) setIsModalOpen(false);
   };
 
   return (
@@ -117,19 +168,30 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUser, user
                 <p className="text-slate-500">Đăng ký lịch công tác, nghỉ phép và làm thêm giờ (OT)</p>
             </div>
             
-            {/* User Selector */}
-            {(isAdmin || isManager) && (
-                <div className="flex items-center gap-2 bg-white p-1 rounded-lg border border-slate-200 shadow-sm">
-                    <div className="px-2 text-slate-400"><UserIcon className="w-4 h-4" /></div>
-                    <select 
-                        className="bg-transparent outline-none text-sm font-medium text-slate-700 py-1 pr-4"
-                        value={selectedUserId}
-                        onChange={e => setSelectedUserId(e.target.value)}
-                    >
-                        {users.map(u => (
-                            <option key={u.id} value={u.id}>{u.fullName}</option>
-                        ))}
-                    </select>
+            {/* User Selector & Approval Badge */}
+            {isAdmin && (
+                <div className="flex items-center gap-4">
+                    {pendingRecords.length > 0 && (
+                        <button 
+                            onClick={() => setIsApprovalListOpen(true)}
+                            className="bg-amber-100 text-amber-700 text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-2 animate-pulse hover:bg-amber-200 transition-colors shadow-sm"
+                        >
+                            <AlertCircle className="w-4 h-4" /> 
+                            {pendingRecords.length} đơn chờ duyệt
+                        </button>
+                    )}
+                    <div className="flex items-center gap-2 bg-white p-1 rounded-lg border border-slate-200 shadow-sm">
+                        <div className="px-2 text-slate-400"><UserIcon className="w-4 h-4" /></div>
+                        <select 
+                            className="bg-transparent outline-none text-sm font-medium text-slate-700 py-1 pr-4"
+                            value={selectedUserId}
+                            onChange={e => setSelectedUserId(e.target.value)}
+                        >
+                            {users.map(u => (
+                                <option key={u.id} value={u.id}>{u.fullName}</option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
             )}
         </div>
@@ -166,6 +228,9 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUser, user
                         <div className="flex items-center gap-2">
                             <div className="w-3 h-3 rounded-full bg-purple-500"></div> <span>Có làm OT</span>
                         </div>
+                        <div className="flex items-center gap-2 mt-4 pt-2 border-t border-slate-100">
+                            <div className="w-3 h-3 rounded-full border-2 border-slate-300 bg-slate-100"></div> <span>Ngày nghỉ (T7, CN)</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -179,43 +244,62 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUser, user
                 </div>
 
                 <div className="grid grid-cols-7 gap-1 mb-2">
-                    {['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'].map(d => (
-                        <div key={d} className="text-center text-xs font-semibold text-slate-400 py-2">{d}</div>
+                    {['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'].map((d, i) => (
+                        <div key={d} className={`text-center text-xs font-semibold py-2 ${i===0 || i===6 ? 'text-red-400' : 'text-slate-400'}`}>{d}</div>
                     ))}
                 </div>
 
                 <div className="grid grid-cols-7 gap-1">
                     {/* Empty cells */}
                     {Array.from({ length: startDayOfMonth }).map((_, i) => (
-                        <div key={`empty-${i}`} className="h-28 bg-slate-50/50 rounded-lg"></div>
+                        <div key={`empty-${i}`} className="h-28 bg-slate-50/30 rounded-lg"></div>
                     ))}
 
                     {/* Days */}
                     {Array.from({ length: daysInMonth }).map((_, i) => {
                         const day = i + 1;
+                        const date = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), day);
+                        const dayOfWeek = date.getDay();
+                        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6; // Sun or Sat
+
                         const record = getRecordForDay(day);
                         const statusConfig = record ? getStatusConfig(record.statusId) : null;
                         const isToday = day === new Date().getDate() && selectedDate.getMonth() === new Date().getMonth() && selectedDate.getFullYear() === new Date().getFullYear();
                         
-                        let bgColor = 'bg-white';
-                        if (statusConfig) {
+                        let bgColor = isWeekend ? 'bg-slate-100 text-slate-400' : 'bg-white';
+                        let borderColor = isToday ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-slate-100 hover:border-indigo-300';
+
+                        // Override color if record exists
+                        if (record && statusConfig) {
                             if (statusConfig.type === 'LEAVE' || statusConfig.type === 'SICK') bgColor = 'bg-red-50 border-red-200';
                             else if (statusConfig.type === 'LATE') bgColor = 'bg-yellow-50 border-yellow-200';
                             else if (statusConfig.type === 'CUSTOMER_VISIT') bgColor = 'bg-orange-50 border-orange-200';
+                            else bgColor = 'bg-white'; // Present
+                        }
+
+                        // Approval Status Indicator
+                        let statusIndicator = null;
+                        if (record) {
+                            if (record.approvalStatus === ApprovalStatus.PENDING) {
+                                statusIndicator = <div className="w-2 h-2 rounded-full bg-amber-500 absolute top-2 right-2 shadow-sm" title="Chờ duyệt"></div>;
+                            } else if (record.approvalStatus === ApprovalStatus.REJECTED) {
+                                statusIndicator = <div className="w-2 h-2 rounded-full bg-red-500 absolute top-2 right-2 shadow-sm" title="Đã từ chối"></div>;
+                            } else {
+                                statusIndicator = <div className="w-2 h-2 rounded-full bg-emerald-500 absolute top-2 right-2 shadow-sm" title="Đã duyệt"></div>;
+                            }
                         }
 
                         return (
                             <div 
                                 key={day} 
                                 onClick={() => handleDayClick(day)}
-                                className={`h-28 border rounded-lg p-2 cursor-pointer transition-all hover:shadow-md flex flex-col justify-between ${
-                                    isToday ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-slate-100 hover:border-indigo-300'
-                                } ${bgColor}`}
+                                className={`h-28 border rounded-lg p-2 cursor-pointer transition-all hover:shadow-md flex flex-col justify-between relative ${borderColor} ${bgColor}`}
                             >
+                                {statusIndicator}
                                 <div className="flex justify-between items-start">
-                                    <span className={`text-sm font-medium ${isToday ? 'text-indigo-600' : 'text-slate-600'}`}>{day}</span>
+                                    <span className={`text-sm font-medium ${isToday ? 'text-indigo-600' : ''}`}>{day}</span>
                                     {record?.overtime !== OvertimeType.NONE && (
-                                        <div className="text-[10px] bg-purple-600 text-white px-1.5 rounded-full font-bold flex items-center justify-center shadow-sm" title="Có làm OT">OT</div>
+                                        <div className="text-[10px] bg-purple-600 text-white px-1.5 rounded-full font-bold flex items-center justify-center shadow-sm mr-2" title="Có làm OT">OT</div>
                                     )}
                                 </div>
                                 
@@ -236,9 +320,11 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUser, user
                                         )}
                                     </div>
                                 ) : (
-                                    <div className="flex-1 flex items-center justify-center opacity-0 hover:opacity-100 text-slate-300">
-                                        <Plus className="w-6 h-6" />
-                                    </div>
+                                    !isWeekend && (
+                                        <div className="flex-1 flex items-center justify-center opacity-0 hover:opacity-100 text-slate-300">
+                                            <Plus className="w-6 h-6" />
+                                        </div>
+                                    )
                                 )}
                             </div>
                         );
@@ -247,21 +333,120 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUser, user
             </div>
         </div>
 
-        {/* Modal */}
+        {/* --- APPROVAL LIST MODAL (NEW) --- */}
+        {isApprovalListOpen && (
+            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                <div className="bg-white rounded-xl max-w-4xl w-full p-6 shadow-xl max-h-[90vh] overflow-y-auto">
+                    <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                            <ShieldCheck className="w-6 h-6 text-indigo-600" />
+                            Duyệt Đăng ký ({pendingRecords.length})
+                        </h2>
+                        <button onClick={() => setIsApprovalListOpen(false)} className="text-slate-400 hover:text-slate-600">
+                            <X className="w-6 h-6" />
+                        </button>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm border-collapse">
+                            <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                                <tr>
+                                    <th className="px-4 py-3">Nhân viên</th>
+                                    <th className="px-4 py-3">Ngày</th>
+                                    <th className="px-4 py-3">Loại hình</th>
+                                    <th className="px-4 py-3">Thời gian / OT</th>
+                                    <th className="px-4 py-3">Lý do / Ghi chú</th>
+                                    <th className="px-4 py-3 text-right">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {pendingRecords.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={6} className="px-4 py-8 text-center text-slate-400 italic">
+                                            Không có đơn nào cần duyệt.
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    pendingRecords.map(record => {
+                                        const user = users.find(u => u.id === record.userId);
+                                        const status = getStatusConfig(record.statusId);
+                                        return (
+                                            <tr key={record.id} className="hover:bg-slate-50">
+                                                <td className="px-4 py-3 font-medium text-slate-800">{user?.fullName || 'Unknown'}</td>
+                                                <td className="px-4 py-3">{new Date(record.date).toLocaleDateString('vi-VN')}</td>
+                                                <td className="px-4 py-3">
+                                                    <span className={`px-2 py-1 rounded text-xs font-medium ${status?.color || 'bg-slate-100'}`}>
+                                                        {status?.name || '---'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <div>{record.startTime} - {record.endTime}</div>
+                                                    {record.overtime !== OvertimeType.NONE && (
+                                                        <div className="text-purple-600 text-xs font-bold mt-1">
+                                                            OT: {record.overtimeHours}h
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 max-w-xs text-slate-600">
+                                                    {record.note && <div className="truncate" title={record.note}>{record.note}</div>}
+                                                    {record.overtimeReason && <div className="text-xs text-purple-700 font-medium mt-0.5">{record.overtimeReason}</div>}
+                                                </td>
+                                                <td className="px-4 py-3 text-right">
+                                                    <div className="flex justify-end gap-2">
+                                                        <button 
+                                                            onClick={() => handleApprove(record)}
+                                                            className="p-1.5 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 rounded shadow-sm"
+                                                            title="Duyệt"
+                                                        >
+                                                            <Check className="w-4 h-4" />
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => handleReject(record)}
+                                                            className="p-1.5 bg-red-100 text-red-700 hover:bg-red-200 rounded shadow-sm"
+                                                            title="Từ chối"
+                                                        >
+                                                            <X className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* --- DETAIL/EDIT MODAL (EXISTING) --- */}
         {isModalOpen && (
             <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                <div className="bg-white rounded-xl max-w-lg w-full p-6 shadow-xl max-h-[95vh] overflow-y-auto">
+                <div className="bg-white rounded-xl max-w-lg w-full p-6 shadow-xl max-h-[95vh] overflow-y-auto relative">
+                    {/* Status Badge */}
+                    {formRecord.approvalStatus && (
+                        <div className={`absolute top-6 right-6 px-3 py-1 rounded-full text-xs font-bold border ${
+                            formRecord.approvalStatus === ApprovalStatus.APPROVED ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
+                            formRecord.approvalStatus === ApprovalStatus.REJECTED ? 'bg-red-100 text-red-700 border-red-200' :
+                            'bg-amber-100 text-amber-700 border-amber-200'
+                        }`}>
+                            {formRecord.approvalStatus === ApprovalStatus.APPROVED ? 'ĐÃ DUYỆT' :
+                             formRecord.approvalStatus === ApprovalStatus.REJECTED ? 'TỪ CHỐI' : 'CHỜ DUYỆT'}
+                        </div>
+                    )}
+
                     <h2 className="text-xl font-bold mb-1 text-slate-800">
-                        Đăng ký Chấm công
+                        {isAdmin && isViewingOther ? 'Quản lý Chấm công (Admin)' : 'Đăng ký Chấm công'}
                     </h2>
-                    <p className="text-sm text-slate-500 mb-4">Ngày: {new Date(formRecord.date || '').toLocaleDateString('vi-VN')}</p>
+                    <p className="text-sm text-slate-500 mb-4">Ngày: {new Date(formRecord.date || '').toLocaleDateString('vi-VN')} - {users.find(u => u.id === formRecord.userId)?.fullName}</p>
                     
                     <form onSubmit={handleSave} className="space-y-6">
                         
                         {/* 1. Loại hình (Attendance Type) */}
                         <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
                             <label className="block text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-                                <Briefcase className="w-4 h-4 text-indigo-600" /> Chọn loại hình vắng mặt / công tác
+                                <Briefcase className="w-4 h-4 text-indigo-600" /> Loại hình vắng mặt / công tác
                             </label>
                             
                             <div className="grid grid-cols-2 gap-2 mb-4">
@@ -314,7 +499,7 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUser, user
                                 Ngoài khoảng thời gian đã chọn ở trên, hệ thống mặc định hiểu là bạn làm việc tại cơ quan.
                             </p>
 
-                            {/* 2. Ghi chú (Note) - Placed immediately after time selection */}
+                            {/* 2. Ghi chú (Note) */}
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1">
                                     <AlignLeft className="w-4 h-4" /> Ghi chú / Lý do
@@ -356,7 +541,7 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUser, user
                                             onChange={e => setFormRecord({ ...formRecord, overtimeDate: e.target.value })}
                                         />
                                     </div>
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-2 gap-4 mb-3">
                                         <div>
                                             <label className="block text-xs font-medium text-purple-700 mb-1">Bắt đầu</label>
                                             <input 
@@ -376,13 +561,63 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUser, user
                                             />
                                         </div>
                                     </div>
+                                    
+                                    {/* New Reason Select */}
+                                    <div>
+                                         <label className="block text-xs font-medium text-purple-700 mb-1 flex items-center gap-1">
+                                            <List className="w-3 h-3" /> Lý do OT
+                                         </label>
+                                         <select
+                                            className="w-full p-2 border border-purple-200 rounded-lg bg-white text-sm focus:ring-2 focus:ring-purple-500 outline-none"
+                                            value={formRecord.overtimeReason || ''}
+                                            onChange={e => setFormRecord({ ...formRecord, overtimeReason: e.target.value })}
+                                         >
+                                             <option value="">-- Chọn lý do --</option>
+                                             {OT_REASONS.map(reason => (
+                                                 <option key={reason} value={reason}>{reason}</option>
+                                             ))}
+                                         </select>
+                                    </div>
                                 </div>
                             )}
                         </div>
 
+                        {/* Admin Approval Section (Only if editing a record and Pending) */}
+                        {isAdmin && formRecord.id && formRecord.approvalStatus === ApprovalStatus.PENDING && (
+                            <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
+                                <label className="block text-sm font-bold text-amber-800 mb-2 flex items-center gap-2">
+                                    <ShieldCheck className="w-4 h-4" /> Phê duyệt (Admin)
+                                </label>
+                                <textarea 
+                                    className="w-full p-2 border border-amber-200 rounded bg-white text-sm focus:ring-2 focus:ring-amber-500 outline-none mb-3"
+                                    placeholder="Nhập ghi chú của người duyệt..."
+                                    value={formRecord.reviewerNote || ''}
+                                    onChange={e => setFormRecord({ ...formRecord, reviewerNote: e.target.value })}
+                                />
+                                <div className="flex gap-2">
+                                    <button 
+                                        type="button" 
+                                        onClick={() => handleApprove(formRecord as AttendanceRecord)}
+                                        className="flex-1 bg-emerald-600 text-white py-2 rounded-lg font-bold hover:bg-emerald-700 shadow-sm"
+                                    >
+                                        Duyệt đơn
+                                    </button>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => handleReject(formRecord as AttendanceRecord)}
+                                        className="flex-1 bg-red-600 text-white py-2 rounded-lg font-bold hover:bg-red-700 shadow-sm"
+                                    >
+                                        Từ chối
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
                         <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
                             <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium">Hủy</button>
-                            <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium shadow-sm">Lưu đăng ký</button>
+                            <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium shadow-sm">
+                                {isAdmin ? 'Lưu thay đổi' : 'Gửi đăng ký'}
+                            </button>
                         </div>
                     </form>
                 </div>

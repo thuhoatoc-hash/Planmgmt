@@ -1,7 +1,7 @@
 
-import React, { useState } from 'react';
-import { ProjectStatusItem, User, Partner, Category, Project, Contract, UserRole, Role, UserFieldDefinition, AttendanceStatusConfig } from '../types';
-import { Edit, Trash2, List, Settings, Users, Tags, Briefcase, Shield, Settings2, Image, Clock } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ProjectStatusItem, User, Partner, Category, Project, Contract, UserRole, Role, UserFieldDefinition, AttendanceStatusConfig, AttendanceSystemConfig } from '../types';
+import { Edit, Trash2, List, Settings, Users, Tags, Briefcase, Shield, Settings2, Image, Clock, ToggleLeft, ToggleRight, Save, Loader2 } from 'lucide-react';
 import UserManager from './UserManager';
 import PartnerManager from './PartnerManager';
 import CategoryManager from './CategoryManager';
@@ -17,55 +17,29 @@ interface ConfigurationManagerProps {
   users: User[];
   partners: Partner[];
   categories: Category[];
-  projects: Project[]; // Needed for PartnerManager logic
-  contracts: Contract[]; // Needed for PartnerManager logic
+  projects: Project[]; 
+  contracts: Contract[];
   attendanceStatuses: AttendanceStatusConfig[];
   
-  // Status Handlers
   onAddStatus: (s: ProjectStatusItem) => void;
   onUpdateStatus: (s: ProjectStatusItem) => void;
   onDeleteStatus: (id: string) => void;
 
-  // User Handlers
   onAddUser: (u: User) => void;
   onUpdateUser: (u: User) => void;
   onDeleteUser: (id: string) => void;
 
-  // Partner Handlers
   onAddPartner: (p: Partner) => void;
   onUpdatePartner: (p: Partner) => void;
   onDeletePartner: (id: string) => void;
 
-  // Category Handlers
   onAddCategory: (c: Category) => void;
   onDeleteCategory: (id: string) => void;
 
-  // Attendance Status Handlers
   onAddAttendanceStatus: (s: AttendanceStatusConfig) => void;
   onUpdateAttendanceStatus: (s: AttendanceStatusConfig) => void;
   onDeleteAttendanceStatus: (id: string) => void;
 }
-
-// Internal State for Role Manager since it's fully managed via API in its component usually, 
-// but for consistency we might want to lift it. For now, RoleManager fetches its own or we pass it? 
-// Based on App.tsx, roles are fetched in App. Let's assume we need to pass roles too?
-// Wait, in previous App.tsx code, `roles` were fetched but NOT passed to ConfigurationManager. 
-// I should probably fix that or let RoleManager fetch internally. 
-// Given the complexity, let's keep RoleManager fetching internally or update App.tsx to pass it.
-// Checking `RoleManager.tsx`: It accepts `roles` as props.
-// Checking `App.tsx`: It fetches `roles`.
-// Missing piece: Pass `roles` and handlers to ConfigurationManager.
-// HOWEVER, to avoid breaking changes in this specific step causing too much diff, 
-// I will implement RoleManager to use the `api` directly if props are missing, OR better,
-// since I am updating App.tsx anyway, I should have passed roles.
-// BUT, the prompt asked to fix the specific issue. 
-// Let's assume RoleManager fetches internally for now or I will use a simple wrapper.
-// Actually, looking at `RoleManager.tsx` provided previously, it takes props.
-// I will update this component to accept roles and handlers, but since I cannot easily change App.tsx signature 
-// for *every* prop without making the diff huge, I will use a local fetch for Roles inside ConfigManager 
-// OR just focus on what's requested: Attendance.
-//
-// Let's stick to the requested changes. I will add Attendance config.
 
 const ConfigurationManager: React.FC<ConfigurationManagerProps> = ({ 
   currentUser, statuses, users, partners, categories, projects, contracts, attendanceStatuses,
@@ -77,14 +51,19 @@ const ConfigurationManager: React.FC<ConfigurationManagerProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'USERS' | 'ROLES' | 'FIELDS' | 'PARTNERS' | 'PROJECT_STATUS' | 'CATEGORIES' | 'BANNER' | 'ATTENDANCE'>('USERS');
   
-  // Local state for Roles (since not passed from App yet, to keep it simple)
   const [roles, setRoles] = useState<Role[]>([]);
   const [fieldDefinitions, setFieldDefinitions] = useState<UserFieldDefinition[]>([]);
+  
+  // Attendance System Config
+  const [attConfig, setAttConfig] = useState<AttendanceSystemConfig>({ defaultBehavior: 'PRESENT', workingDays: [1,2,3,4,5] });
+  const [loadingAttConfig, setLoadingAttConfig] = useState(false);
 
-  // Fetch roles and fields on mount since they are not passed from App (yet)
   React.useEffect(() => {
       api.roles.getAll().then(setRoles);
       api.fieldDefinitions.getAll().then(setFieldDefinitions);
+      api.settings.getAttendanceConfig().then(cfg => {
+          if (cfg) setAttConfig(cfg);
+      });
   }, []);
 
   const handleRoleUpdate = async (r: Role) => {
@@ -107,6 +86,13 @@ const ConfigurationManager: React.FC<ConfigurationManagerProps> = ({
       await api.fieldDefinitions.delete(id);
       const data = await api.fieldDefinitions.getAll();
       setFieldDefinitions(data);
+  }
+
+  const handleSaveAttConfig = async () => {
+      setLoadingAttConfig(true);
+      await api.settings.saveAttendanceConfig(attConfig);
+      setLoadingAttConfig(false);
+      alert("Đã lưu cấu hình chấm công thành công!");
   }
 
   // Status Handlers (Local Wrapper for Modal)
@@ -221,12 +207,53 @@ const ConfigurationManager: React.FC<ConfigurationManagerProps> = ({
             )}
 
             {activeTab === 'ATTENDANCE' && (
-                <AttendanceStatusManager 
-                    statuses={attendanceStatuses}
-                    onAdd={onAddAttendanceStatus}
-                    onUpdate={onUpdateAttendanceStatus}
-                    onDelete={onDeleteAttendanceStatus}
-                />
+                <div className="space-y-8">
+                    {/* General Settings */}
+                    <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                        <h4 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                            <Settings className="w-5 h-5 text-indigo-600" /> Cài đặt Chấm công Chung
+                        </h4>
+                        
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                <div>
+                                    <p className="font-medium text-slate-700">Mặc định khi Không điểm danh</p>
+                                    <p className="text-xs text-slate-500 mt-1">Áp dụng cho báo cáo khi nhân viên không có bản ghi nào trong ngày làm việc.</p>
+                                </div>
+                                <button 
+                                    onClick={() => setAttConfig({...attConfig, defaultBehavior: attConfig.defaultBehavior === 'PRESENT' ? 'ABSENT' : 'PRESENT'})}
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors border ${
+                                        attConfig.defaultBehavior === 'PRESENT'
+                                        ? 'bg-green-50 border-green-200 text-green-700' 
+                                        : 'bg-red-50 border-red-200 text-red-700'
+                                    }`}
+                                >
+                                    {attConfig.defaultBehavior === 'PRESENT' ? <ToggleRight className="w-6 h-6" /> : <ToggleLeft className="w-6 h-6" />}
+                                    <span className="font-bold">{attConfig.defaultBehavior === 'PRESENT' ? 'Được tính công (Có mặt)' : 'Không tính công (Vắng)'}</span>
+                                </button>
+                            </div>
+
+                            <div className="flex justify-end">
+                                <button 
+                                    onClick={handleSaveAttConfig}
+                                    disabled={loadingAttConfig}
+                                    className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 font-medium shadow-sm flex items-center gap-2 disabled:opacity-50"
+                                >
+                                    {loadingAttConfig ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                                    Lưu cấu hình
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Status Types Manager */}
+                    <AttendanceStatusManager 
+                        statuses={attendanceStatuses}
+                        onAdd={onAddAttendanceStatus}
+                        onUpdate={onUpdateAttendanceStatus}
+                        onDelete={onDeleteAttendanceStatus}
+                    />
+                </div>
             )}
 
             {activeTab === 'PROJECT_STATUS' && (

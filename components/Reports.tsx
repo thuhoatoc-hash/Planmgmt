@@ -1,8 +1,9 @@
 
-import React, { useState, useMemo } from 'react';
-import { Project, Contract, Category, User, ContractType, Task, TaskStatus, InstallmentStatus, AttendanceRecord, AttendanceType, OvertimeType, AttendanceStatusConfig } from '../types';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Project, Contract, Category, User, ContractType, Task, TaskStatus, InstallmentStatus, AttendanceRecord, AttendanceType, OvertimeType, AttendanceStatusConfig, AttendanceSystemConfig } from '../types';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Download, Filter, Calendar, BarChart3, PieChart as PieChartIcon, User as UserIcon, TrendingUp, CheckSquare, Clock } from 'lucide-react';
+import { api } from '../services/api';
 
 interface ReportsProps {
   projects: Project[];
@@ -11,7 +12,7 @@ interface ReportsProps {
   users: User[];
   tasks?: Task[]; 
   attendanceRecords?: AttendanceRecord[];
-  attendanceStatuses?: AttendanceStatusConfig[]; // Added Prop
+  attendanceStatuses?: AttendanceStatusConfig[]; 
 }
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#FF6B6B'];
@@ -20,21 +21,26 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
   const [activeTab, setActiveTab] = useState<'GENERAL' | 'COST' | 'AM' | 'TREND' | 'TASKS' | 'ATTENDANCE'>('GENERAL');
   
   // Date Filter State
-  const [startDate, setStartDate] = useState(new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0]); // First day of year
-  const [endDate, setEndDate] = useState(new Date(new Date().getFullYear(), 11, 31).toISOString().split('T')[0]); // Last day of year
+  const [startDate, setStartDate] = useState(new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0]); 
+  const [endDate, setEndDate] = useState(new Date(new Date().getFullYear(), 11, 31).toISOString().split('T')[0]); 
   
   // Attendance Specific State
   const [attendanceMonth, setAttendanceMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
   const [attendanceSubTab, setAttendanceSubTab] = useState<'MATRIX' | 'DETAIL' | 'SUMMARY'>('MATRIX');
   const [filterEmployeeId, setFilterEmployeeId] = useState<string>('');
+  const [attConfig, setAttConfig] = useState<AttendanceSystemConfig>({ defaultBehavior: 'PRESENT', workingDays: [1,2,3,4,5] });
+
+  useEffect(() => {
+      api.settings.getAttendanceConfig().then(cfg => {
+          if(cfg) setAttConfig(cfg);
+      });
+  }, []);
 
   const formatCurrency = (val: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(val);
 
   // Helper: Export to CSV
   const exportToCSV = (data: any[], filename: string) => {
     if (!data || data.length === 0) return;
-    
-    // Get headers
     const headers = Object.keys(data[0]);
     const csvContent = [
       headers.join(','),
@@ -64,12 +70,22 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
   }, [tasks, startDate, endDate]);
 
   const filteredAttendance = useMemo(() => {
-      // Filter by Month string match (YYYY-MM)
       return attendanceRecords.filter(r => r.date.startsWith(attendanceMonth) && (filterEmployeeId === '' || r.userId === filterEmployeeId));
   }, [attendanceRecords, attendanceMonth, filterEmployeeId]);
 
   // --- ATTENDANCE REPORT DATA ---
   const getStatusConfig = (id: string) => attendanceStatuses.find(s => s.id === id);
+
+  // Helper to count working days in month (excluding weekends)
+  const countWorkingDaysInMonth = (year: number, month: number) => {
+      const days = new Date(year, month, 0).getDate();
+      let count = 0;
+      for (let d = 1; d <= days; d++) {
+          const dayOfWeek = new Date(year, month - 1, d).getDay(); // 0-6
+          if (dayOfWeek !== 0 && dayOfWeek !== 6) count++;
+      }
+      return count;
+  };
 
   const attendanceMatrix = useMemo(() => {
       if (attendanceSubTab !== 'MATRIX') return [];
@@ -83,13 +99,15 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
           const row: any = { id: user.id, name: user.fullName };
           
           days.forEach(day => {
+              const dateObj = new Date(year, month - 1, day);
+              const dayOfWeek = dateObj.getDay();
+              const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
               const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
               const record = userRecords.find(r => r.date === dateStr);
               
               if (record) {
                   const status = getStatusConfig(record.statusId);
-                  let symbol = '✔'; // Default Present
-                  
+                  let symbol = '✔'; 
                   if (status) {
                       switch(status.type) {
                           case 'LATE': symbol = 'M'; break;
@@ -100,38 +118,44 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
                           default: symbol = '✔';
                       }
                   }
-                  
-                  if (record.overtime !== 'NONE') {
-                      symbol += '+OT';
-                  }
+                  if (record.overtime !== 'NONE') symbol += '+OT';
                   row[`day_${day}`] = symbol;
               } else {
-                  row[`day_${day}`] = '';
+                  // No Record Logic based on Config
+                  if (isWeekend) {
+                      row[`day_${day}`] = ''; // Weekend is blank
+                  } else {
+                      // Weekday with no record
+                      row[`day_${day}`] = attConfig.defaultBehavior === 'PRESENT' ? '✔' : 'X';
+                  }
               }
           });
           return row;
       });
-  }, [users, filteredAttendance, attendanceMonth, attendanceSubTab, attendanceStatuses]);
+  }, [users, filteredAttendance, attendanceMonth, attendanceSubTab, attendanceStatuses, attConfig]);
 
   const attendanceSummary = useMemo(() => {
       if (attendanceSubTab !== 'SUMMARY') return [];
-      
+      const [year, month] = attendanceMonth.split('-').map(Number);
+      const totalStandardDays = countWorkingDaysInMonth(year, month);
+
       return users.map(user => {
           const userRecords = filteredAttendance.filter(r => r.userId === user.id);
           
-          let totalWorkDays = 0; // Present + Late + Visit + WFH
-          let totalLeaveDays = 0; // Leave + Sick
+          let presentDays = 0; // Actual records
+          let leaveDays = 0;
           let totalOTHours = 0;
           let visitDays = 0;
 
+          // Count explicit records
           userRecords.forEach(r => {
               const status = getStatusConfig(r.statusId);
               const type = status?.type || 'PRESENT';
 
               if (type === 'LEAVE' || type === 'SICK') {
-                  totalLeaveDays++;
+                  leaveDays++;
               } else {
-                  totalWorkDays++; // Assume valid work day
+                  presentDays++; 
                   if (type === 'CUSTOMER_VISIT') visitDays++;
               }
 
@@ -139,16 +163,34 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
                   totalOTHours += (r.overtimeHours || 0);
               }
           });
+
+          // Handle Missing Days based on Config
+          let impliedDays = 0;
+          if (attConfig.defaultBehavior === 'PRESENT') {
+              const daysInMonth = new Date(year, month, 0).getDate();
+              for(let d=1; d<=daysInMonth; d++) {
+                  const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                  const hasRecord = userRecords.some(r => r.date === dateStr);
+                  const isWeekend = new Date(year, month - 1, d).getDay() % 6 === 0;
+                  
+                  if (!hasRecord && !isWeekend) {
+                      impliedDays++;
+                  }
+              }
+          }
+
+          const finalWorkDays = presentDays + impliedDays;
           
           return {
               name: user.fullName,
-              totalWorkDays,
-              totalLeaveDays,
+              totalWorkDays: finalWorkDays,
+              standardDays: totalStandardDays,
+              totalLeaveDays: leaveDays,
               visitDays,
               totalOTHours
           };
-      }).filter(u => (u.totalWorkDays + u.totalLeaveDays) > 0 || filterEmployeeId); // Show only if active or explicitly filtered
-  }, [users, filteredAttendance, attendanceSubTab, filterEmployeeId, attendanceStatuses]);
+      }).filter(u => (u.totalWorkDays + u.totalLeaveDays) > 0 || filterEmployeeId); 
+  }, [users, filteredAttendance, attendanceSubTab, filterEmployeeId, attendanceStatuses, attConfig]);
 
 
   // ... (Existing Reports Data Logic) ...
@@ -374,11 +416,12 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
 
                  {attendanceSubTab === 'MATRIX' && (
                      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-                         <div className="p-3 bg-slate-50 text-xs text-slate-500 flex gap-4 border-b border-slate-200">
+                         <div className="p-3 bg-slate-50 text-xs text-slate-500 flex gap-4 border-b border-slate-200 flex-wrap">
                              <div className="flex items-center gap-1"><span className="text-emerald-500 font-bold">✔</span> Có mặt</div>
                              <div className="flex items-center gap-1"><span className="text-yellow-600 font-bold">M</span> Đi muộn</div>
                              <div className="flex items-center gap-1"><span className="text-red-600 font-bold">P</span> Nghỉ phép</div>
                              <div className="flex items-center gap-1"><span className="text-blue-600 font-bold">CT</span> Công tác</div>
+                             <div className="flex items-center gap-1"><span className="text-slate-400 font-bold">X</span> Vắng</div>
                              <div className="flex items-center gap-1"><span className="text-purple-600 font-bold">OT</span> Tăng ca</div>
                          </div>
                          <div className="overflow-x-auto">
@@ -387,7 +430,7 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
                                      <tr className="bg-slate-50 text-slate-700 border-b border-slate-200">
                                          <th className="px-4 py-3 text-left font-bold border-r border-slate-200 sticky left-0 bg-slate-50 z-10 w-40">Nhân viên</th>
                                          {Array.from({length: new Date(parseInt(attendanceMonth.split('-')[0]), parseInt(attendanceMonth.split('-')[1]), 0).getDate()}, (_, i) => i + 1).map(d => (
-                                             <th key={d} className="w-10 py-3 border-r border-slate-100 min-w-[32px]">{d}</th>
+                                             <th key={d} className={`w-10 py-3 border-r border-slate-100 min-w-[32px] ${[0,6].includes(new Date(parseInt(attendanceMonth.split('-')[0]), parseInt(attendanceMonth.split('-')[1]) - 1, d).getDay()) ? 'bg-slate-100 text-red-400' : ''}`}>{d}</th>
                                          ))}
                                      </tr>
                                  </thead>
@@ -396,13 +439,14 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
                                          <tr key={row.id} className="border-b border-slate-100 hover:bg-slate-50">
                                              <td className="px-4 py-2 text-left font-medium border-r border-slate-200 sticky left-0 bg-white z-10 whitespace-nowrap">{row.name}</td>
                                              {Array.from({length: new Date(parseInt(attendanceMonth.split('-')[0]), parseInt(attendanceMonth.split('-')[1]), 0).getDate()}, (_, i) => i + 1).map(d => (
-                                                 <td key={d} className="border-r border-slate-100 py-1 font-bold">
-                                                     {row[`day_${d}`].includes('P') || row[`day_${d}`].includes('O') && !row[`day_${d}`].includes('OT') ? 
+                                                 <td key={d} className={`border-r border-slate-100 py-1 font-bold ${[0,6].includes(new Date(parseInt(attendanceMonth.split('-')[0]), parseInt(attendanceMonth.split('-')[1]) - 1, d).getDay()) ? 'bg-slate-50' : ''}`}>
+                                                     {row[`day_${d}`].includes('P') || row[`day_${d}`].includes('O') ? 
                                                         <span className="text-red-500">{row[`day_${d}`]}</span> :
+                                                        (row[`day_${d}`].includes('X') ? <span className="text-slate-300">X</span> :
                                                         (row[`day_${d}`].includes('OT') ? 
                                                             <span className="text-purple-600 text-[9px]">{row[`day_${d}`]}</span> : 
                                                             <span className="text-slate-700">{row[`day_${d}`]}</span>
-                                                        )
+                                                        ))
                                                      }
                                                  </td>
                                              ))}
@@ -468,7 +512,8 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
                              <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
                                  <tr>
                                      <th className="px-6 py-3">Nhân viên</th>
-                                     <th className="px-6 py-3 text-center">Tổng ngày đi làm</th>
+                                     <th className="px-6 py-3 text-center">Tổng ngày công</th>
+                                     <th className="px-6 py-3 text-center">Ngày chuẩn (Tháng)</th>
                                      <th className="px-6 py-3 text-center">Ngày nghỉ (P/O)</th>
                                      <th className="px-6 py-3 text-center">Đi công tác</th>
                                      <th className="px-6 py-3 text-center">Tổng giờ OT</th>
@@ -479,6 +524,7 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
                                      <tr key={idx} className="hover:bg-slate-50">
                                          <td className="px-6 py-3 font-medium text-slate-800">{row.name}</td>
                                          <td className="px-6 py-3 text-center font-bold text-indigo-600">{row.totalWorkDays}</td>
+                                         <td className="px-6 py-3 text-center text-slate-500">{row.standardDays}</td>
                                          <td className="px-6 py-3 text-center text-red-600">{row.totalLeaveDays}</td>
                                          <td className="px-6 py-3 text-center text-blue-600">{row.visitDays}</td>
                                          <td className="px-6 py-3 text-center font-bold text-purple-600">{row.totalOTHours}</td>

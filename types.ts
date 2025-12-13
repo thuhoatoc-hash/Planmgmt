@@ -308,7 +308,6 @@ export interface Notification {
 }
 
 // --- ATTENDANCE TYPES ---
-// Updated to match new requirements
 export type AttendanceType = 'LEAVE' | 'SICK' | 'LATE' | 'CUSTOMER_VISIT' | 'PRESENT' | 'WFH';
 
 export interface AttendanceStatusConfig {
@@ -325,6 +324,12 @@ export enum OvertimeType {
     HOLIDAY = 'HOLIDAY'  // Ngày lễ
 }
 
+export enum ApprovalStatus {
+    PENDING = 'PENDING',
+    APPROVED = 'APPROVED',
+    REJECTED = 'REJECTED'
+}
+
 export interface AttendanceRecord {
     id: string;
     userId: string;
@@ -337,11 +342,22 @@ export interface AttendanceRecord {
     
     // OT Info
     overtime: OvertimeType;
-    overtimeDate?: string; // Allow different date for OT if needed, but usually same
-    overtimeStartTime?: string; // HH:mm
-    overtimeEndTime?: string; // HH:mm
-    overtimeHours?: number; // Calculated or manual input
+    overtimeReason?: string; // Trực lễ, Làm tăng cường, Họp/Gặp đối tác, Khác
+    overtimeDate?: string; 
+    overtimeStartTime?: string; 
+    overtimeEndTime?: string; 
+    overtimeHours?: number; 
     
+    // Approval Workflow
+    approvalStatus: ApprovalStatus;
+    reviewerId?: string;
+    reviewerNote?: string;
+
     note?: string;
     location?: string;
+}
+
+export interface AttendanceSystemConfig {
+    defaultBehavior: 'PRESENT' | 'ABSENT'; // Nếu không chấm công thì mặc định là gì
+    workingDays: number[]; // [1,2,3,4,5] = Mon-Fri. 0=Sun, 6=Sat
 }
