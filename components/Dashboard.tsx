@@ -81,7 +81,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   // Attendance Widget Pagination
   const [attPage, setAttPage] = useState(1);
-  const ATT_ITEMS_PER_PAGE = 5;
+  const ATT_ITEMS_PER_PAGE = 3;
 
   const isAdmin = currentUser?.role === UserRole.ADMIN;
 
