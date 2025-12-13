@@ -2,7 +2,7 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Project, Contract, ContractType, Category, CategoryType, KPIMonthlyData, Task, User, TaskStatus, InstallmentStatus, EmployeeEvaluation, UserRole, BirthdayEvent, Role, Notification, NotificationPriority, AttendanceRecord, AttendanceStatusConfig, ApprovalStatus, OvertimeType } from '../types';
-import { Wallet, TrendingUp, TrendingDown, Activity, Settings, Check, X, SlidersHorizontal, CheckSquare, Award, AlertTriangle, Target, Gift, Phone, ClipboardList, Move, GripHorizontal, Bell, Info, Clock, CheckCircle2, XCircle } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, Activity, Settings, Check, X, SlidersHorizontal, CheckSquare, Award, AlertTriangle, Target, Gift, Phone, ClipboardList, Move, GripHorizontal, Bell, Info, Clock, CheckCircle2, XCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface DashboardProps {
   currentUser?: User | null;
@@ -78,6 +78,10 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [isDragMode, setIsDragMode] = useState(false);
   const [widgetOrder, setWidgetOrder] = useState<WidgetType[]>(DEFAULT_ORDER);
   const [draggedItem, setDraggedItem] = useState<number | null>(null);
+
+  // Attendance Widget Pagination
+  const [attPage, setAttPage] = useState(1);
+  const ATT_ITEMS_PER_PAGE = 5;
 
   const isAdmin = currentUser?.role === UserRole.ADMIN;
 
@@ -536,6 +540,10 @@ const Dashboard: React.FC<DashboardProps> = ({
                   </div>
               ) : null;
           case 'attendance_daily':
+              // Paginate attendance
+              const totalAttPages = Math.ceil(dailyAttendance.length / ATT_ITEMS_PER_PAGE);
+              const displayedAtt = dailyAttendance.slice((attPage - 1) * ATT_ITEMS_PER_PAGE, attPage * ATT_ITEMS_PER_PAGE);
+
               return config.showAttendanceDaily ? (
                   <div 
                     onClick={() => !isDragMode && onNavigate && onNavigate('attendance')}
@@ -550,13 +558,13 @@ const Dashboard: React.FC<DashboardProps> = ({
                           </span>
                       </h3>
                       
-                      <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                      <div className="flex-1 overflow-y-auto space-y-2 pr-1 mb-2">
                           {dailyAttendance.length === 0 ? (
                               <div className="h-full flex items-center justify-center text-slate-400 text-sm italic">
                                   Chưa có đăng ký nào hôm nay.
                               </div>
                           ) : (
-                              dailyAttendance.map(record => {
+                              displayedAtt.map(record => {
                                   const user = users.find(u => u.id === record.userId);
                                   const status = attendanceStatuses.find(s => s.id === record.statusId);
                                   
@@ -585,7 +593,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                           {/* Actions / Status */}
                                           {isAdmin ? (
                                               record.approvalStatus === ApprovalStatus.PENDING ? (
-                                                  <div className="flex gap-1">
+                                                  <div className="flex gap-1" onClick={e => e.stopPropagation()}>
                                                       <button 
                                                           onClick={(e) => handleQuickApprove(e, record)}
                                                           className="p-1.5 bg-emerald-100 text-emerald-600 rounded hover:bg-emerald-200"
@@ -623,6 +631,29 @@ const Dashboard: React.FC<DashboardProps> = ({
                               })
                           )}
                       </div>
+                      
+                      {/* Pagination Controls */}
+                      {totalAttPages > 1 && (
+                          <div className="flex justify-between items-center pt-2 border-t border-slate-100" onClick={e => e.stopPropagation()}>
+                              <button 
+                                onClick={() => setAttPage(p => Math.max(1, p - 1))}
+                                disabled={attPage === 1}
+                                className="p-1 text-slate-500 hover:bg-slate-100 rounded disabled:opacity-30"
+                              >
+                                  <ChevronLeft className="w-4 h-4" />
+                              </button>
+                              <span className="text-xs text-slate-500">
+                                  {attPage} / {totalAttPages}
+                              </span>
+                              <button 
+                                onClick={() => setAttPage(p => Math.min(totalAttPages, p + 1))}
+                                disabled={attPage === totalAttPages}
+                                className="p-1 text-slate-500 hover:bg-slate-100 rounded disabled:opacity-30"
+                              >
+                                  <ChevronRight className="w-4 h-4" />
+                              </button>
+                          </div>
+                      )}
                   </div>
               ) : null;
           case 'my_tasks':

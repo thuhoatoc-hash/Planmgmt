@@ -60,6 +60,16 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
     }
   };
 
+  // Helper: Calculate duration in hours
+  const getDurationInHours = (start?: string, end?: string): number => {
+      if (!start || !end) return 0;
+      const [h1, m1] = start.split(':').map(Number);
+      const [h2, m2] = end.split(':').map(Number);
+      let diff = (h2 + m2/60) - (h1 + m1/60);
+      if (diff < 0) diff += 24; // Handle overnight (simple logic)
+      return diff > 0 ? diff : 0;
+  };
+
   // --- FILTER DATA ---
   const filteredContracts = useMemo(() => {
     return contracts.filter(c => c.signedDate >= startDate && c.signedDate <= endDate);
@@ -138,58 +148,75 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
       if (attendanceSubTab !== 'SUMMARY') return [];
       const [year, month] = attendanceMonth.split('-').map(Number);
       const totalStandardDays = countWorkingDaysInMonth(year, month);
+      const daysInMonth = new Date(year, month, 0).getDate();
 
       return users.map(user => {
           const userRecords = filteredAttendance.filter(r => r.userId === user.id);
           
-          let presentDays = 0; // Actual records
-          let leaveDays = 0;
+          let effectiveWorkDays = 0; // Công thực tế (đã trừ nghỉ, cộng OT)
+          let totalLeaveHours = 0;
           let totalOTHours = 0;
           let visitDays = 0;
 
-          // Count explicit records
-          userRecords.forEach(r => {
-              const status = getStatusConfig(r.statusId);
-              const type = status?.type || 'PRESENT';
+          // Iterate through all days in month to calculate correctly
+          for(let d=1; d<=daysInMonth; d++) {
+              const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+              const record = userRecords.find(r => r.date === dateStr);
+              const dayOfWeek = new Date(year, month - 1, d).getDay(); // 0-6
+              const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
-              if (type === 'LEAVE' || type === 'SICK') {
-                  leaveDays++;
+              let dayValue = 0;
+
+              if (record) {
+                  const status = getStatusConfig(record.statusId);
+                  const type = status?.type || 'PRESENT';
+
+                  // 1. BASE DAY VALUE
+                  if (type === 'LEAVE' || type === 'SICK') {
+                      // Calculate leave deduction (1 day = 8h)
+                      const duration = getDurationInHours(record.startTime, record.endTime);
+                      totalLeaveHours += duration;
+                      const deduction = duration / 8;
+                      
+                      // Base is 1 for weekday, 0 for weekend. Deduct from base.
+                      const baseDay = isWeekend ? 0 : 1;
+                      dayValue = Math.max(0, baseDay - deduction);
+                  } else {
+                      // PRESENT, VISIT, LATE, WFH
+                      if (type === 'CUSTOMER_VISIT') visitDays++;
+                      // Standard day value
+                      dayValue = isWeekend ? 0 : 1; 
+                  }
+
+                  // 2. ADD OT
+                  if (record.overtime !== 'NONE' && record.overtimeHours && record.overtimeHours > 0) {
+                      totalOTHours += record.overtimeHours;
+                      // Add OT days (1 day = 8h)
+                      dayValue += (record.overtimeHours / 8);
+                  }
+
               } else {
-                  presentDays++; 
-                  if (type === 'CUSTOMER_VISIT') visitDays++;
-              }
-
-              if (r.overtime !== 'NONE') {
-                  totalOTHours += (r.overtimeHours || 0);
-              }
-          });
-
-          // Handle Missing Days based on Config
-          let impliedDays = 0;
-          if (attConfig.defaultBehavior === 'PRESENT') {
-              const daysInMonth = new Date(year, month, 0).getDate();
-              for(let d=1; d<=daysInMonth; d++) {
-                  const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-                  const hasRecord = userRecords.some(r => r.date === dateStr);
-                  const isWeekend = new Date(year, month - 1, d).getDay() % 6 === 0;
-                  
-                  if (!hasRecord && !isWeekend) {
-                      impliedDays++;
+                  // NO RECORD
+                  if (!isWeekend) {
+                      // If weekday and no record, check default behavior
+                      if (attConfig.defaultBehavior === 'PRESENT') {
+                          dayValue = 1;
+                      }
                   }
               }
+              
+              effectiveWorkDays += dayValue;
           }
-
-          const finalWorkDays = presentDays + impliedDays;
           
           return {
               name: user.fullName,
-              totalWorkDays: finalWorkDays,
+              totalWorkDays: effectiveWorkDays.toFixed(2), // Công thực tế
               standardDays: totalStandardDays,
-              totalLeaveDays: leaveDays,
+              totalLeaveHours: totalLeaveHours.toFixed(1),
               visitDays,
-              totalOTHours
+              totalOTHours: totalOTHours.toFixed(1)
           };
-      }).filter(u => (u.totalWorkDays + u.totalLeaveDays) > 0 || filterEmployeeId); 
+      }).filter(u => parseFloat(u.totalWorkDays) > 0 || parseFloat(u.totalLeaveHours) > 0 || filterEmployeeId); 
   }, [users, filteredAttendance, attendanceSubTab, filterEmployeeId, attendanceStatuses, attConfig]);
 
 
@@ -371,364 +398,290 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
             { id: 'TREND', label: 'Xu hướng (Trend)', icon: TrendingUp },
             { id: 'COST', label: 'Phân tích Chi phí', icon: PieChartIcon },
             { id: 'AM', label: 'Hiệu quả AM', icon: UserIcon },
-            { id: 'TASKS', label: 'Thống kê Nhiệm vụ', icon: CheckSquare },
+            { id: 'TASKS', label: 'Tiến độ Công việc', icon: CheckSquare },
           ].map(tab => (
-             <button
+            <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
               className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === tab.id 
-                  ? 'border-[#EE0033] text-[#EE0033]' 
-                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                ? 'border-[#EE0033] text-[#EE0033]' 
+                : 'border-transparent text-slate-500 hover:text-slate-700'
               }`}
-             >
-               <tab.icon className="w-4 h-4" />
-               {tab.label}
-             </button>
+            >
+              <tab.icon className="w-4 h-4" />
+              {tab.label}
+            </button>
           ))}
         </nav>
       </div>
 
-      {/* Report Content */}
-      <div className="min-h-[500px]">
-         
-         {/* --- ATTENDANCE REPORT --- */}
-         {activeTab === 'ATTENDANCE' && (
-             <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-300">
-                 {/* Sub Tabs */}
-                 <div className="flex gap-2 p-1 bg-slate-100 w-fit rounded-lg">
-                     {[
-                         { id: 'MATRIX', label: 'Bảng chấm công tháng' },
-                         { id: 'DETAIL', label: 'Nhật ký chi tiết' },
-                         { id: 'SUMMARY', label: 'Tổng hợp ngày công' },
-                     ].map(sub => (
-                         <button
-                            key={sub.id}
-                            onClick={() => setAttendanceSubTab(sub.id as any)}
-                            className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
-                                attendanceSubTab === sub.id ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-                            }`}
-                         >
-                             {sub.label}
-                         </button>
-                     ))}
-                 </div>
+      {/* --- CONTENT AREA --- */}
+      {activeTab === 'GENERAL' && (
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm animate-in slide-in-from-bottom-2">
+              <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                      <tr>
+                          <th className="px-6 py-4">Dự án</th>
+                          <th className="px-6 py-4 text-right">Doanh số (Ký)</th>
+                          <th className="px-6 py-4 text-right">Doanh thu (NT)</th>
+                          <th className="px-6 py-4 text-right">Chi phí</th>
+                          <th className="px-6 py-4 text-right">Lợi nhuận</th>
+                      </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                      {generalData.map((d, i) => (
+                          <tr key={i} className="hover:bg-slate-50">
+                              <td className="px-6 py-4 font-medium text-slate-800">
+                                  <div className="flex flex-col">
+                                      <span>{d.projectName}</span>
+                                      <span className="text-xs text-slate-400 font-mono">{d.projectCode}</span>
+                                  </div>
+                              </td>
+                              <td className="px-6 py-4 text-right text-indigo-600 font-medium">{formatCurrency(d.sales)}</td>
+                              <td className="px-6 py-4 text-right text-emerald-600 font-medium">{formatCurrency(d.revenue)}</td>
+                              <td className="px-6 py-4 text-right text-rose-600 font-medium">{formatCurrency(d.cost)}</td>
+                              <td className={`px-6 py-4 text-right font-bold ${d.profit >= 0 ? 'text-blue-600' : 'text-orange-500'}`}>
+                                  {formatCurrency(d.profit)}
+                              </td>
+                          </tr>
+                      ))}
+                      {generalData.length === 0 && (
+                          <tr><td colSpan={5} className="px-6 py-8 text-center text-slate-400">Không có dữ liệu trong khoảng thời gian này.</td></tr>
+                      )}
+                  </tbody>
+                  <tfoot className="bg-slate-50 font-bold text-slate-700 border-t border-slate-200">
+                      <tr>
+                          <td className="px-6 py-4">TỔNG CỘNG</td>
+                          <td className="px-6 py-4 text-right">{formatCurrency(generalData.reduce((a,b) => a + b.sales, 0))}</td>
+                          <td className="px-6 py-4 text-right">{formatCurrency(generalData.reduce((a,b) => a + b.revenue, 0))}</td>
+                          <td className="px-6 py-4 text-right">{formatCurrency(generalData.reduce((a,b) => a + b.cost, 0))}</td>
+                          <td className="px-6 py-4 text-right">{formatCurrency(generalData.reduce((a,b) => a + b.profit, 0))}</td>
+                      </tr>
+                  </tfoot>
+              </table>
+          </div>
+      )}
 
-                 {attendanceSubTab === 'MATRIX' && (
-                     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-                         <div className="p-3 bg-slate-50 text-xs text-slate-500 flex gap-4 border-b border-slate-200 flex-wrap">
-                             <div className="flex items-center gap-1"><span className="text-emerald-500 font-bold">✔</span> Có mặt</div>
-                             <div className="flex items-center gap-1"><span className="text-yellow-600 font-bold">M</span> Đi muộn</div>
-                             <div className="flex items-center gap-1"><span className="text-red-600 font-bold">P</span> Nghỉ phép</div>
-                             <div className="flex items-center gap-1"><span className="text-blue-600 font-bold">CT</span> Công tác</div>
-                             <div className="flex items-center gap-1"><span className="text-slate-400 font-bold">X</span> Vắng</div>
-                             <div className="flex items-center gap-1"><span className="text-purple-600 font-bold">OT</span> Tăng ca</div>
-                         </div>
-                         <div className="overflow-x-auto">
-                             <table className="w-full text-xs text-center border-collapse">
-                                 <thead>
-                                     <tr className="bg-slate-50 text-slate-700 border-b border-slate-200">
-                                         <th className="px-4 py-3 text-left font-bold border-r border-slate-200 sticky left-0 bg-slate-50 z-10 w-40">Nhân viên</th>
-                                         {Array.from({length: new Date(parseInt(attendanceMonth.split('-')[0]), parseInt(attendanceMonth.split('-')[1]), 0).getDate()}, (_, i) => i + 1).map(d => (
-                                             <th key={d} className={`w-10 py-3 border-r border-slate-100 min-w-[32px] ${[0,6].includes(new Date(parseInt(attendanceMonth.split('-')[0]), parseInt(attendanceMonth.split('-')[1]) - 1, d).getDay()) ? 'bg-slate-100 text-red-400' : ''}`}>{d}</th>
-                                         ))}
-                                     </tr>
-                                 </thead>
-                                 <tbody>
-                                     {attendanceMatrix.map((row: any) => (
-                                         <tr key={row.id} className="border-b border-slate-100 hover:bg-slate-50">
-                                             <td className="px-4 py-2 text-left font-medium border-r border-slate-200 sticky left-0 bg-white z-10 whitespace-nowrap">{row.name}</td>
-                                             {Array.from({length: new Date(parseInt(attendanceMonth.split('-')[0]), parseInt(attendanceMonth.split('-')[1]), 0).getDate()}, (_, i) => i + 1).map(d => (
-                                                 <td key={d} className={`border-r border-slate-100 py-1 font-bold ${[0,6].includes(new Date(parseInt(attendanceMonth.split('-')[0]), parseInt(attendanceMonth.split('-')[1]) - 1, d).getDay()) ? 'bg-slate-50' : ''}`}>
-                                                     {row[`day_${d}`].includes('P') || row[`day_${d}`].includes('O') ? 
-                                                        <span className="text-red-500">{row[`day_${d}`]}</span> :
-                                                        (row[`day_${d}`].includes('X') ? <span className="text-slate-300">X</span> :
-                                                        (row[`day_${d}`].includes('OT') ? 
-                                                            <span className="text-purple-600 text-[9px]">{row[`day_${d}`]}</span> : 
-                                                            <span className="text-slate-700">{row[`day_${d}`]}</span>
-                                                        ))
-                                                     }
-                                                 </td>
-                                             ))}
-                                         </tr>
-                                     ))}
-                                 </tbody>
-                             </table>
-                         </div>
-                     </div>
-                 )}
+      {/* --- ATTENDANCE TAB --- */}
+      {activeTab === 'ATTENDANCE' && (
+          <div className="space-y-4 animate-in slide-in-from-bottom-2">
+              <div className="flex gap-2 mb-4 bg-slate-100 p-1 rounded-lg w-fit">
+                  <button 
+                    onClick={() => setAttendanceSubTab('MATRIX')}
+                    className={`px-3 py-1.5 text-xs font-bold rounded transition-colors ${attendanceSubTab === 'MATRIX' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                      Bảng chấm công
+                  </button>
+                  <button 
+                    onClick={() => setAttendanceSubTab('SUMMARY')}
+                    className={`px-3 py-1.5 text-xs font-bold rounded transition-colors ${attendanceSubTab === 'SUMMARY' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                      Tổng hợp công
+                  </button>
+                  <button 
+                    onClick={() => setAttendanceSubTab('DETAIL')}
+                    className={`px-3 py-1.5 text-xs font-bold rounded transition-colors ${attendanceSubTab === 'DETAIL' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                      Chi tiết dữ liệu
+                  </button>
+              </div>
 
-                 {attendanceSubTab === 'DETAIL' && (
-                     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-                         <table className="w-full text-sm text-left">
-                             <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
-                                 <tr>
-                                     <th className="px-6 py-3">Ngày</th>
-                                     <th className="px-6 py-3">Nhân viên</th>
-                                     <th className="px-6 py-3">Loại hình</th>
-                                     <th className="px-6 py-3">Giờ làm việc</th>
-                                     <th className="px-6 py-3">OT</th>
-                                     <th className="px-6 py-3">Ghi chú</th>
-                                 </tr>
-                             </thead>
-                             <tbody className="divide-y divide-slate-100">
-                                 {filteredAttendance.map(record => {
-                                     const status = getStatusConfig(record.statusId);
-                                     return (
-                                     <tr key={record.id} className="hover:bg-slate-50">
-                                         <td className="px-6 py-3 whitespace-nowrap">{new Date(record.date).toLocaleDateString('vi-VN')}</td>
-                                         <td className="px-6 py-3 font-medium text-slate-800">{users.find(u => u.id === record.userId)?.fullName}</td>
-                                         <td className="px-6 py-3">
-                                             <span className={`px-2 py-1 rounded text-xs font-medium ${status?.color || 'bg-slate-100'}`}>
-                                                 {status?.name || '---'}
-                                             </span>
-                                         </td>
-                                         <td className="px-6 py-3">
-                                             {record.startTime && record.endTime ? `${record.startTime} - ${record.endTime}` : '-'}
-                                         </td>
-                                         <td className="px-6 py-3">
-                                             {record.overtime !== 'NONE' ? (
-                                                 <span className="text-purple-600 font-medium bg-purple-50 px-2 py-1 rounded-full text-xs">
-                                                     {record.overtimeHours}h
-                                                 </span>
-                                             ) : '-'}
-                                         </td>
-                                         <td className="px-6 py-3 text-slate-500 max-w-xs truncate" title={record.note}>
-                                             {record.note || ''}
-                                         </td>
-                                     </tr>
-                                 )})}
-                                 {filteredAttendance.length === 0 && (
-                                     <tr><td colSpan={6} className="px-6 py-8 text-center text-slate-400">Không có dữ liệu</td></tr>
-                                 )}
-                             </tbody>
-                         </table>
-                     </div>
-                 )}
+              {attendanceSubTab === 'MATRIX' && (
+                  <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto shadow-sm">
+                      <table className="w-full text-xs text-center border-collapse min-w-[1200px]">
+                          <thead>
+                              <tr className="bg-slate-100 text-slate-700 border-b border-slate-200">
+                                  <th className="p-2 border-r border-slate-200 min-w-[150px] sticky left-0 bg-slate-100 z-10">Nhân viên</th>
+                                  {Array.from({ length: new Date(parseInt(attendanceMonth.split('-')[0]), parseInt(attendanceMonth.split('-')[1]), 0).getDate() }, (_, i) => i + 1).map(d => (
+                                      <th key={d} className={`p-2 border-r border-slate-200 min-w-[30px] ${[0,6].includes(new Date(parseInt(attendanceMonth.split('-')[0]), parseInt(attendanceMonth.split('-')[1])-1, d).getDay()) ? 'bg-red-50 text-red-600' : ''}`}>{d}</th>
+                                  ))}
+                              </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                              {attendanceMatrix.map(row => (
+                                  <tr key={row.id} className="hover:bg-slate-50">
+                                      <td className="p-2 border-r border-slate-200 font-medium text-left sticky left-0 bg-white z-10">{row.name}</td>
+                                      {Array.from({ length: new Date(parseInt(attendanceMonth.split('-')[0]), parseInt(attendanceMonth.split('-')[1]), 0).getDate() }, (_, i) => i + 1).map(d => (
+                                          <td key={d} className="p-1 border-r border-slate-200 text-[10px]">
+                                              {row[`day_${d}`]}
+                                          </td>
+                                      ))}
+                                  </tr>
+                              ))}
+                          </tbody>
+                      </table>
+                  </div>
+              )}
 
-                 {attendanceSubTab === 'SUMMARY' && (
-                     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-                         <table className="w-full text-sm text-left">
-                             <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
-                                 <tr>
-                                     <th className="px-6 py-3">Nhân viên</th>
-                                     <th className="px-6 py-3 text-center">Tổng ngày công</th>
-                                     <th className="px-6 py-3 text-center">Ngày chuẩn (Tháng)</th>
-                                     <th className="px-6 py-3 text-center">Ngày nghỉ (P/O)</th>
-                                     <th className="px-6 py-3 text-center">Đi công tác</th>
-                                     <th className="px-6 py-3 text-center">Tổng giờ OT</th>
-                                 </tr>
-                             </thead>
-                             <tbody className="divide-y divide-slate-100">
-                                 {attendanceSummary.map((row, idx) => (
-                                     <tr key={idx} className="hover:bg-slate-50">
-                                         <td className="px-6 py-3 font-medium text-slate-800">{row.name}</td>
-                                         <td className="px-6 py-3 text-center font-bold text-indigo-600">{row.totalWorkDays}</td>
-                                         <td className="px-6 py-3 text-center text-slate-500">{row.standardDays}</td>
-                                         <td className="px-6 py-3 text-center text-red-600">{row.totalLeaveDays}</td>
-                                         <td className="px-6 py-3 text-center text-blue-600">{row.visitDays}</td>
-                                         <td className="px-6 py-3 text-center font-bold text-purple-600">{row.totalOTHours}</td>
-                                     </tr>
-                                 ))}
-                             </tbody>
-                         </table>
-                     </div>
-                 )}
-             </div>
-         )}
+              {attendanceSubTab === 'SUMMARY' && (
+                  <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                      <table className="w-full text-left text-sm">
+                          <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                              <tr>
+                                  <th className="px-6 py-4">Nhân viên</th>
+                                  <th className="px-6 py-4 text-center">Ngày công chuẩn</th>
+                                  <th className="px-6 py-4 text-center bg-green-50 text-green-700">Ngày công thực tế</th>
+                                  <th className="px-6 py-4 text-center text-orange-600">Đi khách hàng (ngày)</th>
+                                  <th className="px-6 py-4 text-center text-red-600">Nghỉ phép/ốm (giờ)</th>
+                                  <th className="px-6 py-4 text-center text-purple-600">Làm thêm giờ (giờ)</th>
+                              </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                              {attendanceSummary.map((row, i) => (
+                                  <tr key={i} className="hover:bg-slate-50">
+                                      <td className="px-6 py-4 font-medium text-slate-800">{row.name}</td>
+                                      <td className="px-6 py-4 text-center">{row.standardDays}</td>
+                                      <td className="px-6 py-4 text-center font-bold text-green-700 bg-green-50/50">{row.totalWorkDays}</td>
+                                      <td className="px-6 py-4 text-center">{row.visitDays}</td>
+                                      <td className="px-6 py-4 text-center">{row.totalLeaveHours}</td>
+                                      <td className="px-6 py-4 text-center font-bold text-purple-700">{row.totalOTHours}</td>
+                                  </tr>
+                              ))}
+                          </tbody>
+                      </table>
+                  </div>
+              )}
 
-         {/* --- GENERAL REPORT (Existing) --- */}
-         {activeTab === 'GENERAL' && (
-             <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-300">
-                 {/* Chart */}
-                 <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-96">
-                    <h3 className="font-bold text-slate-700 mb-4">Biểu đồ Doanh số - Doanh thu - Chi phí</h3>
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={generalData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                            <XAxis dataKey="projectCode" tick={{fontSize: 12, fill: '#64748b'}} />
-                            <YAxis tickFormatter={(val) => `${(val/1e9).toFixed(0)} tỷ`} width={60} tick={{fontSize: 12, fill: '#64748b'}} />
-                            <Tooltip 
-                              formatter={(value: number) => formatCurrency(value)} 
-                              contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                            />
-                            <Legend />
-                            <Bar dataKey="sales" name="Doanh số (Ký)" fill="#6366f1" radius={[4, 4, 0, 0]} barSize={30} />
-                            <Bar dataKey="revenue" name="Doanh thu (NT)" fill="#10b981" radius={[4, 4, 0, 0]} barSize={30} />
-                            <Bar dataKey="cost" name="Chi phí" fill="#f43f5e" radius={[4, 4, 0, 0]} barSize={30} />
-                        </BarChart>
-                    </ResponsiveContainer>
-                 </div>
+              {attendanceSubTab === 'DETAIL' && (
+                  <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                      <table className="w-full text-left text-sm">
+                          <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                              <tr>
+                                  <th className="px-6 py-4">Ngày</th>
+                                  <th className="px-6 py-4">Nhân viên</th>
+                                  <th className="px-6 py-4">Trạng thái</th>
+                                  <th className="px-6 py-4">Thời gian</th>
+                                  <th className="px-6 py-4">Ghi chú</th>
+                              </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                              {filteredAttendance.sort((a,b) => b.date.localeCompare(a.date)).map((record) => {
+                                  const user = users.find(u => u.id === record.userId);
+                                  const status = attendanceStatuses.find(s => s.id === record.statusId);
+                                  return (
+                                      <tr key={record.id} className="hover:bg-slate-50">
+                                          <td className="px-6 py-4 text-slate-500 font-mono text-xs">{record.date}</td>
+                                          <td className="px-6 py-4 font-medium text-slate-800">{user?.fullName}</td>
+                                          <td className="px-6 py-4">
+                                              <span className={`px-2 py-1 rounded text-xs font-medium ${status?.color || 'bg-slate-100'}`}>
+                                                  {status?.name}
+                                              </span>
+                                          </td>
+                                          <td className="px-6 py-4 text-xs">
+                                              {record.startTime} - {record.endTime}
+                                              {record.overtime !== 'NONE' && <span className="ml-2 text-purple-600 font-bold">+ OT {record.overtimeHours}h</span>}
+                                          </td>
+                                          <td className="px-6 py-4 text-slate-500 truncate max-w-xs">{record.note}</td>
+                                      </tr>
+                                  );
+                              })}
+                          </tbody>
+                      </table>
+                  </div>
+              )}
+          </div>
+      )}
 
-                 {/* Table */}
-                 <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-                    <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
-                        <h3 className="font-bold text-slate-800">Chi tiết số liệu theo Dự án</h3>
-                    </div>
-                    <table className="w-full text-sm text-left">
-                        <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
-                            <tr>
-                                <th className="px-6 py-3">Mã DA</th>
-                                <th className="px-6 py-3">Tên Dự án</th>
-                                <th className="px-6 py-3 text-right">Doanh số (Ký)</th>
-                                <th className="px-6 py-3 text-right">Doanh thu (NT)</th>
-                                <th className="px-6 py-3 text-right">Chi phí</th>
-                                <th className="px-6 py-3 text-right">Lợi nhuận (DS - CP)</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {generalData.map((row, idx) => (
-                                <tr key={idx} className="hover:bg-slate-50">
-                                    <td className="px-6 py-3 font-mono text-slate-600">{row.projectCode}</td>
-                                    <td className="px-6 py-3 font-medium text-slate-800">{row.projectName}</td>
-                                    <td className="px-6 py-3 text-right text-indigo-600">{formatCurrency(row.sales)}</td>
-                                    <td className="px-6 py-3 text-right text-emerald-600">{formatCurrency(row.revenue)}</td>
-                                    <td className="px-6 py-3 text-right text-rose-600">{formatCurrency(row.cost)}</td>
-                                    <td className={`px-6 py-3 text-right font-bold ${row.profit >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>
-                                        {formatCurrency(row.profit)}
-                                    </td>
-                                </tr>
-                            ))}
-                            {generalData.length === 0 && (
-                                <tr><td colSpan={6} className="px-6 py-8 text-center text-slate-400">Không có dữ liệu trong khoảng thời gian này</td></tr>
-                            )}
-                        </tbody>
-                        <tfoot className="bg-slate-50 font-bold text-slate-800 border-t border-slate-200">
-                            <tr>
-                                <td colSpan={2} className="px-6 py-3 text-right">Tổng cộng:</td>
-                                <td className="px-6 py-3 text-right text-indigo-700">{formatCurrency(generalData.reduce((a,b) => a + b.sales, 0))}</td>
-                                <td className="px-6 py-3 text-right text-emerald-700">{formatCurrency(generalData.reduce((a,b) => a + b.revenue, 0))}</td>
-                                <td className="px-6 py-3 text-right text-rose-700">{formatCurrency(generalData.reduce((a,b) => a + b.cost, 0))}</td>
-                                <td className="px-6 py-3 text-right text-blue-700">{formatCurrency(generalData.reduce((a,b) => a + b.profit, 0))}</td>
-                            </tr>
-                        </tfoot>
-                    </table>
-                 </div>
-             </div>
-         )}
-         
-         {/* ... (Other existing reports: Trend, Cost, AM, Tasks) ... */}
-         {activeTab === 'TREND' && (
-             <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-300">
-                 <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-96">
-                    <h3 className="font-bold text-slate-700 mb-4">Xu hướng Doanh số & Chi phí theo tháng</h3>
-                    <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={trendData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                            <XAxis dataKey="date" tick={{fontSize: 12, fill: '#64748b'}} />
-                            <YAxis tickFormatter={(val) => `${(val/1e9).toFixed(0)} tỷ`} width={60} tick={{fontSize: 12, fill: '#64748b'}} />
-                            <Tooltip formatter={(value: number) => formatCurrency(value)} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                            <Legend />
-                            <Line type="monotone" dataKey="sales" name="Doanh số (Ký)" stroke="#6366f1" strokeWidth={2} dot={{r: 4}} activeDot={{r: 6}} />
-                            <Line type="monotone" dataKey="revenue" name="Doanh thu (NT)" stroke="#10b981" strokeWidth={2} dot={{r: 4}} activeDot={{r: 6}} />
-                            <Line type="monotone" dataKey="cost" name="Chi phí" stroke="#f43f5e" strokeWidth={2} dot={{r: 4}} activeDot={{r: 6}} />
-                        </LineChart>
-                    </ResponsiveContainer>
-                 </div>
-             </div>
-         )}
+      {/* --- OTHER TABS --- */}
+      {activeTab === 'COST' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in slide-in-from-bottom-2">
+              <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-96">
+                  <h3 className="font-bold text-slate-700 mb-4">Cơ cấu Chi phí</h3>
+                  <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                          <Pie
+                              data={costData}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={60}
+                              outerRadius={100}
+                              paddingAngle={5}
+                              dataKey="value"
+                          >
+                              {costData.map((_, index) => (
+                                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                              ))}
+                          </Pie>
+                          <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                          <Legend layout="vertical" verticalAlign="middle" align="right" />
+                      </PieChart>
+                  </ResponsiveContainer>
+              </div>
+              <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-96 overflow-y-auto">
+                  <h3 className="font-bold text-slate-700 mb-4">Chi tiết theo Danh mục</h3>
+                  <table className="w-full text-sm">
+                      <tbody className="divide-y divide-slate-100">
+                          {costData.map((item, i) => (
+                              <tr key={i}>
+                                  <td className="py-3 text-slate-600">{item.name}</td>
+                                  <td className="py-3 text-right font-medium text-slate-800">{formatCurrency(item.value)}</td>
+                              </tr>
+                          ))}
+                      </tbody>
+                  </table>
+              </div>
+          </div>
+      )}
 
-         {activeTab === 'COST' && (
-             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in slide-in-from-bottom-2 duration-300">
-                 <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                    <h3 className="font-bold text-slate-700 mb-4">Cơ cấu Chi phí</h3>
-                    <div className="h-80 flex justify-center">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie
-                                    data={costData}
-                                    cx="50%"
-                                    cy="50%"
-                                    innerRadius={60}
-                                    outerRadius={100}
-                                    paddingAngle={5}
-                                    dataKey="value"
-                                >
-                                    {costData.map((_, index) => (
-                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                    ))}
-                                </Pie>
-                                <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                                <Legend />
-                            </PieChart>
-                        </ResponsiveContainer>
-                    </div>
-                 </div>
-                 <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm h-full">
-                    <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
-                        <h3 className="font-bold text-slate-800">Chi tiết theo loại Chi phí</h3>
-                    </div>
-                    <table className="w-full text-sm text-left">
-                        <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
-                            <tr>
-                                <th className="px-6 py-3">Loại Chi phí</th>
-                                <th className="px-6 py-3 text-right">Giá trị</th>
-                                <th className="px-6 py-3 text-right">Tỷ trọng</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {costData.map((row, idx) => {
-                                const total = costData.reduce((a,b) => a + b.value, 0);
-                                return (
-                                    <tr key={idx} className="hover:bg-slate-50">
-                                        <td className="px-6 py-3 font-medium text-slate-800 flex items-center gap-2">
-                                            <div className="w-3 h-3 rounded-full" style={{backgroundColor: COLORS[idx % COLORS.length]}}></div>
-                                            {row.name}
-                                        </td>
-                                        <td className="px-6 py-3 text-right text-slate-700">{formatCurrency(row.value)}</td>
-                                        <td className="px-6 py-3 text-right text-slate-500">
-                                            {total > 0 ? ((row.value / total) * 100).toFixed(1) : 0}%
-                                        </td>
-                                    </tr>
-                                )
-                            })}
-                        </tbody>
-                    </table>
-                 </div>
-             </div>
-         )}
+      {activeTab === 'AM' && (
+          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm animate-in slide-in-from-bottom-2">
+              <h3 className="font-bold text-slate-700 mb-6">Hiệu quả Kinh doanh theo AM</h3>
+              <div className="h-96">
+                  <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={amData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                          <XAxis dataKey="amName" tick={{fontSize: 12}} />
+                          <YAxis tickFormatter={(value) => `${(value/1e9).toFixed(0)} tỷ`} width={80} />
+                          <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                          <Legend />
+                          <Bar dataKey="sales" name="Doanh số Ký" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                          <Bar dataKey="revenue" name="Doanh thu NT" fill="#10b981" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                  </ResponsiveContainer>
+              </div>
+          </div>
+      )}
 
-         {activeTab === 'AM' && (
-             <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-300">
-                 <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-96">
-                    <h3 className="font-bold text-slate-700 mb-4">Hiệu quả kinh doanh theo AM</h3>
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={amData} layout="vertical" margin={{ top: 20, right: 30, left: 100, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
-                            <XAxis type="number" tickFormatter={(val) => `${(val/1e9).toFixed(0)} tỷ`} tick={{fontSize: 12}} />
-                            <YAxis dataKey="amName" type="category" width={150} tick={{fontSize: 12, fontWeight: 500}} />
-                            <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                            <Legend />
-                            <Bar dataKey="sales" name="Doanh số (Ký)" fill="#6366f1" radius={[0, 4, 4, 0]} barSize={20} />
-                            <Bar dataKey="revenue" name="Doanh thu (NT)" fill="#10b981" radius={[0, 4, 4, 0]} barSize={20} />
-                        </BarChart>
-                    </ResponsiveContainer>
-                 </div>
-             </div>
-         )}
+      {activeTab === 'TREND' && (
+          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm animate-in slide-in-from-bottom-2">
+              <h3 className="font-bold text-slate-700 mb-6">Xu hướng Doanh số & Doanh thu theo tháng</h3>
+              <div className="h-96">
+                  <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={trendData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                          <XAxis dataKey="date" />
+                          <YAxis tickFormatter={(value) => `${(value/1e9).toFixed(0)} tỷ`} width={80} />
+                          <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                          <Legend />
+                          <Line type="monotone" dataKey="sales" name="Doanh số" stroke="#6366f1" strokeWidth={2} />
+                          <Line type="monotone" dataKey="revenue" name="Doanh thu" stroke="#10b981" strokeWidth={2} />
+                          <Line type="monotone" dataKey="cost" name="Chi phí" stroke="#ef4444" strokeWidth={2} />
+                      </LineChart>
+                  </ResponsiveContainer>
+              </div>
+          </div>
+      )}
 
-         {activeTab === 'TASKS' && (
-             <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-300">
-                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                     <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-96">
-                        <h3 className="font-bold text-slate-700 mb-4">Tỷ lệ Hoàn thành Nhiệm vụ theo Nhân sự</h3>
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={taskReportData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                <XAxis dataKey="name" tick={{fontSize: 12}} />
-                                <YAxis />
-                                <Tooltip />
-                                <Legend />
-                                <Bar dataKey="completed" name="Hoàn thành" stackId="a" fill="#10b981" barSize={30} />
-                                <Bar dataKey="inProgress" name="Đang làm" stackId="a" fill="#3b82f6" barSize={30} />
-                                <Bar dataKey="late" name="Quá hạn" stackId="a" fill="#ef4444" barSize={30} />
-                            </BarChart>
-                        </ResponsiveContainer>
-                     </div>
-                 </div>
-             </div>
-         )}
-      </div>
+      {activeTab === 'TASKS' && (
+          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm animate-in slide-in-from-bottom-2">
+              <h3 className="font-bold text-slate-700 mb-6">Thống kê Nhiệm vụ theo Nhân sự</h3>
+              <div className="h-96">
+                  <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={taskReportData} layout="vertical" margin={{ top: 20, right: 30, left: 40, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                          <XAxis type="number" />
+                          <YAxis dataKey="name" type="category" width={120} tick={{fontSize: 12}} />
+                          <Tooltip />
+                          <Legend />
+                          <Bar dataKey="completed" name="Hoàn thành" stackId="a" fill="#10b981" />
+                          <Bar dataKey="inProgress" name="Đang làm" stackId="a" fill="#3b82f6" />
+                          <Bar dataKey="late" name="Trễ hạn" stackId="a" fill="#ef4444" />
+                      </BarChart>
+                  </ResponsiveContainer>
+              </div>
+          </div>
+      )}
     </div>
   );
 };
