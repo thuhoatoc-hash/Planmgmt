@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Project, Contract, ContractType, KPIMonthlyData, Task, User, TaskStatus, InstallmentStatus, EmployeeEvaluation, BirthdayEvent, Role, Notification, NotificationPriority, AttendanceRecord, AttendanceStatusConfig, ApprovalStatus, OvertimeType, NotificationType, Category } from '../types';
-import { TrendingUp, Activity, Settings, Move, GripHorizontal, Bell, Clock, ChevronLeft, ChevronRight, PartyPopper, BarChart3, ClipboardList, CheckSquare, Gift, Award, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Settings, Move, GripHorizontal, Bell, Clock, ChevronLeft, ChevronRight, PartyPopper, BarChart3, ClipboardList, CheckSquare, Gift, Award, AlertTriangle, CheckCircle } from 'lucide-react';
 
 interface DashboardProps {
   currentUser?: User | null;
