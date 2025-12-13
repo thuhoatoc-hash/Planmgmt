@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { KPIMonthlyData, KPIGroup, KPIItem, UserRole, User } from '../types';
-import { TrendingUp, AlertCircle, CheckCircle, Lock, Unlock, Plus, Trash2, PlusCircle, Copy, CheckSquare, Square, BarChart3, List, FileBarChart, Bell } from 'lucide-react';
+import { TrendingUp, AlertCircle, Lock, Unlock, Plus, Trash2, PlusCircle, Copy, CheckSquare, Square, BarChart3, List, FileBarChart, Bell } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 interface KPIManagementProps {
