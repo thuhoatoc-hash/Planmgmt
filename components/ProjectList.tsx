@@ -1,8 +1,9 @@
 
-import React, { useState } from 'react';
-import { Project, ProjectStatusItem, User, Partner, ProjectType, ProductType, Contract, ContractType, PartnerType } from '../types';
-import { Plus, Search, Calendar, ChevronRight, User as UserIcon, Building2, Edit, Trash2, Tag, Box, Filter } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Project, ProjectStatusItem, User, Partner, ProjectType, ProductType, Contract, ContractType, PartnerType, InstallmentStatus, Task, TaskType, TaskStatus } from '../types';
+import { Plus, Search, Calendar, ChevronRight, User as UserIcon, Building2, Edit, Trash2, Tag, Box, Filter, TrendingUp, DollarSign, Wallet, Activity } from 'lucide-react';
 import CurrencyInput from './CurrencyInput';
+import { api } from '../services/api';
 
 interface ProjectListProps {
   projects: Project[];
@@ -43,6 +44,54 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, contracts, users, p
     (filterStatusId === '' || p.statusId === filterStatusId)
   );
 
+  // --- OVERVIEW STATS ---
+  const overviewStats = useMemo(() => {
+      let totalSales = 0;
+      let totalPlannedRevenue = 0;
+      let totalRealizedRevenue = 0;
+      let totalProfit = 0;
+
+      filteredProjects.forEach(project => {
+          const pContracts = contracts.filter(c => c.projectId === project.id);
+          
+          // Signed Sales
+          const signedSales = pContracts
+            .filter(c => c.type === ContractType.OUTPUT && c.status !== 'CANCELLED')
+            .reduce((sum, c) => sum + c.value, 0);
+          
+          // Actual Realized Revenue (Invoiced/Paid)
+          const realized = pContracts
+            .filter(c => c.type === ContractType.OUTPUT && c.status !== 'CANCELLED')
+            .reduce((acc, c) => {
+                if (c.installments && c.installments.length > 0) {
+                    return acc + c.installments
+                        .filter(i => i.status === InstallmentStatus.INVOICED || i.status === InstallmentStatus.PAID)
+                        .reduce((sum, i) => sum + i.value, 0);
+                } else {
+                    return acc + (c.status === 'COMPLETED' ? c.value : 0);
+                }
+            }, 0);
+
+          // Actual Cost
+          const cost = pContracts
+            .filter(c => c.type === ContractType.INPUT && c.status !== 'CANCELLED')
+            .reduce((sum, c) => sum + c.value, 0);
+
+          totalSales += signedSales;
+          totalPlannedRevenue += (project.plannedRevenue || 0); // Using planned for reference, or could be signedSales
+          totalRealizedRevenue += realized;
+          totalProfit += (signedSales - cost);
+      });
+
+      return {
+          count: filteredProjects.length,
+          totalSales,
+          totalPlannedRevenue,
+          totalRealizedRevenue,
+          totalProfit
+      };
+  }, [filteredProjects, contracts]);
+
   const handleOpenModal = (project?: Project, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     if (project) {
@@ -63,7 +112,7 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, contracts, users, p
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (formData.id) {
@@ -72,11 +121,39 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, contracts, users, p
         // Fix TS2783
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { id: _id, ...restProject } = formData as Project;
+        const projectId = `prj_${Date.now()}`;
         const project: Project = {
           ...restProject,
-          id: `prj_${Date.now()}`,
+          id: projectId,
         };
         onAddProject(project);
+
+        // --- AUTO GENERATE STANDARD MILESTONES ---
+        // Requirement 4: Auto create tasks for key milestones
+        const milestones = [
+            { key: 'CONTACT', name: '1. Tiếp xúc, giới thiệu sản phẩm' },
+            { key: 'DEMO', name: '2. Demo, POC' },
+            { key: 'PROPOSAL', name: '3. Phối hợp xây dựng hồ sơ đề xuất, chủ trương' },
+            { key: 'BIDDING', name: '4. Đấu thầu, ký Hợp đồng' },
+            { key: 'DEPLOY', name: '5. Triển khai' },
+            { key: 'ACCEPTANCE', name: '6. Nghiệm thu, xuất hoá đơn' },
+        ];
+
+        for (const m of milestones) {
+            const task: Task = {
+                id: `task_${Date.now()}_${m.key}`,
+                projectId: projectId,
+                name: m.name,
+                taskType: TaskType.PROJECT,
+                status: TaskStatus.NOT_STARTED,
+                deadline: project.endDate, // Default to project end date
+                assignerId: formData.pmId || formData.amId || '', // Default to PM or AM
+                assigneeId: formData.amId || '', // Default to AM
+                milestoneKey: m.key
+            };
+            // Call API directly to ensure they are created in DB
+            await api.tasks.save(task);
+        }
     }
     setIsModalOpen(false);
   };
@@ -111,6 +188,45 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, contracts, users, p
           <Plus className="w-5 h-5" />
           Thêm Dự án
         </button>
+      </div>
+
+      {/* OVERVIEW SUMMARY CARDS */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+              <p className="text-slate-500 text-xs font-bold uppercase mb-1">Số lượng Dự án</p>
+              <h3 className="text-2xl font-bold text-slate-800">{overviewStats.count}</h3>
+              <div className="mt-2 text-xs text-slate-400 flex items-center gap-1">
+                  <Box className="w-3 h-3" /> Đang hiển thị
+              </div>
+          </div>
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+              <p className="text-slate-500 text-xs font-bold uppercase mb-1">Tổng Doanh số (Ký)</p>
+              <h3 className="text-xl font-bold text-indigo-600 truncate" title={formatCurrency(overviewStats.totalSales)}>{formatCurrency(overviewStats.totalSales)}</h3>
+              <div className="mt-2 text-xs text-slate-400 flex items-center gap-1">
+                  <TrendingUp className="w-3 h-3" /> Tổng HĐ đầu ra
+              </div>
+          </div>
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+              <p className="text-slate-500 text-xs font-bold uppercase mb-1">DT Dự kiến (PAKD)</p>
+              <h3 className="text-xl font-bold text-blue-600 truncate" title={formatCurrency(overviewStats.totalPlannedRevenue)}>{formatCurrency(overviewStats.totalPlannedRevenue)}</h3>
+              <div className="mt-2 text-xs text-slate-400 flex items-center gap-1">
+                  <Activity className="w-3 h-3" /> Theo kế hoạch
+              </div>
+          </div>
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between bg-emerald-50/50 border-emerald-100">
+              <p className="text-emerald-700 text-xs font-bold uppercase mb-1">DT Thực hiện (NT)</p>
+              <h3 className="text-xl font-bold text-emerald-600 truncate" title={formatCurrency(overviewStats.totalRealizedRevenue)}>{formatCurrency(overviewStats.totalRealizedRevenue)}</h3>
+              <div className="mt-2 text-xs text-emerald-600/70 flex items-center gap-1">
+                  <DollarSign className="w-3 h-3" /> Đã nghiệm thu/TT
+              </div>
+          </div>
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+              <p className="text-slate-500 text-xs font-bold uppercase mb-1">Tổng Hiệu quả</p>
+              <h3 className={`text-xl font-bold truncate ${overviewStats.totalProfit >= 0 ? 'text-slate-800' : 'text-orange-600'}`} title={formatCurrency(overviewStats.totalProfit)}>{formatCurrency(overviewStats.totalProfit)}</h3>
+              <div className="mt-2 text-xs text-slate-400 flex items-center gap-1">
+                  <Wallet className="w-3 h-3" /> Lợi nhuận dự kiến
+              </div>
+          </div>
       </div>
 
       {/* Search and Filter Bar */}
@@ -150,6 +266,19 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, contracts, users, p
           // Doanh số: Tổng giá trị HĐ (trừ Hủy) - Thể hiện quy mô đã ký
           const sales = pContracts.filter(c => c.type === ContractType.OUTPUT && c.status !== 'CANCELLED').reduce((sum, c) => sum + c.value, 0);
           
+          // Doanh thu thực tế (Realized Revenue): Đã xuất hóa đơn hoặc đã thanh toán
+          const realizedRevenue = pContracts
+            .filter(c => c.type === ContractType.OUTPUT && c.status !== 'CANCELLED')
+            .reduce((acc, c) => {
+                if (c.installments && c.installments.length > 0) {
+                    return acc + c.installments
+                        .filter(i => i.status === InstallmentStatus.INVOICED || i.status === InstallmentStatus.PAID)
+                        .reduce((sum, i) => sum + i.value, 0);
+                } else {
+                    return acc + (c.status === 'COMPLETED' ? c.value : 0);
+                }
+            }, 0);
+
           // Chi phí: Tổng chi phí (trừ Hủy)
           const cost = pContracts.filter(c => c.type === ContractType.INPUT && c.status !== 'CANCELLED').reduce((sum, c) => sum + c.value, 0);
 
@@ -205,6 +334,11 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, contracts, users, p
                   <div className="flex justify-between items-center text-slate-600 border-b border-dashed border-slate-200 pb-2">
                      <span>Doanh số (Ký HĐ):</span>
                      <span className="font-bold text-indigo-600">{formatCurrency(sales)}</span>
+                  </div>
+                  {/* NEW FIELD: Realized Revenue */}
+                  <div className="flex justify-between items-center text-slate-600 border-b border-dashed border-slate-200 pb-2 bg-emerald-50/30 px-1 -mx-1 rounded">
+                     <span className="text-emerald-800 font-medium">Đã nghiệm thu (NT):</span>
+                     <span className="font-bold text-emerald-600">{formatCurrency(realizedRevenue)}</span>
                   </div>
                    <div className="flex justify-between items-center text-slate-600 border-b border-dashed border-slate-200 pb-2">
                      <span>Chi phí thực tế:</span>

@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Project, Contract, Category, ContractType, CategoryType, ProjectType, ProductType, User, Partner, ProjectStatusItem, UserRole, Task, TaskStatus, ContractInstallment, InstallmentStatus, TaskType, CustomerObligation, ObligationStatus, FundingSource, FundingSourceStatus, PartnerType } from '../types';
-import { ArrowLeft, Plus, Calendar, User as UserIcon, Building2, Edit, Trash2, Tag, Box, ListTodo, PlusCircle, MinusCircle, Clock, CheckSquare, Users, Target, AlertCircle, Shield, Coins, Landmark, RefreshCcw } from 'lucide-react';
+import { ArrowLeft, Plus, Calendar, User as UserIcon, Building2, Edit, Trash2, Tag, Box, ListTodo, PlusCircle, MinusCircle, Clock, CheckSquare, Users, Target, AlertCircle, Shield, Coins, Landmark, RefreshCcw, ChevronDown, ChevronRight, FileText } from 'lucide-react';
 import CurrencyInput from './CurrencyInput';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
@@ -27,6 +27,16 @@ interface ProjectDetailProps {
 }
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#FF6B6B'];
+
+// Requirement 4: Standard Milestones
+const STANDARD_MILESTONES = [
+    { key: 'CONTACT', name: '1. Tiếp xúc, giới thiệu sản phẩm' },
+    { key: 'DEMO', name: '2. Demo, POC' },
+    { key: 'PROPOSAL', name: '3. Phối hợp xây dựng hồ sơ đề xuất, chủ trương' },
+    { key: 'BIDDING', name: '4. Đấu thầu, ký Hợp đồng' },
+    { key: 'DEPLOY', name: '5. Triển khai' },
+    { key: 'ACCEPTANCE', name: '6. Nghiệm thu, xuất hoá đơn' },
+];
 
 const ProjectDetail: React.FC<ProjectDetailProps> = ({ 
   project, contracts, categories, user, partners, users, statuses, tasks,
@@ -106,7 +116,9 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
     assignerId: user.id, // Defaults to current user
     assigneeId: '',
     collaboratorIds: [],
-    taskType: TaskType.PROJECT // Default to Project type in this view
+    taskType: TaskType.PROJECT,
+    parentId: undefined,
+    milestoneKey: undefined
   };
   const [taskForm, setTaskForm] = useState<Partial<Task>>(initialTaskState);
 
@@ -137,21 +149,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
   
   // Filter only PROJECT tasks for this project
   const projectTasks = useMemo(() => {
-      return tasks
-        .filter(t => t.projectId === project.id) // Simply filter by project ID, assuming if it has project ID it belongs here
-        .sort((a, b) => {
-             const priority = { 
-                 [TaskStatus.EXTENSION_REQUESTED]: 0, 
-                 [TaskStatus.IN_PROGRESS]: 1, 
-                 [TaskStatus.NOT_STARTED]: 2, 
-                 [TaskStatus.CANCELLED]: 3,
-                 [TaskStatus.COMPLETED]: 4 
-             };
-             if (priority[a.status] !== priority[b.status]) {
-                 return priority[a.status] - priority[b.status];
-             }
-             return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
-        });
+      return tasks.filter(t => t.projectId === project.id);
   }, [tasks, project.id]);
   
   const stats = useMemo(() => {
@@ -283,6 +281,14 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
       }));
   };
 
+  // Requirement 3: Change status of installment in modal
+  const handleUpdateInstallmentStatus = (id: string, status: InstallmentStatus) => {
+      setContractForm(prev => ({
+          ...prev,
+          installments: prev.installments?.map(i => i.id === id ? { ...i, status } : i) || []
+      }));
+  };
+
   const handleSaveContract = (e: React.FormEvent) => {
     e.preventDefault();
     if (!contractForm.categoryId) return;
@@ -332,7 +338,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
     }
   };
 
-  const handleOpenTaskModal = (task?: Task) => {
+  const handleOpenTaskModal = (task?: Task, parentId?: string) => {
       if(task) {
           setTaskForm({
               ...task,
@@ -343,7 +349,8 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
               ...initialTaskState,
               projectId: project.id,
               assignerId: user.id,
-              taskType: TaskType.PROJECT // Enforce Project type
+              taskType: TaskType.PROJECT,
+              parentId: parentId // Set parent ID if creating subtask
           });
       }
       setIsTaskModalOpen(true);
@@ -354,15 +361,14 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
       
       const finalTask = {
           ...taskForm,
-          projectId: project.id, // Ensure correct project ID
-          taskType: TaskType.PROJECT, // Ensure type is PROJECT
+          projectId: project.id, 
+          taskType: TaskType.PROJECT,
           collaboratorIds: taskForm.collaboratorIds || []
       } as Task;
 
       if(finalTask.id) {
           onUpdateTask(finalTask);
       } else {
-          // Allow API to generate ID
           onAddTask(finalTask);
       }
       setIsTaskModalOpen(false);
@@ -624,7 +630,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                 <div className="h-6 w-px bg-slate-300 mx-1"></div>
                 <button 
                     onClick={() => {
-                        if (activeTab === 'TASKS') handleOpenTaskModal();
+                        if (activeTab === 'TASKS') handleOpenTaskModal(); // Create a general task or milestone if needed
                         else handleOpenContractModal();
                     }}
                     className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2 font-medium shadow-sm"
@@ -642,7 +648,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                     { id: 'OVERVIEW', label: 'Tổng quan' },
                     { id: 'OUTPUT', label: 'Doanh thu (Đầu ra)' },
                     { id: 'INPUT', label: 'Chi phí (Đầu vào)' },
-                    { id: 'TASKS', label: 'Công việc (Project Task)' },
+                    { id: 'TASKS', label: 'Các mốc công việc' }, // Updated Label
                     // Show Obligation tab only for Admin
                     ...(isAdmin ? [{ id: 'OBLIGATION', label: 'Nghĩa vụ Khách hàng' }] : []),
                 ].map(tab => (
@@ -811,71 +817,112 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
         )}
 
         {activeTab === 'TASKS' && (
-            <div className="animate-in slide-in-from-bottom-2 duration-300">
-                <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-                    <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
-                        <h3 className="font-bold text-slate-700">Danh sách công việc dự án</h3>
-                        <span className="text-xs text-slate-500">{projectTasks.length} nhiệm vụ</span>
-                    </div>
-                    <div className="divide-y divide-slate-100">
-                        {projectTasks.length === 0 ? (
-                             <div className="p-8 text-center text-slate-400">Chưa có công việc nào trong dự án này.</div>
-                        ) : (
-                            projectTasks.map(task => {
-                                const isLate = task.deadline < new Date().toISOString().split('T')[0] && task.status !== TaskStatus.COMPLETED && task.status !== TaskStatus.CANCELLED;
-                                const statusInfo = taskStatusLabels[task.status] || taskStatusLabels[TaskStatus.NOT_STARTED];
-                                
-                                return (
-                                    <div key={task.id} className="p-4 hover:bg-slate-50 flex items-start justify-between group flex-col md:flex-row gap-4">
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <h4 className="font-bold text-slate-800">{task.name}</h4>
-                                                {isLate && <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold border border-red-200 flex items-center gap-0.5"><AlertCircle className="w-3 h-3"/> Trễ hạn</span>}
+            <div className="animate-in slide-in-from-bottom-2 duration-300 space-y-4">
+                {STANDARD_MILESTONES.map((milestone) => {
+                    const milestoneTask = projectTasks.find(t => t.milestoneKey === milestone.key);
+                    const subTasks = projectTasks.filter(t => t.parentId === milestoneTask?.id);
+                    
+                    const isLate = milestoneTask && new Date(milestoneTask.deadline) < new Date() && milestoneTask.status !== TaskStatus.COMPLETED && milestoneTask.status !== TaskStatus.CANCELLED;
+                    
+                    return (
+                        <div key={milestone.key} className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                            {/* Milestone Header */}
+                            <div className="bg-slate-50 p-4 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                <div className="flex-1">
+                                    <div className="flex items-center gap-2">
+                                        <h4 className="font-bold text-slate-800 text-base">{milestone.name}</h4>
+                                        {milestoneTask && (
+                                            <span className={`px-2 py-0.5 rounded text-xs font-bold ${taskStatusLabels[milestoneTask.status]?.color}`}>
+                                                {taskStatusLabels[milestoneTask.status]?.label}
+                                            </span>
+                                        )}
+                                    </div>
+                                    
+                                    {milestoneTask ? (
+                                        <div className="flex flex-wrap gap-4 mt-2 text-sm text-slate-600">
+                                            <div className="flex items-center gap-1">
+                                                <UserIcon className="w-3 h-3 text-slate-400" />
+                                                Chủ trì: <strong>{getAssigneeName(milestoneTask.assigneeId)}</strong>
                                             </div>
-                                            {task.description && <p className="text-sm text-slate-600 mb-2 line-clamp-2">{task.description}</p>}
-                                            
-                                            <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500 mt-2">
-                                                <span className="flex items-center gap-1 bg-slate-100 px-2 py-1 rounded">
-                                                    <UserIcon className="w-3 h-3 text-slate-400" /> 
-                                                    Chủ trì: <span className="font-medium text-slate-700">{getAssigneeName(task.assigneeId)}</span>
-                                                </span>
-                                                <span className="flex items-center gap-1 bg-slate-100 px-2 py-1 rounded">
-                                                    <Clock className="w-3 h-3 text-slate-400" /> 
-                                                    Deadline: <span className={`font-medium ${isLate ? 'text-red-600' : 'text-slate-700'}`}>{new Date(task.deadline).toLocaleDateString('vi-VN')}</span>
-                                                </span>
-                                                {task.outputStandard && (
-                                                    <span className="flex items-center gap-1 bg-indigo-50 px-2 py-1 rounded border border-indigo-100 text-indigo-700">
-                                                        <Target className="w-3 h-3" /> Output: {task.outputStandard}
-                                                    </span>
-                                                )}
+                                            <div className="flex items-center gap-1">
+                                                <Clock className="w-3 h-3 text-slate-400" />
+                                                Hạn: <span className={isLate ? 'text-red-600 font-bold' : ''}>{new Date(milestoneTask.deadline).toLocaleDateString('vi-VN')}</span>
                                             </div>
                                         </div>
+                                    ) : (
+                                        <div className="text-xs text-slate-400 mt-1 italic">Chưa khởi tạo mốc này</div>
+                                    )}
+                                </div>
 
-                                        <div className="flex items-center gap-3 self-end md:self-center">
+                                <div className="flex items-center gap-2">
+                                    {milestoneTask ? (
+                                        <>
                                             <select 
-                                                value={task.status}
-                                                onChange={(e) => onUpdateTask({...task, status: e.target.value as TaskStatus})}
-                                                className={`text-xs border rounded px-2 py-1.5 outline-none font-medium cursor-pointer ${statusInfo.color.replace('text-', 'border-').replace('bg-', 'focus:ring-')}`}
+                                                value={milestoneTask.status}
+                                                onChange={(e) => onUpdateTask({...milestoneTask, status: e.target.value as TaskStatus})}
+                                                className="text-xs border border-slate-300 rounded px-2 py-1.5 outline-none bg-white cursor-pointer hover:border-indigo-300"
                                             >
                                                 {Object.entries(taskStatusLabels).map(([key, val]) => (
                                                     <option key={key} value={key}>{val.label}</option>
                                                 ))}
                                             </select>
-                                            <div className="flex gap-1">
-                                                <button onClick={() => handleOpenTaskModal(task)} className="p-1.5 text-slate-400 hover:text-indigo-600 rounded bg-slate-50 hover:bg-indigo-50 border border-slate-200">
-                                                    <Edit className="w-4 h-4" />
-                                                </button>
-                                                <button onClick={() => handleDeleteTaskItem(task.id)} className="p-1.5 text-slate-400 hover:text-red-600 rounded bg-slate-50 hover:bg-red-50 border border-slate-200">
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
+                                            <button onClick={() => handleOpenTaskModal(milestoneTask)} className="p-1.5 bg-white border border-slate-200 rounded hover:bg-slate-50 text-slate-500">
+                                                <Edit className="w-4 h-4" />
+                                            </button>
+                                            <button 
+                                                onClick={() => handleOpenTaskModal(undefined, milestoneTask.id)}
+                                                className="text-xs flex items-center gap-1 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded hover:bg-indigo-100 font-medium"
+                                            >
+                                                <PlusCircle className="w-3 h-3" /> Việc con
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <button 
+                                            onClick={() => {
+                                                // Create Milestone Task on the fly if missing (should be auto-created but good fallback)
+                                                handleOpenTaskModal({
+                                                    ...initialTaskState,
+                                                    name: milestone.name,
+                                                    milestoneKey: milestone.key,
+                                                    projectId: project.id
+                                                } as Task);
+                                            }}
+                                            className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded hover:bg-indigo-700 font-medium"
+                                        >
+                                            Khởi tạo
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Subtasks List */}
+                            {subTasks.length > 0 && (
+                                <div className="bg-white p-2 space-y-1">
+                                    {subTasks.map(st => (
+                                        <div key={st.id} className="flex items-center justify-between p-2 hover:bg-slate-50 rounded group border border-transparent hover:border-slate-100 ml-4 border-l-2 border-l-slate-200">
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm font-medium text-slate-700">{st.name}</span>
+                                                    <span className={`text-[10px] px-1.5 rounded border ${taskStatusLabels[st.status]?.color.replace('bg-', 'border-').replace('text-', 'text-')}`}>
+                                                        {taskStatusLabels[st.status]?.label}
+                                                    </span>
+                                                </div>
+                                                <div className="text-xs text-slate-500 flex gap-3 mt-0.5">
+                                                    <span>{getAssigneeName(st.assigneeId)}</span>
+                                                    <span>{new Date(st.deadline).toLocaleDateString('vi-VN')}</span>
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button onClick={() => handleOpenTaskModal(st)} className="p-1 text-slate-400 hover:text-indigo-600"><Edit className="w-3 h-3" /></button>
+                                                <button onClick={() => handleDeleteTaskItem(st.id)} className="p-1 text-slate-400 hover:text-red-600"><Trash2 className="w-3 h-3" /></button>
                                             </div>
                                         </div>
-                                    </div>
-                                )
-                            })
-                        )}
-                    </div>
-                </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
             </div>
         )}
 
@@ -1113,9 +1160,6 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                         <datalist id="partners-list">
                             {partners
                                 // Filter partners based on Contract Type:
-                                // If Revenue (OUTPUT) -> Show Customers
-                                // If Cost (INPUT) -> Show Suppliers
-                                // If Category not selected -> Show all (or strictly follow type logic)
                                 .filter(p => {
                                     if (!currentCategoryType) return true;
                                     if (currentCategoryType === CategoryType.REVENUE) return p.type === PartnerType.CUSTOMER || !p.type;
@@ -1166,12 +1210,21 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                                 <span className="col-span-2 text-xs text-slate-500 text-center">
                                     {ins.revenueMonth ? `Kỳ: ${ins.revenueMonth}` : 'Chưa chọn kỳ'}
                                 </span>
-                                <span className={`col-span-2 text-xs px-1 py-0.5 rounded text-center ${
-                                    ins.status === InstallmentStatus.PAID ? 'bg-green-100 text-green-700' :
-                                    ins.status === InstallmentStatus.INVOICED ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 text-slate-600'
-                                }`}>
-                                    {ins.status === InstallmentStatus.PAID ? 'Đã TT' : ins.status === InstallmentStatus.INVOICED ? 'Đã xuất HĐ' : 'Kế hoạch'}
-                                </span>
+                                {/* Requirement 3: Editable Status */}
+                                <div className="col-span-2 text-center">
+                                    <select 
+                                        className={`text-[10px] w-full border rounded px-1 py-0.5 outline-none cursor-pointer ${
+                                            ins.status === InstallmentStatus.PAID ? 'bg-green-100 text-green-700 border-green-200' :
+                                            ins.status === InstallmentStatus.INVOICED ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-slate-200 text-slate-600 border-slate-300'
+                                        }`}
+                                        value={ins.status}
+                                        onChange={(e) => handleUpdateInstallmentStatus(ins.id, e.target.value as InstallmentStatus)}
+                                    >
+                                        <option value={InstallmentStatus.PLANNING}>Kế hoạch</option>
+                                        <option value={InstallmentStatus.INVOICED}>Đã xuất HĐ</option>
+                                        <option value={InstallmentStatus.PAID}>Đã thanh toán</option>
+                                    </select>
+                                </div>
                                 <button type="button" onClick={() => handleRemoveInstallment(ins.id)} className="col-span-1 text-red-500 hover:bg-red-50 p-1 rounded flex justify-center">
                                     <MinusCircle className="w-4 h-4" />
                                 </button>
@@ -1294,10 +1347,25 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
               <div className="bg-white rounded-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
                   <h2 className="text-xl font-bold mb-4 text-slate-800">{taskForm.id ? 'Sửa Nhiệm vụ' : 'Thêm Nhiệm vụ Mới'}</h2>
                   <form onSubmit={handleSaveTask} className="space-y-4">
+                      {/* Hidden milestone key if any */}
+                      {taskForm.milestoneKey && (
+                          <div className="bg-blue-50 p-3 rounded-lg text-sm text-blue-800 mb-2 border border-blue-200">
+                              Đây là công việc thuộc mốc: <strong>{taskForm.name}</strong>
+                          </div>
+                      )}
+
                       <div className="grid grid-cols-2 gap-4">
                           <div className="col-span-2">
                               <label className="block text-sm font-medium text-slate-700 mb-1">Tên nhiệm vụ <span className="text-red-500">*</span></label>
-                              <input required type="text" className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" value={taskForm.name} onChange={e => setTaskForm({...taskForm, name: e.target.value})} placeholder="VD: Khảo sát hiện trạng..." />
+                              <input 
+                                required 
+                                type="text" 
+                                className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" 
+                                value={taskForm.name} 
+                                onChange={e => setTaskForm({...taskForm, name: e.target.value})} 
+                                placeholder="VD: Khảo sát hiện trạng..." 
+                                disabled={!!taskForm.milestoneKey} // Disable name edit for standard milestones to keep consistency
+                              />
                           </div>
                           
                           <div className="col-span-2">

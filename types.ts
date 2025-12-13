@@ -221,6 +221,10 @@ export interface Task {
     collaboratorIds?: string[]; // Người phối
     status: TaskStatus;
     deadline: string;
+    
+    // For standard project milestones
+    milestoneKey?: string; // 'CONTACT' | 'DEMO' | 'PROPOSAL' | 'BIDDING' | 'DEPLOY' | 'ACCEPTANCE'
+    parentId?: string; // Sub-task logic
 }
 
 export interface KPIGroup {
