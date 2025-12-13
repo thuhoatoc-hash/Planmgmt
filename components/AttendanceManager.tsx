@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { User, AttendanceRecord, AttendanceStatusConfig, OvertimeType, UserRole, ApprovalStatus } from '../types';
-import { Clock, CheckCircle, Plus, User as UserIcon, ArrowLeft, ArrowRight, Moon, Briefcase, MapPin, AlignLeft, List, ShieldCheck, AlertCircle, X, Check } from 'lucide-react';
+import { Clock, CheckCircle, Plus, User as UserIcon, ArrowLeft, ArrowRight, Moon, Briefcase, MapPin, AlignLeft, List, ShieldCheck, AlertCircle, X, Check, Filter, Trash2, Edit } from 'lucide-react';
 
 interface AttendanceManagerProps {
   currentUser: User;
@@ -25,7 +25,10 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUser, user
   
   // Modals State
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isApprovalListOpen, setIsApprovalListOpen] = useState(false); // New state for Approval List Modal
+  const [isApprovalListOpen, setIsApprovalListOpen] = useState(false); 
+  
+  // Management List Filter State
+  const [manageFilterStatus, setManageFilterStatus] = useState<string>('PENDING'); // PENDING | APPROVED | REJECTED | ALL
   
   const [formRecord, setFormRecord] = useState<Partial<AttendanceRecord>>({});
 
@@ -52,7 +55,7 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUser, user
   const prevMonth = () => setSelectedDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 1, 1));
   const nextMonth = () => setSelectedDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 1));
 
-  // --- FILTERED DATA ---
+  // --- FILTERED DATA FOR CALENDAR ---
   const currentMonthRecords = useMemo(() => {
       const startStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}`;
       return records.filter(r => r.date.startsWith(startStr) && r.userId === selectedUserId);
@@ -65,20 +68,24 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUser, user
 
   const getStatusConfig = (id: string) => displayStatuses.find(s => s.id === id);
 
-  // --- PENDING RECORDS LOGIC ---
-  const pendingRecords = useMemo(() => {
+  // --- MANAGEMENT LIST LOGIC ---
+  const managementRecords = useMemo(() => {
       if (!isAdmin) return [];
-      return records
-        .filter(r => r.approvalStatus === ApprovalStatus.PENDING)
-        .sort((a,b) => b.date.localeCompare(a.date)); // Newest first
-  }, [records, isAdmin]);
+      let filtered = [...records];
+      
+      // Filter by status
+      if (manageFilterStatus !== 'ALL') {
+          filtered = filtered.filter(r => r.approvalStatus === manageFilterStatus);
+      }
+      
+      return filtered.sort((a,b) => b.date.localeCompare(a.date)); // Newest first
+  }, [records, isAdmin, manageFilterStatus]);
+
+  const pendingCount = records.filter(r => r.approvalStatus === ApprovalStatus.PENDING).length;
 
   // --- MODAL HANDLERS ---
   const handleDayClick = (day: number) => {
       const date = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), day);
-      const dayOfWeek = date.getDay(); // 0 = Sun, 6 = Sat
-      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-
       const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       const existing = getRecordForDay(day);
       
@@ -93,7 +100,7 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUser, user
               statusId: defaultStatus?.id || '',
               startTime: '08:00',
               endTime: '17:30',
-              overtime: isWeekend ? OvertimeType.WEEKEND : OvertimeType.NONE, // Auto suggest OT if weekend
+              overtime: OvertimeType.NONE, // REQUIREMENT 1: Always Default to NONE
               overtimeReason: '',
               overtimeDate: dateStr, 
               overtimeStartTime: '18:00',
@@ -104,6 +111,12 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUser, user
           });
       }
       setIsModalOpen(true);
+  };
+
+  const handleEditFromList = (record: AttendanceRecord) => {
+      setFormRecord({ ...record });
+      setIsModalOpen(true);
+      // setIsApprovalListOpen(false); // Optional: keep list open behind? Better to close to avoid z-index mess or confusion
   };
 
   const handleSave = (e: React.FormEvent) => {
@@ -117,10 +130,25 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUser, user
           let diff = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
           if (diff < 0) diff += 24; // Handle overnight
           otHours = parseFloat(diff.toFixed(1));
+      } else {
+          // If User switched back to NO OT, clear these values
+          formRecord.overtimeReason = '';
+          formRecord.overtimeDate = formRecord.date;
       }
 
-      // APPROVAL LOGIC
-      const status = isAdmin ? ApprovalStatus.APPROVED : (formRecord.approvalStatus || ApprovalStatus.PENDING);
+      // REQUIREMENT 2: Approval Logic
+      // If Admin is saving -> APPROVED immediately (or keep existing status if they are just editing details)
+      // If User is saving -> Always PENDING (unless they are editing a draft, but here simplicity = Pending)
+      let status = formRecord.approvalStatus || ApprovalStatus.PENDING;
+      
+      if (isAdmin) {
+          // Admin always approves by default when creating/editing, unless they explicitly set it to REJECTED in the form (not implemented in form UI yet, usually done via buttons)
+          // For simplicity: Admin edits = Approved
+          status = ApprovalStatus.APPROVED;
+      } else {
+          // Normal user: Always reset to PENDING on edit/create to require re-approval
+          status = ApprovalStatus.PENDING;
+      }
       
       const record = { 
           ...formRecord,
@@ -143,8 +171,6 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUser, user
           approvalStatus: ApprovalStatus.APPROVED, 
           reviewerId: currentUser.id 
       });
-      // Don't close list modal to allow multiple approvals
-      if (isModalOpen) setIsModalOpen(false);
   };
 
   const handleReject = (record: AttendanceRecord) => {
@@ -154,7 +180,6 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUser, user
           approvalStatus: ApprovalStatus.REJECTED, 
           reviewerId: currentUser.id 
       });
-      if (isModalOpen) setIsModalOpen(false);
   };
 
   return (
@@ -168,18 +193,21 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUser, user
                 <p className="text-slate-500">Đăng ký lịch công tác, nghỉ phép và làm thêm giờ (OT)</p>
             </div>
             
-            {/* User Selector & Approval Badge */}
+            {/* Admin Controls */}
             {isAdmin && (
                 <div className="flex items-center gap-4">
-                    {pendingRecords.length > 0 && (
-                        <button 
-                            onClick={() => setIsApprovalListOpen(true)}
-                            className="bg-amber-100 text-amber-700 text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-2 animate-pulse hover:bg-amber-200 transition-colors shadow-sm"
-                        >
-                            <AlertCircle className="w-4 h-4" /> 
-                            {pendingRecords.length} đơn chờ duyệt
-                        </button>
-                    )}
+                    <button 
+                        onClick={() => { setManageFilterStatus('PENDING'); setIsApprovalListOpen(true); }}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold transition-colors shadow-sm ${
+                            pendingCount > 0 
+                            ? 'bg-amber-100 text-amber-700 hover:bg-amber-200 animate-pulse border border-amber-200' 
+                            : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                        }`}
+                    >
+                        {pendingCount > 0 ? <AlertCircle className="w-4 h-4" /> : <List className="w-4 h-4" />}
+                        {pendingCount > 0 ? `${pendingCount} Chờ duyệt` : 'Danh sách & Phê duyệt'}
+                    </button>
+
                     <div className="flex items-center gap-2 bg-white p-1 rounded-lg border border-slate-200 shadow-sm">
                         <div className="px-2 text-slate-400"><UserIcon className="w-4 h-4" /></div>
                         <select 
@@ -333,17 +361,45 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUser, user
             </div>
         </div>
 
-        {/* --- APPROVAL LIST MODAL (NEW) --- */}
+        {/* --- MANAGEMENT LIST MODAL (REPLACES APPROVAL LIST) --- */}
         {isApprovalListOpen && (
             <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                <div className="bg-white rounded-xl max-w-4xl w-full p-6 shadow-xl max-h-[90vh] overflow-y-auto">
+                <div className="bg-white rounded-xl max-w-5xl w-full p-6 shadow-xl max-h-[90vh] overflow-y-auto">
                     <div className="flex justify-between items-center mb-6">
                         <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                             <ShieldCheck className="w-6 h-6 text-indigo-600" />
-                            Duyệt Đăng ký ({pendingRecords.length})
+                            Quản lý & Phê duyệt Chấm công
                         </h2>
                         <button onClick={() => setIsApprovalListOpen(false)} className="text-slate-400 hover:text-slate-600">
                             <X className="w-6 h-6" />
+                        </button>
+                    </div>
+
+                    {/* Filter Bar */}
+                    <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+                        <button 
+                            onClick={() => setManageFilterStatus('PENDING')}
+                            className={`px-4 py-2 rounded-full text-sm font-bold transition-colors whitespace-nowrap flex items-center gap-2 ${manageFilterStatus === 'PENDING' ? 'bg-amber-100 text-amber-700 ring-2 ring-amber-500' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                        >
+                            <AlertCircle className="w-4 h-4" /> Chờ duyệt ({records.filter(r => r.approvalStatus === 'PENDING').length})
+                        </button>
+                        <button 
+                            onClick={() => setManageFilterStatus('APPROVED')}
+                            className={`px-4 py-2 rounded-full text-sm font-bold transition-colors whitespace-nowrap flex items-center gap-2 ${manageFilterStatus === 'APPROVED' ? 'bg-emerald-100 text-emerald-700 ring-2 ring-emerald-500' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                        >
+                            <CheckCircle className="w-4 h-4" /> Đã duyệt
+                        </button>
+                        <button 
+                            onClick={() => setManageFilterStatus('REJECTED')}
+                            className={`px-4 py-2 rounded-full text-sm font-bold transition-colors whitespace-nowrap flex items-center gap-2 ${manageFilterStatus === 'REJECTED' ? 'bg-red-100 text-red-700 ring-2 ring-red-500' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                        >
+                            <X className="w-4 h-4" /> Đã từ chối
+                        </button>
+                        <button 
+                            onClick={() => setManageFilterStatus('ALL')}
+                            className={`px-4 py-2 rounded-full text-sm font-bold transition-colors whitespace-nowrap flex items-center gap-2 ${manageFilterStatus === 'ALL' ? 'bg-indigo-100 text-indigo-700 ring-2 ring-indigo-500' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                        >
+                            <List className="w-4 h-4" /> Tất cả
                         </button>
                     </div>
 
@@ -356,22 +412,23 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUser, user
                                     <th className="px-4 py-3">Loại hình</th>
                                     <th className="px-4 py-3">Thời gian / OT</th>
                                     <th className="px-4 py-3">Lý do / Ghi chú</th>
+                                    <th className="px-4 py-3 text-center">Trạng thái</th>
                                     <th className="px-4 py-3 text-right">Thao tác</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {pendingRecords.length === 0 ? (
+                                {managementRecords.length === 0 ? (
                                     <tr>
-                                        <td colSpan={6} className="px-4 py-8 text-center text-slate-400 italic">
-                                            Không có đơn nào cần duyệt.
+                                        <td colSpan={7} className="px-4 py-8 text-center text-slate-400 italic">
+                                            Không có bản ghi nào.
                                         </td>
                                     </tr>
                                 ) : (
-                                    pendingRecords.map(record => {
+                                    managementRecords.map(record => {
                                         const user = users.find(u => u.id === record.userId);
                                         const status = getStatusConfig(record.statusId);
                                         return (
-                                            <tr key={record.id} className="hover:bg-slate-50">
+                                            <tr key={record.id} className="hover:bg-slate-50 group">
                                                 <td className="px-4 py-3 font-medium text-slate-800">{user?.fullName || 'Unknown'}</td>
                                                 <td className="px-4 py-3">{new Date(record.date).toLocaleDateString('vi-VN')}</td>
                                                 <td className="px-4 py-3">
@@ -391,23 +448,51 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUser, user
                                                     {record.note && <div className="truncate" title={record.note}>{record.note}</div>}
                                                     {record.overtimeReason && <div className="text-xs text-purple-700 font-medium mt-0.5">{record.overtimeReason}</div>}
                                                 </td>
+                                                <td className="px-4 py-3 text-center">
+                                                    <span className={`px-2 py-1 rounded text-xs font-bold ${
+                                                        record.approvalStatus === ApprovalStatus.APPROVED ? 'bg-emerald-100 text-emerald-700' :
+                                                        record.approvalStatus === ApprovalStatus.REJECTED ? 'bg-red-100 text-red-700' :
+                                                        'bg-amber-100 text-amber-700'
+                                                    }`}>
+                                                        {record.approvalStatus}
+                                                    </span>
+                                                </td>
                                                 <td className="px-4 py-3 text-right">
-                                                    <div className="flex justify-end gap-2">
-                                                        <button 
-                                                            onClick={() => handleApprove(record)}
-                                                            className="p-1.5 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 rounded shadow-sm"
-                                                            title="Duyệt"
-                                                        >
-                                                            <Check className="w-4 h-4" />
-                                                        </button>
-                                                        <button 
-                                                            onClick={() => handleReject(record)}
-                                                            className="p-1.5 bg-red-100 text-red-700 hover:bg-red-200 rounded shadow-sm"
-                                                            title="Từ chối"
-                                                        >
-                                                            <X className="w-4 h-4" />
-                                                        </button>
-                                                    </div>
+                                                    {record.approvalStatus === ApprovalStatus.PENDING ? (
+                                                        <div className="flex justify-end gap-2">
+                                                            <button 
+                                                                onClick={() => handleApprove(record)}
+                                                                className="p-1.5 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 rounded shadow-sm"
+                                                                title="Duyệt"
+                                                            >
+                                                                <Check className="w-4 h-4" />
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => handleReject(record)}
+                                                                className="p-1.5 bg-red-100 text-red-700 hover:bg-red-200 rounded shadow-sm"
+                                                                title="Từ chối"
+                                                            >
+                                                                <X className="w-4 h-4" />
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => handleEditFromList(record)}
+                                                                className="p-1.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded shadow-sm"
+                                                                title="Sửa"
+                                                            >
+                                                                <Edit className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex justify-end gap-2">
+                                                            <button 
+                                                                onClick={() => handleEditFromList(record)}
+                                                                className="p-1.5 text-slate-400 hover:text-blue-600 rounded"
+                                                                title="Sửa chi tiết"
+                                                            >
+                                                                <Edit className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
+                                                    )}
                                                 </td>
                                             </tr>
                                         );
@@ -513,7 +598,7 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUser, user
                             </div>
                         </div>
 
-                        {/* 3. OT Section */}
+                        {/* 3. OT Section - Conditional Render */}
                         <div className="bg-purple-50 p-4 rounded-lg border border-purple-100">
                             <div className="flex justify-between items-center mb-2">
                                 <label className="block text-sm font-bold text-purple-800 flex items-center gap-2">
@@ -616,7 +701,7 @@ const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUser, user
                         <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
                             <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium">Hủy</button>
                             <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium shadow-sm">
-                                {isAdmin ? 'Lưu thay đổi' : 'Gửi đăng ký'}
+                                {isAdmin ? 'Lưu & Duyệt' : 'Gửi đăng ký'}
                             </button>
                         </div>
                     </form>
