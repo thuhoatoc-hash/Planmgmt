@@ -1,9 +1,20 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Project, Contract, Category, ContractType, CategoryType, ProjectType, ProductType, User, Partner, ProjectStatusItem, UserRole, Task, TaskStatus, ContractInstallment, InstallmentStatus, TaskType, CustomerObligation, ObligationStatus, FundingSource, FundingSourceStatus, PartnerType } from '../types';
-import { ArrowLeft, Plus, Calendar, User as UserIcon, Building2, Edit, Trash2, Tag, Box, ListTodo, PlusCircle, MinusCircle, Clock, CheckSquare, Users, Target, AlertCircle, Shield, Coins, Landmark, RefreshCcw, ChevronDown, ChevronRight, FileText } from 'lucide-react';
+import { ArrowLeft, Plus, Calendar, User as UserIcon, Building2, Edit, Trash2, Tag, Box, ListTodo, PlusCircle, MinusCircle, Clock, CheckSquare, Users, Target, Shield, Coins, Landmark, RefreshCcw } from 'lucide-react';
 import CurrencyInput from './CurrencyInput';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+
+// UUID Generator Polyfill
+const generateUUID = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
 
 interface ProjectDetailProps {
   project: Project;
@@ -28,11 +39,11 @@ interface ProjectDetailProps {
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#FF6B6B'];
 
-// Requirement 4: Standard Milestones
+// Requirement 4: Standard Milestones (Updated)
 const STANDARD_MILESTONES = [
     { key: 'CONTACT', name: '1. Tiếp xúc, giới thiệu sản phẩm' },
     { key: 'DEMO', name: '2. Demo, POC' },
-    { key: 'PROPOSAL', name: '3. Phối hợp xây dựng hồ sơ đề xuất, chủ trương' },
+    { key: 'PROPOSAL', name: '3. Xây dựng hồ sơ đề xuất, chủ trương' },
     { key: 'BIDDING', name: '4. Đấu thầu, ký Hợp đồng' },
     { key: 'DEPLOY', name: '5. Triển khai' },
     { key: 'ACCEPTANCE', name: '6. Nghiệm thu, xuất hoá đơn' },
@@ -259,7 +270,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
       if (!newInstallment.name || !newInstallment.value) return;
       const item: ContractInstallment = {
           ...newInstallment as ContractInstallment,
-          id: `ins_${Date.now()}`
+          id: generateUUID()
       };
       setContractForm(prev => ({
           ...prev,
@@ -309,7 +320,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
     } else {
         onAddContract({
             ...finalContract,
-            id: `ctr_${Date.now()}`,
+            id: generateUUID(),
         });
     }
     setIsContractModalOpen(false);
@@ -369,7 +380,11 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
       if(finalTask.id) {
           onUpdateTask(finalTask);
       } else {
-          onAddTask(finalTask);
+          // New task with UUID
+          onAddTask({
+              ...finalTask,
+              id: generateUUID()
+          });
       }
       setIsTaskModalOpen(false);
   }
@@ -392,7 +407,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
   // --- OBLIGATION HANDLERS ---
   const handleAddFundingSource = () => {
       const newSource: FundingSource = {
-          id: `fs_${Date.now()}`,
+          id: generateUUID(),
           name: '',
           value: 0,
           status: FundingSourceStatus.PENDING

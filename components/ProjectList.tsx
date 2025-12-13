@@ -5,6 +5,17 @@ import { Plus, Search, Calendar, ChevronRight, User as UserIcon, Building2, Edit
 import CurrencyInput from './CurrencyInput';
 import { api } from '../services/api';
 
+// UUID Generator Polyfill
+const generateUUID = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
 interface ProjectListProps {
   projects: Project[];
   contracts: Contract[];
@@ -118,10 +129,10 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, contracts, users, p
     if (formData.id) {
         onUpdateProject(formData as Project);
     } else {
-        // Fix TS2783
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { id: _id, ...restProject } = formData as Project;
-        const projectId = `prj_${Date.now()}`;
+        // Generate UUID for new project to ensure consistency
+        const projectId = generateUUID();
         const project: Project = {
           ...restProject,
           id: projectId,
@@ -129,11 +140,11 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, contracts, users, p
         onAddProject(project);
 
         // --- AUTO GENERATE STANDARD MILESTONES ---
-        // Requirement 4: Auto create tasks for key milestones
+        // Requirement: Default 6 tasks with updated names
         const milestones = [
             { key: 'CONTACT', name: '1. Tiếp xúc, giới thiệu sản phẩm' },
             { key: 'DEMO', name: '2. Demo, POC' },
-            { key: 'PROPOSAL', name: '3. Phối hợp xây dựng hồ sơ đề xuất, chủ trương' },
+            { key: 'PROPOSAL', name: '3. Xây dựng hồ sơ đề xuất, chủ trương' },
             { key: 'BIDDING', name: '4. Đấu thầu, ký Hợp đồng' },
             { key: 'DEPLOY', name: '5. Triển khai' },
             { key: 'ACCEPTANCE', name: '6. Nghiệm thu, xuất hoá đơn' },
@@ -141,7 +152,7 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, contracts, users, p
 
         for (const m of milestones) {
             const task: Task = {
-                id: `task_${Date.now()}_${m.key}`,
+                id: generateUUID(),
                 projectId: projectId,
                 name: m.name,
                 taskType: TaskType.PROJECT,
@@ -151,7 +162,7 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, contracts, users, p
                 assigneeId: formData.amId || '', // Default to AM
                 milestoneKey: m.key
             };
-            // Call API directly to ensure they are created in DB
+            // Call API directly to ensure they are created in DB immediately
             await api.tasks.save(task);
         }
     }

@@ -3,6 +3,17 @@ import React, { useState } from 'react';
 import { Partner, Project, Contract, ContractType, PartnerType } from '../types';
 import { Briefcase, Plus, Edit, Trash2, Phone, X, FileText, Folder, Users, Truck } from 'lucide-react';
 
+// UUID Generator Polyfill
+const generateUUID = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
 interface PartnerManagerProps {
   partners: Partner[];
   projects: Project[];
@@ -34,7 +45,7 @@ const PartnerManager: React.FC<PartnerManagerProps> = ({ partners, projects, con
     if (editing.id) {
       onUpdate(editing as Partner);
     } else {
-      onAdd({ ...editing, id: `partner_${Date.now()}` } as Partner);
+      onAdd({ ...editing, id: generateUUID() } as Partner);
     }
     setIsModalOpen(false);
   };
