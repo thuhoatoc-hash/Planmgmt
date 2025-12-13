@@ -176,8 +176,60 @@ export const api = {
       delete: (id: string) => remove('attendance_statuses', id),
   },
   savedReports: {
-      getAll: () => fetchAll<SavedReport>('saved_reports'),
-      save: (r: SavedReport) => upsert<SavedReport>('saved_reports', r),
+      // Map Snake_case (DB) <-> CamelCase (App) manually for this table due to mixed conventions
+      getAll: async () => {
+          const { data, error } = await supabase.from('saved_reports').select('*');
+          if (error) {
+              console.error("Error fetching saved_reports:", error);
+              return [];
+          }
+          return data.map((r: any) => ({
+              id: r.id,
+              title: r.title,
+              periodType: r.period_type,
+              startDate: r.start_date,
+              endDate: r.end_date,
+              content: r.content,
+              createdAt: r.createdAt || r.created_at, 
+              updatedAt: r.updatedAt || r.updated_at
+          })) as SavedReport[];
+      },
+      save: async (r: SavedReport) => {
+          const payload = {
+              id: r.id,
+              title: r.title,
+              period_type: r.periodType,
+              start_date: r.startDate,
+              end_date: r.endDate,
+              content: r.content,
+              "createdAt": r.createdAt, // Case-sensitive column added manually
+              "updatedAt": r.updatedAt
+          };
+          
+          const { data, error } = await supabase.from('saved_reports').upsert(payload).select().single();
+          
+          if (error) {
+              console.error(`Error saving report:`, error);
+              let msg = error.message;
+              if (msg.includes('violates not-null constraint')) {
+                  msg = `Dữ liệu thiếu trường bắt buộc: ${msg}`;
+              }
+              alert(`Lỗi lưu dữ liệu: ${msg}`);
+              return null;
+          }
+          
+          const res = data as any;
+          return {
+              id: res.id,
+              title: res.title,
+              periodType: res.period_type,
+              startDate: res.start_date,
+              endDate: res.end_date,
+              content: res.content,
+              createdAt: res.createdAt || res.created_at,
+              updatedAt: res.updatedAt || res.updated_at
+          } as SavedReport;
+      },
       delete: (id: string) => remove('saved_reports', id),
   },
   logs: {
