@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { LayoutDashboard, FolderKanban, LogOut, Menu, X, Settings, BarChart3, Download, Target, Award, CheckSquare, CalendarDays, Signal, Bell, Clock } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, LogOut, Menu, X, Settings, BarChart3, Download, Target, Award, CheckSquare, CalendarDays, Signal, Bell, Clock, FileText } from 'lucide-react';
 import { User, Role, UserRole, ResourceType } from '../types';
 import BannerSlider from './BannerSlider';
 
@@ -28,6 +28,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, roles = [], onLogout, c
       'evaluation': 'EVALUATION',
       'events': 'EVENTS',
       'reports': 'REPORTS',
+      'weekly_report': 'REPORTS', // New Item maps to REPORTS permission
       'notifications': 'NOTIFICATIONS',
       'settings': 'CONFIG'
   };
@@ -55,12 +56,13 @@ const Layout: React.FC<LayoutProps> = ({ children, user, roles = [], onLogout, c
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'attendance', label: 'Điểm danh', icon: Clock },
+    { id: 'weekly_report', label: 'Báo cáo tuần', icon: FileText }, // New Menu Item
     { id: 'tasks', label: 'Quản lý Nhiệm vụ', icon: CheckSquare }, 
     { id: 'projects', label: 'Dự án', icon: FolderKanban },
     { id: 'kpi', label: 'Điều hành chỉ tiêu', icon: Target },
     { id: 'evaluation', label: 'Đánh giá KI', icon: Award },
     { id: 'events', label: 'Sự kiện (Sinh nhật)', icon: CalendarDays },
-    { id: 'reports', label: 'Báo cáo', icon: BarChart3 },
+    { id: 'reports', label: 'Thống kê & Biểu đồ', icon: BarChart3 },
     { id: 'notifications', label: 'Thông báo', icon: Bell },
     { id: 'settings', label: 'Cấu hình hệ thống', icon: Settings }
   ].filter(item => canViewMenu(item.id));
@@ -217,7 +219,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user, roles = [], onLogout, c
                     © {new Date().getFullYear()} Khối Giải pháp Công nghệ thông tin - Viettel Hà Nội
                 </p>
                 <p className="text-[10px] text-slate-400">
-                    Hệ thống Quản lý Phương án Kinh doanh & KPI • Version 1.3
+                    Hệ thống Quản lý Phương án Kinh doanh & KPI • Version 1.4
                 </p>
              </div>
           </footer>

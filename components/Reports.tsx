@@ -311,8 +311,9 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
            <h1 className="text-2xl font-bold text-slate-800">Báo cáo & Thống kê</h1>
            <p className="text-slate-500">Phân tích hiệu quả hoạt động kinh doanh, công việc và nhân sự</p>
         </div>
+        
         <div className="flex gap-2">
-             <button 
+            <button 
                 onClick={() => {
                     if(activeTab === 'GENERAL') exportToCSV(generalData, `Bao_Cao_Tong_Hop`);
                     if(activeTab === 'COST') exportToCSV(costData, `Bao_Cao_Chi_Phi`);
@@ -325,9 +326,9 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
                     }
                 }}
                 className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 flex items-center gap-2 shadow-sm font-medium"
-             >
+            >
                 <Download className="w-4 h-4" /> Xuất Excel
-             </button>
+            </button>
         </div>
       </div>
 
@@ -417,6 +418,7 @@ const Reports: React.FC<ReportsProps> = ({ projects, contracts, categories, user
       </div>
 
       {/* --- CONTENT AREA --- */}
+
       {activeTab === 'GENERAL' && (
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm animate-in slide-in-from-bottom-2">
               <table className="w-full text-left text-sm">

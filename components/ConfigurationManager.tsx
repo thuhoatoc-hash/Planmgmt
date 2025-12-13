@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ProjectStatusItem, User, Partner, Category, Project, Contract, Role, UserFieldDefinition, AttendanceStatusConfig, AttendanceSystemConfig } from '../types';
+import { ProjectStatusItem, User, Partner, Category, Project, Contract, Role, UserFieldDefinition, AttendanceStatusConfig, AttendanceSystemConfig, Task, KPIMonthlyData } from '../types';
 import { Edit, Trash2, List, Settings, Users, Tags, Briefcase, Shield, Settings2, Image, Clock, ToggleLeft, ToggleRight, Save, Loader2 } from 'lucide-react';
 import UserManager from './UserManager';
 import PartnerManager from './PartnerManager';
@@ -20,6 +20,8 @@ interface ConfigurationManagerProps {
   projects: Project[]; 
   contracts: Contract[];
   attendanceStatuses: AttendanceStatusConfig[];
+  tasks: Task[];
+  kpiData: KPIMonthlyData[];
   
   onAddStatus: (s: ProjectStatusItem) => void;
   onUpdateStatus: (s: ProjectStatusItem) => void;
@@ -42,7 +44,7 @@ interface ConfigurationManagerProps {
 }
 
 const ConfigurationManager: React.FC<ConfigurationManagerProps> = ({ 
-  statuses, users, partners, categories, projects, contracts, attendanceStatuses,
+  statuses, users, partners, categories, projects, contracts, attendanceStatuses, tasks, kpiData,
   onAddStatus, onUpdateStatus, onDeleteStatus,
   onAddUser, onUpdateUser, onDeleteUser,
   onAddPartner, onUpdatePartner, onDeletePartner,

@@ -14,6 +14,7 @@ import TaskManagement from './components/TaskManagement';
 import EventManager from './components/EventManager';
 import NotificationManager from './components/NotificationManager';
 import AttendanceManager from './components/AttendanceManager';
+import WeeklyReportGenerator from './components/WeeklyReportGenerator';
 import { User, Project, Contract, Category, Partner, ProjectStatusItem, Task, KPIMonthlyData, EmployeeEvaluation, TaskStatus, BirthdayEvent, Role, UserRole, ResourceType, Notification, AttendanceRecord, AttendanceStatusConfig } from './types';
 import { api } from './services/api';
 import { Loader2 } from 'lucide-react';
@@ -497,6 +498,13 @@ const App: React.FC = () => {
               attendanceStatuses={attendanceStatuses}
             />
           )}
+          {currentPath === 'weekly_report' && (
+            <WeeklyReportGenerator 
+              projects={projects}
+              tasks={tasks}
+              kpiData={kpiData}
+            />
+          )}
           {currentPath === 'kpi' && (
             <KPIManagement 
               kpiData={kpiData}
@@ -539,6 +547,8 @@ const App: React.FC = () => {
               projects={projects}
               contracts={contracts}
               attendanceStatuses={attendanceStatuses}
+              tasks={tasks}
+              kpiData={kpiData}
               onAddStatus={handleAddStatus}
               onUpdateStatus={handleUpdateStatus}
               onDeleteStatus={handleDeleteStatus}
