@@ -446,6 +446,9 @@ const App: React.FC = () => {
               events={events}
               roles={roles}
               notifications={notifications}
+              attendanceRecords={attendanceRecords}
+              attendanceStatuses={attendanceStatuses}
+              onUpdateAttendanceRecord={handleUpdateAttendanceRecord}
               onNavigate={navigateTo}
             />
           )}

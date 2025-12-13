@@ -1,8 +1,8 @@
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Project, Contract, ContractType, Category, CategoryType, KPIMonthlyData, Task, User, TaskStatus, InstallmentStatus, EmployeeEvaluation, UserRole, BirthdayEvent, Role, Notification, NotificationPriority } from '../types';
-import { Wallet, TrendingUp, TrendingDown, Activity, Settings, Check, X, SlidersHorizontal, CheckSquare, Award, AlertTriangle, Target, Gift, Phone, ClipboardList, Move, GripHorizontal, Bell, Info } from 'lucide-react';
+import { Project, Contract, ContractType, Category, CategoryType, KPIMonthlyData, Task, User, TaskStatus, InstallmentStatus, EmployeeEvaluation, UserRole, BirthdayEvent, Role, Notification, NotificationPriority, AttendanceRecord, AttendanceStatusConfig, ApprovalStatus, OvertimeType } from '../types';
+import { Wallet, TrendingUp, TrendingDown, Activity, Settings, Check, X, SlidersHorizontal, CheckSquare, Award, AlertTriangle, Target, Gift, Phone, ClipboardList, Move, GripHorizontal, Bell, Info, Clock, CheckCircle2, XCircle } from 'lucide-react';
 
 interface DashboardProps {
   currentUser?: User | null;
@@ -16,6 +16,9 @@ interface DashboardProps {
   events?: BirthdayEvent[];
   roles?: Role[];
   notifications?: Notification[];
+  attendanceRecords?: AttendanceRecord[]; // Added
+  attendanceStatuses?: AttendanceStatusConfig[]; // Added
+  onUpdateAttendanceRecord?: (r: AttendanceRecord) => void; // Added for Quick Approve
   onNavigate?: (path: string, id?: string) => void;
 }
 
@@ -37,18 +40,19 @@ const DEFAULT_CONFIG = {
   showDueTasks: true,
   showBirthdays: true,
   showNotifications: true,
+  showAttendanceDaily: true, // New config
 };
 
 // Widget Definitions for Drag and Drop
-type WidgetType = 'sales' | 'cost' | 'profit' | 'revenue' | 'my_tasks' | 'due_tasks' | 'birthdays' | 'kpi' | 'task_am' | 'task_project' | 'eval' | 'fin_project' | 'fin_category' | 'notifications';
+type WidgetType = 'sales' | 'cost' | 'profit' | 'revenue' | 'my_tasks' | 'due_tasks' | 'birthdays' | 'kpi' | 'task_am' | 'task_project' | 'eval' | 'fin_project' | 'fin_category' | 'notifications' | 'attendance_daily';
 
 const DEFAULT_ORDER: WidgetType[] = [
     // 0. Thông báo (Important)
     'notifications',
     // 1. Chỉ tiêu điều hành (KPI)
     'kpi', 
-    // 2. Việc cần làm (My Tasks) & Sinh nhật
-    'my_tasks', 'birthdays', 
+    // 2. Việc cần làm & Sinh nhật & Chấm công (Daily Ops)
+    'attendance_daily', 'birthdays', 'my_tasks', 
     // 3. Doanh thu, doanh số, chi phí, lợi nhuận (Finance)
     'revenue', 'sales', 'cost', 'profit', 
     // 4. Đánh giá nhân viên
@@ -59,7 +63,12 @@ const DEFAULT_ORDER: WidgetType[] = [
     'due_tasks', 'fin_project', 'fin_category'
 ];
 
-const Dashboard: React.FC<DashboardProps> = ({ currentUser, projects, contracts, categories, kpiData = [], tasks = [], users = [], evaluations = [], events = [], roles = [], notifications = [], onNavigate }) => {
+const Dashboard: React.FC<DashboardProps> = ({ 
+    currentUser, projects, contracts, categories, kpiData = [], tasks = [], users = [], 
+    evaluations = [], events = [], roles = [], notifications = [], 
+    attendanceRecords = [], attendanceStatuses = [], onUpdateAttendanceRecord,
+    onNavigate 
+}) => {
   // State for customization
   const [config, setConfig] = useState(DEFAULT_CONFIG);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
@@ -69,6 +78,8 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, projects, contracts,
   const [isDragMode, setIsDragMode] = useState(false);
   const [widgetOrder, setWidgetOrder] = useState<WidgetType[]>(DEFAULT_ORDER);
   const [draggedItem, setDraggedItem] = useState<number | null>(null);
+
+  const isAdmin = currentUser?.role === UserRole.ADMIN;
 
   // Helper to check permission
   const canViewEvaluation = useMemo(() => {
@@ -88,16 +99,15 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, projects, contracts,
         setConfig({ ...DEFAULT_CONFIG, ...JSON.parse(savedConfig) });
       }
       
-      // Use v2 key to force reset order for users who had old order cached
-      const savedOrder = localStorage.getItem('pm_dashboard_order_v3'); // Increment to v3 for new widget
+      // Use v4 key to include new widget
+      const savedOrder = localStorage.getItem('pm_dashboard_order_v4'); 
       if (savedOrder) {
           // Merge saved order with default to handle new widgets if any
           const parsedOrder = JSON.parse(savedOrder);
           const validOrder = parsedOrder.filter((id: string) => DEFAULT_ORDER.includes(id as WidgetType));
           const missing = DEFAULT_ORDER.filter(id => !validOrder.includes(id));
-          setWidgetOrder([...missing, ...validOrder]); // Put missing (new) widgets at top usually
+          setWidgetOrder([...missing, ...validOrder]); 
       } else {
-          // Use default order if no saved order
           setWidgetOrder(DEFAULT_ORDER);
       }
     } catch (e) {
@@ -108,7 +118,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, projects, contracts,
   // Save order when changed
   const handleOrderChange = (newOrder: WidgetType[]) => {
       setWidgetOrder(newOrder);
-      localStorage.setItem('pm_dashboard_order_v3', JSON.stringify(newOrder));
+      localStorage.setItem('pm_dashboard_order_v4', JSON.stringify(newOrder));
   };
 
   // Close config panel when clicking outside
@@ -132,11 +142,10 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, projects, contracts,
   const onDragStart = (e: React.DragEvent, index: number) => {
       setDraggedItem(index);
       e.dataTransfer.effectAllowed = "move";
-      // Optional: Set a drag image if needed
   };
 
   const onDragOver = (e: React.DragEvent) => {
-      e.preventDefault(); // Necessary to allow dropping
+      e.preventDefault(); 
   };
 
   const onDrop = (e: React.DragEvent, dropIndex: number) => {
@@ -375,6 +384,42 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, projects, contracts,
       return [...notifications].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 5);
   }, [notifications]);
 
+  // --- Daily Attendance Logic ---
+  const dailyAttendance = useMemo(() => {
+      const todayStr = new Date().toISOString().split('T')[0];
+      return attendanceRecords
+        .filter(r => r.date === todayStr)
+        .sort((a, b) => {
+            // Pending first
+            if (a.approvalStatus === ApprovalStatus.PENDING && b.approvalStatus !== ApprovalStatus.PENDING) return -1;
+            if (a.approvalStatus !== ApprovalStatus.PENDING && b.approvalStatus === ApprovalStatus.PENDING) return 1;
+            // Then by time
+            return (a.startTime || '').localeCompare(b.startTime || '');
+        });
+  }, [attendanceRecords]);
+
+  // --- Quick Approval Handlers ---
+  const handleQuickApprove = (e: React.MouseEvent, record: AttendanceRecord) => {
+      e.stopPropagation();
+      if (!onUpdateAttendanceRecord || !currentUser) return;
+      onUpdateAttendanceRecord({
+          ...record,
+          approvalStatus: ApprovalStatus.APPROVED,
+          reviewerId: currentUser.id
+      });
+  };
+
+  const handleQuickReject = (e: React.MouseEvent, record: AttendanceRecord) => {
+      e.stopPropagation();
+      if (!window.confirm("Từ chối đăng ký này?")) return;
+      if (!onUpdateAttendanceRecord || !currentUser) return;
+      onUpdateAttendanceRecord({
+          ...record,
+          approvalStatus: ApprovalStatus.REJECTED,
+          reviewerId: currentUser.id
+      });
+  };
+
   const StatCard = ({ title, value, subValue, icon: Icon, colorClass, onClick }: any) => (
     <div 
         onClick={isDragMode ? undefined : onClick}
@@ -401,6 +446,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, projects, contracts,
           case 'fin_project': return 'col-span-1 md:col-span-2';
           case 'fin_category': return 'col-span-1 md:col-span-2';
           case 'my_tasks': return 'col-span-1 md:col-span-2 lg:col-span-2';
+          case 'attendance_daily': return 'col-span-1 md:col-span-2 lg:col-span-2'; // New attendance widget size
           case 'due_tasks': return 'col-span-1 md:col-span-2 lg:col-span-1';
           case 'birthdays': return 'col-span-1 md:col-span-2 lg:col-span-1';
           case 'eval': return 'col-span-1 md:col-span-2 lg:col-span-4'; // Eval full width or 2/3
@@ -466,7 +512,6 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, projects, contracts,
                       <h3 className="flex items-center gap-2 text-slate-800 font-bold mb-3 flex-shrink-0">
                           <Bell className="w-5 h-5 text-[#EE0033]" /> Thông báo mới nhất
                       </h3>
-                      {/* FIX: Use flex-grow and allow scrolling or better grid distribution */}
                       <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 overflow-y-auto">
                           {latestNotifications.map(notif => {
                               const priorityColor = 
@@ -483,11 +528,100 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, projects, contracts,
                                           </div>
                                           <span className="text-[10px] text-slate-500 whitespace-nowrap ml-2">{new Date(notif.createdAt).toLocaleDateString('vi-VN')}</span>
                                       </div>
-                                      {/* Updated: Increased line clamp for desktop and better handling */}
                                       <p className="text-xs text-slate-600 line-clamp-2 md:line-clamp-4 leading-relaxed">{notif.content}</p>
                                   </div>
                               );
                           })}
+                      </div>
+                  </div>
+              ) : null;
+          case 'attendance_daily':
+              return config.showAttendanceDaily ? (
+                  <div 
+                    onClick={() => !isDragMode && onNavigate && onNavigate('attendance')}
+                    className={`bg-white border border-slate-200 rounded-xl p-4 h-full shadow-sm overflow-hidden flex flex-col ${!isDragMode ? 'cursor-pointer hover:border-indigo-300' : ''}`}
+                  >
+                      <h3 className="flex items-center justify-between text-slate-800 font-bold mb-3 flex-shrink-0">
+                          <div className="flex items-center gap-2">
+                              <Clock className="w-5 h-5 text-indigo-600" /> Chấm công & OT Hôm nay
+                          </div>
+                          <span className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500 font-normal">
+                              {new Date().toLocaleDateString('vi-VN')}
+                          </span>
+                      </h3>
+                      
+                      <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                          {dailyAttendance.length === 0 ? (
+                              <div className="h-full flex items-center justify-center text-slate-400 text-sm italic">
+                                  Chưa có đăng ký nào hôm nay.
+                              </div>
+                          ) : (
+                              dailyAttendance.map(record => {
+                                  const user = users.find(u => u.id === record.userId);
+                                  const status = attendanceStatuses.find(s => s.id === record.statusId);
+                                  
+                                  return (
+                                      <div key={record.id} className="p-2.5 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-between">
+                                          <div className="min-w-0 flex-1 pr-2">
+                                              <div className="flex items-center gap-2">
+                                                  <span className="font-bold text-sm text-slate-800 truncate">{user?.fullName}</span>
+                                                  {record.approvalStatus === ApprovalStatus.PENDING && (
+                                                      <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" title="Chờ duyệt"></span>
+                                                  )}
+                                              </div>
+                                              <div className="flex items-center gap-2 mt-1">
+                                                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold border ${status?.color || 'bg-slate-200 border-slate-300'}`}>
+                                                      {status?.name || '---'}
+                                                  </span>
+                                                  <span className="text-xs text-slate-500 flex items-center gap-1">
+                                                      {record.startTime} - {record.endTime}
+                                                  </span>
+                                                  {record.overtime !== OvertimeType.NONE && (
+                                                      <span className="text-[10px] font-bold text-purple-600 bg-purple-100 px-1.5 rounded">OT: {record.overtimeHours}h</span>
+                                                  )}
+                                              </div>
+                                          </div>
+                                          
+                                          {/* Actions / Status */}
+                                          {isAdmin ? (
+                                              record.approvalStatus === ApprovalStatus.PENDING ? (
+                                                  <div className="flex gap-1">
+                                                      <button 
+                                                          onClick={(e) => handleQuickApprove(e, record)}
+                                                          className="p-1.5 bg-emerald-100 text-emerald-600 rounded hover:bg-emerald-200"
+                                                          title="Duyệt"
+                                                      >
+                                                          <CheckCircle2 className="w-4 h-4" />
+                                                      </button>
+                                                      <button 
+                                                          onClick={(e) => handleQuickReject(e, record)}
+                                                          className="p-1.5 bg-red-100 text-red-600 rounded hover:bg-red-200"
+                                                          title="Từ chối"
+                                                      >
+                                                          <XCircle className="w-4 h-4" />
+                                                      </button>
+                                                  </div>
+                                              ) : (
+                                                  <div className={`text-xs font-bold px-2 py-1 rounded ${
+                                                      record.approvalStatus === ApprovalStatus.APPROVED ? 'text-emerald-600 bg-emerald-50' : 'text-red-600 bg-red-50'
+                                                  }`}>
+                                                      {record.approvalStatus === ApprovalStatus.APPROVED ? 'Đã duyệt' : 'Từ chối'}
+                                                  </div>
+                                              )
+                                          ) : (
+                                              <div className={`text-[10px] font-bold px-2 py-1 rounded border ${
+                                                  record.approvalStatus === ApprovalStatus.APPROVED ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                                  record.approvalStatus === ApprovalStatus.REJECTED ? 'bg-red-50 text-red-700 border-red-200' :
+                                                  'bg-amber-50 text-amber-700 border-amber-200'
+                                              }`}>
+                                                  {record.approvalStatus === ApprovalStatus.APPROVED ? 'Đã duyệt' :
+                                                   record.approvalStatus === ApprovalStatus.REJECTED ? 'Từ chối' : 'Chờ duyệt'}
+                                              </div>
+                                          )}
+                                      </div>
+                                  );
+                              })
+                          )}
                       </div>
                   </div>
               ) : null;
@@ -864,6 +998,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, projects, contracts,
                 <div className="space-y-2 max-h-80 overflow-y-auto">
                   {[
                     { key: 'showNotifications', label: 'Thông báo' },
+                    { key: 'showAttendanceDaily', label: 'Chấm công & OT Hôm nay' }, // Added
                     { key: 'showSales', label: 'Thẻ Doanh số' },
                     { key: 'showCost', label: 'Thẻ Chi phí' },
                     { key: 'showProfit', label: 'Thẻ Lợi nhuận' },
