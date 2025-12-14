@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { Project, Contract, ContractType, KPIMonthlyData, Task, User, TaskStatus, InstallmentStatus, EmployeeEvaluation, BirthdayEvent, Role, Notification, NotificationPriority, AttendanceRecord, AttendanceStatusConfig, ApprovalStatus, OvertimeType, NotificationType, Category, KPIItem } from '../types';
-import { Settings, Move, GripHorizontal, Bell, Clock, ChevronLeft, ChevronRight, PartyPopper, BarChart3, ClipboardList, CheckSquare, Gift, Award, AlertTriangle, CheckCircle, Trophy, Smile, Meh, Frown, Activity, DollarSign, Wallet, TrendingUp, Calendar, LayoutTemplate, Rows, FolderOpen } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Cell } from 'recharts';
+import { Project, Contract, ContractType, KPIMonthlyData, Task, User, TaskStatus, InstallmentStatus, EmployeeEvaluation, BirthdayEvent, Role, Notification, NotificationPriority, AttendanceRecord, AttendanceStatusConfig, ApprovalStatus, OvertimeType, NotificationType, Category } from '../types';
+import { Settings, Move, GripHorizontal, Bell, Clock, ChevronLeft, ChevronRight, PartyPopper, BarChart3, ClipboardList, Gift, Award, AlertTriangle, Trophy, Smile, Meh, Frown, Activity, FolderOpen } from 'lucide-react';
 
 interface DashboardProps {
   currentUser?: User | null;
@@ -56,8 +56,10 @@ const Dashboard: React.FC<DashboardProps> = ({
     onNavigate 
 }) => {
   // State for customization
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [config, setConfig] = useState(DEFAULT_CONFIG);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const configRef = useRef<HTMLDivElement>(null);
 
   // Drag and Drop State
@@ -221,6 +223,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                           {isCelebration ? notif.title + ' - ' : ''}{notif.content}
                                       </p>
                                   </div>
+                                  {/* Update: Show thumbnail on the right if available */}
                                   {notif.imageUrl && (
                                       <div className="w-10 h-10 shrink-0 rounded-md overflow-hidden border border-black/5 bg-white">
                                           <img src={notif.imageUrl} alt="" className="w-full h-full object-cover" />
@@ -615,8 +618,8 @@ const Dashboard: React.FC<DashboardProps> = ({
           return diffDays >= 0 && diffDays <= 2; 
       }).length;
 
-      // Active Projects Count
-      const activeProjects = projects.filter(p => p.statusId !== 'st7').length; // st7 = Completed
+      // Active Projects Count (Not completed 'st7')
+      const activeProjects = projects.filter(p => p.statusId !== 'st7').length; 
 
       return (
           <div 
